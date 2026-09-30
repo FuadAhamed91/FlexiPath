@@ -1,0 +1,18 @@
+# dependencies & build output
+node_modules/
+dist/
+.vite/
+
+# benchmark output (regenerate with `npm run benchmark`)
+results/
+
+# Blender autosaves / caches
+*.blend1
+__pycache__/
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/

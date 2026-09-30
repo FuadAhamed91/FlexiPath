@@ -1,0 +1,34 @@
+{
+  "name": "flexipath",
+  "private": true,
+  "version": "1.0.0",
+  "description": "FlexiPath - zero-disruption heterogeneous network mobility digital twin (ATRC Advanced Technology Pioneers 2026 - EDGE Challenge)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "benchmark": "node scripts/benchmark.js",
+    "models": "blender -b -P blender/generate_all_models.py"
+  },
+  "keywords": [
+    "multipath",
+    "handover",
+    "wifi",
+    "5g",
+    "leo-satellite",
+    "three.js",
+    "digital-twin"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "chart.js": "^4.5.1",
+    "lucide": "^1.49.0",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.3.1"
+  }
+}
