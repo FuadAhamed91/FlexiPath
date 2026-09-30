@@ -44,6 +44,7 @@ model is built from Three.js primitives, so the app never fails on assets.
 | `npm run models` | Regenerate the six GLB assets with headless Blender (`blender` on `PATH`) |
 
 URL parameters make demos reproducible: `?seed=2026&speed=90&focus=legacy&camera=overview&paused=1`.
+Add `models=procedural` to force the built-in primitive models instead of the GLBs.
 
 ---
 

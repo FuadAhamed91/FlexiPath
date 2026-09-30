@@ -193,7 +193,7 @@ export class Dashboard {
             <p class="font-mono text-[9px] tracking-[0.14em] text-slate-500">ATRC ADVANCED TECHNOLOGY PIONEERS 2026 · EDGE CHALLENGE</p>
           </div>
         </div>
-        <div class="flex min-w-0 flex-1 items-center justify-center gap-2 overflow-hidden">
+        <div class="flex min-w-0 flex-1 items-center justify-center gap-2 overflow-hidden max-xl:order-last max-xl:basis-full max-xl:justify-start">
           <div class="state-pill min-w-0" data-ref="pill" aria-live="polite">
             <span class="dot shrink-0"></span><span class="shrink-0" data-ref="pillText">INITIALISING</span>
             <span class="truncate font-mono text-[10px] font-semibold tracking-[0.04em] opacity-75" data-ref="pillDetail"></span>

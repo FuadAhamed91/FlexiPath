@@ -19,8 +19,13 @@ const loader = new GLTFLoader();
 const MODEL_BASE = `${import.meta.env?.BASE_URL ?? './'}models/`;
 const OUTAGE_TINT = new THREE.Color('#ff2d55');
 
+/** `?models=procedural` forces the primitive fallbacks (handy for comparison or broken assets). */
+const FORCE_PROCEDURAL =
+  typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('models') === 'procedural';
+
 /** Load a GLB if it exists; resolves to null (never throws) so callers can fall back. */
 export async function loadGLB(file) {
+  if (FORCE_PROCEDURAL) return null;
   const url = `${MODEL_BASE}${file}`;
   try {
     const head = await fetch(url, { method: 'HEAD', cache: 'no-cache' });
