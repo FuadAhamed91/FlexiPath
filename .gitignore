@@ -16,3 +16,6 @@ Thumbs.db
 *.log
 .vscode/
 .idea/
+
+# Claude Code desktop preview config
+.claude/
