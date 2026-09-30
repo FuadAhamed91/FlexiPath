@@ -1,0 +1,58 @@
+{
+  "generator": "blender/generate_all_models.py",
+  "version": "1.0.0",
+  "blender": "5.2.2 LTS",
+  "generatedAt": "2026-09-30T18:50:19Z",
+  "conventions": {
+    "up": "+Y (glTF)",
+    "vehicleForward": "+X",
+    "anchors": {
+      "vehicles": "AntennaAnchor",
+      "nodes": "BeamAnchor"
+    },
+    "wheels": [
+      "Wheel_FL",
+      "Wheel_FR",
+      "Wheel_RL",
+      "Wheel_RR"
+    ]
+  },
+  "assets": [
+    {
+      "file": "flexipath_vehicle.glb",
+      "bytes": 64632,
+      "faces": 1066,
+      "objects": 25
+    },
+    {
+      "file": "legacy_vehicle.glb",
+      "bytes": 64576,
+      "faces": 1066,
+      "objects": 25
+    },
+    {
+      "file": "wired_node.glb",
+      "bytes": 69336,
+      "faces": 1180,
+      "objects": 10
+    },
+    {
+      "file": "wifi_node.glb",
+      "bytes": 34656,
+      "faces": 632,
+      "objects": 8
+    },
+    {
+      "file": "5g_tower.glb",
+      "bytes": 83360,
+      "faces": 834,
+      "objects": 9
+    },
+    {
+      "file": "leo_satellite.glb",
+      "bytes": 101340,
+      "faces": 1472,
+      "objects": 9
+    }
+  ]
+}

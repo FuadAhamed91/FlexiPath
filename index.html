@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#030712" />
+    <title>FlexiPath · Multi-Link Convergence HUD</title>
+    <meta
+      name="description"
+      content="FlexiPath digital twin — predictive multi-path replication keeps sessions unbroken across wired, Wi-Fi 6, 5G SA and LEO satellite links."
+    />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Orbitron:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body class="h-full overflow-hidden bg-void font-sans text-slate-200 antialiased">
+    <div id="app" class="h-full"></div>
+
+    <div id="boot-splash" class="boot-splash" role="status" aria-live="polite">
+      <div class="boot-core">
+        <svg viewBox="0 0 64 64" class="boot-glyph" aria-hidden="true">
+          <path d="M6 44 C 20 44, 22 20, 32 20 S 44 44, 58 44" fill="none" stroke="#00F0FF" stroke-width="3" stroke-linecap="round" />
+          <path d="M6 44 C 20 44, 24 32, 32 32 S 44 44, 58 44" fill="none" stroke="#A855F7" stroke-width="3" stroke-linecap="round" opacity=".85" />
+          <circle cx="6" cy="44" r="4" fill="#00F0FF" />
+          <circle cx="58" cy="44" r="4" fill="#10B981" />
+        </svg>
+        <div class="boot-title">FLEXIPATH</div>
+        <div class="boot-sub" id="boot-status">Initialising digital twin…</div>
+        <div class="boot-bar"><span></span></div>
+      </div>
+    </div>
+
+    <noscript>
+      <p style="padding: 2rem; font-family: sans-serif">FlexiPath needs JavaScript and WebGL to run.</p>
+    </noscript>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

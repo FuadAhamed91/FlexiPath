@@ -20,7 +20,7 @@
     "three.js",
     "digital-twin"
   ],
-  "license": "MIT",
+  "license": "UNLICENSED",
   "dependencies": {
     "chart.js": "^4.5.1",
     "lucide": "^1.49.0",
