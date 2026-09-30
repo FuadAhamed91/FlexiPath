@@ -100,7 +100,7 @@ export const RF = {
   cell: {
     p1: -11.65,
     exponent: 3.8,
-    urbanShadowDb: 18,
+    urbanShadowDb: 14,
     terrainStartX: 165,
     terrainDbPerUnit: 0.62,
     terrainMaxDb: 60,
@@ -112,7 +112,7 @@ export const RF = {
 };
 
 export const FAULTS = {
-  'wifi-fade': { label: 'Rapid Wi-Fi fade', rampUp: 1.5, hold: 6.0, rampDown: 2.5, depthDb: 38 },
+  'wifi-fade': { label: 'Rapid Wi-Fi fade', rampUp: 1.5, hold: 6.0, rampDown: 2.5, depthDb: 46 },
   'cell-outage': { label: '5G cell outage', duration: 12.0, recover: 1.0 },
 };
 

@@ -35,6 +35,10 @@ export const FLEXIPATH_PARAMS = {
   upgradeMinReplicationS: 0.5,
   predictionHorizonS: 2.0,
   ttfTriggerS: 3.0,
+  ttfMarginDb: 10, // only extrapolate time-to-failure within 10 dB of the failure level
+  ttfConfirmTicks: 2, // TTF must persist for 200 ms
+  abortMarginDb: 13, // stand down only once the margin has recovered past this (3 dB hysteresis)
+  rapidFadeSlope: 12, // dB/s — a collapse this steep is never mobility or shadowing
   minSignalSlope: 0.8, // dB/s — slower drifts are treated as probe noise
   rttDriftFactor: 0.25, // RTT slope > 25 % of baseline per second …
   rttDriftLevel: 1.6, // … while RTT > 1.6 × baseline
@@ -172,12 +176,19 @@ export class FlexiPathController {
     };
     const predictedCritical = linkScore(predicted, SCORE_PROFILES.CRITICAL, p.alpha);
 
+    // Time-to-failure: linear extrapolation of the smoothed signal towards the
+    // level where PER reaches the 15 % switch threshold. Gated to the last
+    // `ttfMarginDb` so shadow-fading ripples far from the edge cannot trigger it.
     let ttf = Infinity;
+    let margin = Infinity;
     if (spec.tech === 'wired') {
       if (ctx.dockRelease) ttf = ctx.dockTtf ?? 0;
-    } else if (m.sig.slope < -p.minSignalSlope) {
-      ttf = Math.max(0, (m.sig.value - failureSignalLevel(spec, p.switchLoss)) / -m.sig.slope);
+    } else {
+      margin = m.sig.value - failureSignalLevel(spec, p.switchLoss);
+      if (m.sig.slope < -p.minSignalSlope && margin < p.ttfMarginDb) ttf = Math.max(0, margin / -m.sig.slope);
     }
+
+    m.ttfHits = ttf < p.ttfTriggerS ? (m.ttfHits ?? 0) + 1 : 0;
 
     const loss = m.loss.value ?? 0;
     const rtt = m.rtt.value ?? spec.baseRtt;
@@ -185,11 +196,13 @@ export class FlexiPathController {
       deltaLoss: m.loss.delta > p.deltaLossTrigger,
       lossRate: loss > p.lossTrigger,
       rttDrift: m.rtt.slope > p.rttDriftFactor * spec.baseRtt && rtt > p.rttDriftLevel * spec.baseRtt,
-      ttf: ttf < p.ttfTriggerS,
+      ttf: spec.tech === 'wired' ? ttf < p.ttfTriggerS : m.ttfHits >= p.ttfConfirmTicks,
+      rapidFade: spec.tech !== 'wired' && m.sig.slope < -p.rapidFadeSlope,
       context: spec.tech === 'wired' && !!ctx.dockRelease,
     };
     const degrading = Object.values(triggers).some(Boolean);
-    const failureImminent = predicted.lossRate > p.switchLoss || ttf < p.ttfTriggerS || triggers.context;
+    const failureImminent =
+      predicted.lossRate > p.switchLoss || triggers.ttf || triggers.rapidFade || triggers.context;
     return {
       link: id,
       loss,
@@ -198,6 +211,7 @@ export class FlexiPathController {
       rttSlope: m.rtt.slope,
       signal: m.sig.value,
       signalSlope: m.sig.slope,
+      marginDb: margin,
       predictedLoss: predicted.lossRate,
       predictedRtt: predicted.rttMs,
       predictedCritical,
@@ -232,6 +246,7 @@ export class FlexiPathController {
     this.upgradeTicks = 0;
     const why = [];
     if (pred?.triggers.context) why.push('dock release');
+    if (pred?.triggers.rapidFade) why.push(`signal collapsing ${pred.signalSlope.toFixed(0)} dB/s`);
     if (pred?.triggers.deltaLoss) why.push(`ΔLoss +${pct(pred.dLoss)}/s`);
     if (pred?.triggers.lossRate) why.push(`loss ${pct(pred.loss)}`);
     if (pred?.triggers.rttDrift) why.push(`RTT drift +${pred.rttSlope.toFixed(1)} ms/s`);
@@ -260,6 +275,7 @@ export class FlexiPathController {
   // ── SWITCH & CONTINUE ──────────────────────────────────────────────────
   _switchTo(next, t, reason, events, { seamless = true, from = this.primary, blackoutMs = 0 } = {}) {
     const replicationS = this.state === 'REPLICATING' ? t - this.replStart : 0;
+    this.monitors[next].ttfHits = 0;
     this.primary = next;
     this.replica = null;
     this.state = 'STEADY';
@@ -416,7 +432,12 @@ export class FlexiPathController {
             this.recoverTicks++;
             if (this.recoverTicks * this.dt >= p.abortDwellS - 1e-9) this._abort(t, 'upgrade no longer beneficial', events);
           } else this.recoverTicks = 0;
-        } else if (!pred.degrading && pred.loss < 0.02 && pred.dLoss <= 0.005 && pred.ttf > 2 * p.predictionHorizonS) {
+        } else if (
+          !pred.degrading &&
+          pred.loss < 0.02 &&
+          pred.dLoss <= 0.005 &&
+          (pred.marginDb > p.abortMarginDb || pred.signalSlope > p.minSignalSlope)
+        ) {
           this.recoverTicks++;
           if (this.recoverTicks * this.dt >= p.abortDwellS - 1e-9) this._abort(t, `${this.primary} recovered`, events);
         } else {
