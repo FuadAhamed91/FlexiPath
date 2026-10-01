@@ -78,7 +78,7 @@ How to read it:
 - **Action vs. path failure** compares when each stack acted with the instant the path it was leaving actually failed
   (EWMA of the true loss > 15 % or link down). Negative = acted before the failure.
 - **Overhead** is replicated bytes / original bytes. Replication is confined to the ~400 ms handoff burst, so it costs
-  ≈ 1 % of protected-flow bytes (Phase 1 replicated for the whole risk window: 9–13 %). E (only protected traffic)
+  ≈ 1 % of protected-flow bytes (Phase 1 replicated for the whole risk window: 6–13 %). E (only protected traffic)
   shows the cost side; F shows that bulk traffic is never duplicated.
 - **Radio power**: FlexiPath draws ≈ 8 % more radio power on average than the single-radio legacy stack (1.32 vs
   1.22 W in A–C) — the price of warm-probing the next modem (1.8 W) and of the 400 ms dual-radio burst (3.4 W). Keeping
