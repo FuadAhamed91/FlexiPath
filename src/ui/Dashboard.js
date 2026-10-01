@@ -1,11 +1,14 @@
 /**
- * Dashboard.js — cockpit HUD layout and component orchestrator.
+ * Dashboard.js — HUD layout and component orchestrator.
  *
- *   header      status banner · connection-state pill · anchor IP · zone · clock
- *   left deck   TelemetryPanel (interface health) + FlowInspector
- *   centre      Three.js viewport + overlays (zone track, camera, playback, legend)
- *   right deck  Controls (stall counters, speed, seed, faults, export) + EventLog
- *   bottom      60 s rolling charts: throughput · latency · packet loss · MOS
+ * Two views over the same simulation (progressive disclosure):
+ *
+ *   MISSION (default)  decision loop · live prediction · "why did FlexiPath do that?" · 3D twin ·
+ *                      traffic-aware protection · Legacy vs FlexiPath lanes
+ *   ADVANCED           decision loop · interface health · prediction internals · flow inspector ·
+ *                      3D twin · controls · event log · 60 s charts (throughput, RTT, loss, MOS)
+ *
+ * Every panel reads the engine snapshot; nothing here holds simulation state of its own.
  */
 import {
   createIcons,
@@ -40,21 +43,37 @@ import {
   CircleHelp,
   Maximize2,
   Minimize2,
+  LayoutDashboard,
+  SlidersHorizontal,
+  Presentation,
+  Info,
+  SkipForward,
 } from 'lucide';
 import { TelemetryPanel } from './TelemetryPanel.js';
 import { FlowInspector } from './FlowInspector.js';
 import { EventLog } from './EventLog.js';
 import { Controls } from './Controls.js';
+import { SystemLoop } from './SystemLoop.js';
+import { PredictionPanel } from './PredictionPanel.js';
+import { DecisionPanel } from './DecisionPanel.js';
+import { TrafficPanel } from './TrafficPanel.js';
+import { ComparisonLanes } from './ComparisonLanes.js';
+import { PredictionInternals } from './PredictionInternals.js';
+import { GuidedDemo } from './GuidedDemo.js';
+import { openExperiments } from './ExperimentPanel.js';
+import { infoHTML } from './InfoContent.js';
+import { esc, tag } from './format.js';
 import { ThroughputChart } from '../charts/ThroughputChart.js';
 import { RTTChart } from '../charts/RTTChart.js';
 import { PacketLossChart } from '../charts/PacketLossChart.js';
 import { QoEChart } from '../charts/QoEChart.js';
 import { SERIES_COLORS } from '../charts/BaseTimeSeriesChart.js';
-import { ANCHOR_IP, DT, MOS_THRESHOLD } from '../simulation/SimulationEngine.js';
+import { ANCHOR_IP, DT, VERSION } from '../simulation/SimulationEngine.js';
 import { ZONES } from '../simulation/NetworkEnvironment.js';
 import { ROUTE_END_X } from '../simulation/MobilityModel.js';
 import { INTERFACE_SPECS } from '../simulation/LinkModel.js';
-import { ExperimentRunner, SCENARIOS } from '../simulation/ExperimentRunner.js';
+import { TRAFFIC_PROFILES } from '../simulation/TrafficManager.js';
+import { LIVE_SCENARIOS, SCENARIOS } from '../simulation/Scenarios.js';
 import { downloadText, timestampedName, toCSV, toJSON } from '../utils/Export.js';
 
 const ICONS = {
@@ -89,6 +108,11 @@ const ICONS = {
   CircleHelp,
   Maximize2,
   Minimize2,
+  LayoutDashboard,
+  SlidersHorizontal,
+  Presentation,
+  Info,
+  SkipForward,
 };
 
 export function renderIcons(root = document) {
@@ -120,10 +144,10 @@ const fmtClock = (t) => {
 };
 
 export class Dashboard {
-  constructor(root, engine) {
+  constructor(root, engine, { mode = 'mission' } = {}) {
     this.root = root;
     this.engine = engine;
-    this.view = { focus: 'flexipath', showGhost: true, camera: 'chase', theatre: false };
+    this.view = { focus: 'flexipath', showGhost: true, camera: 'chase', theatre: false, mode };
     this.hooks = {};
     this.replBands = [];
     this.stallBands = [];
@@ -132,6 +156,12 @@ export class Dashboard {
     this._lastChart = 0;
     this._build();
 
+    this.loop = new SystemLoop(this.refs.loop);
+    this.prediction = new PredictionPanel(this.refs.prediction);
+    this.decision = new DecisionPanel(this.refs.decision);
+    this.traffic = new TrafficPanel(this.refs.traffic);
+    this.lanes = new ComparisonLanes(this.refs.lanes);
+    this.internals = new PredictionInternals(this.refs.internals);
     this.telemetry = new TelemetryPanel(this.refs.telemetry);
     this.flows = new FlowInspector(this.refs.flows);
     this.log = new EventLog(this.refs.log);
@@ -150,7 +180,7 @@ export class Dashboard {
       onReset: () => this.restart(),
       onExportJSON: () => this.exportJSON(),
       onExportCSV: () => this.exportCSV(),
-      onBenchmark: () => this.openBenchmark(),
+      onBenchmark: () => this.openExperiments({ scenario: '__all__' }),
     });
     this.charts = {
       thr: new ThroughputChart(this.root.querySelector('[data-chart="thr"]')),
@@ -165,12 +195,19 @@ export class Dashboard {
         lg: this.root.querySelector(`[data-chart-lg="${key}"]`),
       };
     }
+    this.demo = new GuidedDemo(this);
 
     renderIcons(this.root);
     this._bindOverlay();
+    this._bindToolbar();
     this._bindKeyboard();
     this._subscribe();
+    this.setMode(mode, { quiet: true });
     this._syncFromEngine();
+  }
+
+  renderIcons(root) {
+    renderIcons(root);
   }
 
   // ── Layout ──────────────────────────────────────────────────────────────
@@ -182,15 +219,16 @@ export class Dashboard {
         <div class="seg-z rounded-sm" style="height:6px;background:${z.color}"></div>
       </div>`;
     }).join('');
+    const scenarioOptions = LIVE_SCENARIOS.map((id) => `<option value="${id}">${esc(id === 'mission' ? SCENARIOS[id].label : `${id} · ${SCENARIOS[id].label}`)}</option>`).join('');
 
     this.root.innerHTML = `
-    <div class="flex h-full flex-col overflow-y-auto xl:overflow-hidden">
+    <div class="fp-shell hud-scroll flex h-full flex-col overflow-y-auto" data-ref="shell" data-mode="mission">
       <header class="relative z-10 flex shrink-0 flex-wrap items-center gap-x-5 gap-y-2 border-b border-cyan-400/10 bg-slate-950/70 px-4 py-2.5 backdrop-blur">
-        <div class="flex shrink-0 items-center gap-3">
+        <div class="flex min-w-0 shrink-0 items-center gap-3 max-sm:w-full max-sm:shrink">
           ${LOGO}
-          <div>
-            <h1 class="font-display text-[14px] font-extrabold tracking-[0.26em] text-slate-100">FLEXIPATH <span class="text-fp">MULTI-LINK CONVERGENCE HUD</span></h1>
-            <p class="font-mono text-[9px] tracking-[0.14em] text-slate-500">ATRC ADVANCED TECHNOLOGY PIONEERS 2026 · EDGE CHALLENGE</p>
+          <div class="min-w-0">
+            <h1 class="font-display text-[12px] font-extrabold tracking-[0.12em] text-slate-100 sm:text-[14px] sm:tracking-[0.22em]">FLEXIPATH <span class="text-fp">CONNECTIVITY ENGINE</span></h1>
+            <p class="truncate font-mono text-[9px] tracking-[0.12em] text-slate-500">PREDICTIVE · TRAFFIC-AWARE · HETEROGENEOUS NETWORKS<span class="hidden 2xl:inline"> · ATRC EDGE 2026</span></p>
           </div>
         </div>
         <div class="flex min-w-0 flex-1 items-center justify-center gap-2 overflow-hidden max-xl:order-last max-xl:basis-full max-xl:justify-start">
@@ -200,25 +238,51 @@ export class Dashboard {
           </div>
           <span class="chip hidden shrink-0 2xl:inline-flex" data-ref="pill2"></span>
         </div>
-        <div class="flex shrink-0 flex-wrap items-center gap-2">
-          <span class="chip border-fp/30!" title="Persistent anchor IP: applications keep one source address across every path swap, so no socket is ever reset">
-            <i data-lucide="lock" class="text-fp"></i>ANCHOR IP <b class="text-slate-100">${ANCHOR_IP}</b><span class="hidden text-fp 2xl:inline">STATIC</span>
+        <div class="flex min-w-0 flex-wrap items-center gap-2">
+          <span class="chip sim-badge" title="Everything on this screen is produced by the FlexiPath simulation model (seeded, deterministic). No real-world measurements are shown."><span class="dot"></span>SIMULATION · v${VERSION}</span>
+          <span class="chip border-fp/30!" title="Persistent anchor IP: applications keep one source address across every path change, so no socket is reset by a switch">
+            <i data-lucide="lock" class="text-fp"></i>ANCHOR <b class="text-slate-100">${ANCHOR_IP}</b>
           </span>
-          <span class="chip"><i data-lucide="map-pin"></i><span data-ref="zone">ZONE 1</span></span>
+          <span class="chip hidden 2xl:inline-flex"><i data-lucide="map-pin"></i><span data-ref="zone">ZONE 1</span></span>
           <span class="chip"><i data-lucide="timer"></i><span class="text-slate-100" data-ref="clock">T+00:00.0</span></span>
         </div>
       </header>
 
-      <div class="grid shrink-0 grid-cols-1 gap-2 p-2 xl:min-h-0 xl:flex-1 xl:shrink xl:grid-cols-[292px_minmax(0,1fr)_328px]" data-ref="mainGrid">
-        <aside class="hud-scroll flex min-h-0 flex-col gap-2 xl:overflow-y-auto" aria-label="Telemetry deck" data-ref="leftDeck">
-          <section class="hud-panel" data-ref="telemetry"></section>
-          <section class="hud-panel" data-ref="flows"></section>
+      <nav class="fp-toolbar flex shrink-0 flex-wrap items-center gap-2 px-2 pt-2" aria-label="Mission toolbar" data-ref="toolbar">
+        <div class="seg p-[2px]!" role="group" aria-label="View">
+          <button type="button" class="h-[26px]! px-3!" data-mode="mission" aria-pressed="true" title="Mission view (M)"><i data-lucide="layout-dashboard"></i>Mission</button>
+          <button type="button" class="h-[26px]! px-3!" data-mode="advanced" aria-pressed="false" title="Advanced view (M)"><i data-lucide="sliders-horizontal"></i>Advanced</button>
+        </div>
+        <label class="flex min-w-0 items-center gap-2">
+          <span class="hud-label hidden sm:inline">Scenario</span>
+          <select class="toolbar-select" data-ref="scenario" aria-label="Scenario">${scenarioOptions}</select>
+        </label>
+        <span class="chip hidden lg:inline-flex" data-ref="trafficChip" title="Traffic mix of this scenario"></span>
+        <div class="ml-auto flex flex-wrap items-center gap-2">
+          <button type="button" class="btn btn-fault-sm" data-fault="wifi-fade" data-view="mission" title="Inject a rapid Wi-Fi fade (F)"><i data-lucide="wifi-off"></i>Wi-Fi fade</button>
+          <button type="button" class="btn btn-fault-sm" data-fault="cell-outage" data-view="mission" title="Inject an abrupt 5G cell outage (G)"><i data-lucide="tower-control"></i>5G outage</button>
+          <button type="button" class="btn" data-ref="resetBtn" data-view="mission" title="Reset scenario, same seed (R)"><i data-lucide="rotate-ccw"></i>Reset</button>
+          <button type="button" class="btn btn-demo" data-ref="demoBtn" title="Guided demo (D)"><i data-lucide="presentation"></i>Guided demo</button>
+          <button type="button" class="btn btn-primary" data-ref="expBtn" title="Paired experiments (X)"><i data-lucide="flask-conical"></i>Experiments</button>
+          <button type="button" class="btn" data-ref="infoBtn" title="Why FlexiPath? (I)"><i data-lucide="info"></i>Why FlexiPath?</button>
+        </div>
+      </nav>
+
+      <section class="fp-loop hud-panel mx-2 mt-2 shrink-0 px-3 pt-2 pb-2.5" data-ref="loop" aria-label="Decision loop"></section>
+
+      <div class="fp-main grid shrink-0 grid-cols-1 gap-2 p-2 xl:min-h-[500px] xl:flex-1" data-ref="mainGrid">
+        <aside class="fp-deck hud-scroll flex min-h-0 flex-col gap-2 xl:overflow-y-auto" aria-label="Left deck" data-ref="leftDeck">
+          <section class="hud-panel shrink-0" data-ref="prediction" data-view="mission"></section>
+          <section class="hud-panel shrink-0" data-ref="decision" data-view="mission"></section>
+          <section class="hud-panel" data-ref="telemetry" data-view="advanced"></section>
+          <section class="hud-panel" data-ref="internals" data-view="advanced"></section>
+          <section class="hud-panel" data-ref="flows" data-view="advanced"></section>
         </aside>
 
         <main class="viewport hud-panel relative order-first h-[62vh] min-h-[380px] overflow-hidden xl:order-none xl:h-auto" data-ref="viewport">
-          <div class="absolute inset-0" data-ref="canvasHost"></div>
+          <div class="absolute inset-0 isolate" data-ref="canvasHost"></div>
           <div class="viewport-vignette"></div>
-          <div class="scanlines"></div>
+          <div class="scanlines" data-view="advanced"></div>
 
           <div class="overlay-glass pointer-events-none absolute inset-x-3 top-3 px-3 pt-2 pb-2.5">
             <div class="relative">
@@ -228,32 +292,63 @@ export class Dashboard {
             </div>
           </div>
 
-          <div class="absolute top-[62px] right-3 flex items-center gap-2">
+          <div class="fp-camctl absolute top-[62px] right-3 flex items-center gap-2">
             <div class="seg overlay-glass" role="group" aria-label="Camera mode">
               <button type="button" class="px-2.5" data-cam="chase" aria-pressed="true"><i data-lucide="crosshair"></i>Chase</button>
               <button type="button" class="px-2.5" data-cam="cinematic" aria-pressed="false"><i data-lucide="video"></i>Cinematic</button>
               <button type="button" class="px-2.5" data-cam="overview" aria-pressed="false"><i data-lucide="map"></i>Overview</button>
             </div>
             <button type="button" class="btn overlay-glass h-[36px]!" data-ref="theatre" aria-label="Theatre mode (T)" title="Theatre mode (T)"><i data-lucide="maximize-2"></i></button>
-            <button type="button" class="btn overlay-glass h-[36px]!" data-ref="help" aria-label="Keyboard shortcuts and help"><i data-lucide="circle-help"></i></button>
+            <button type="button" class="btn overlay-glass h-[36px]!" data-ref="help" aria-label="Why FlexiPath, help and shortcuts" title="Why FlexiPath? · shortcuts (I)"><i data-lucide="circle-help"></i></button>
           </div>
 
           <div class="overlay-glass pointer-events-none absolute top-[62px] left-3 px-3 py-2" data-ref="kpi" hidden>
-            <div class="hud-label">Cumulative handover stall time</div>
+            <div class="hud-label">Simulated interruption (cumulative)</div>
             <div class="num mt-1.5 flex items-baseline gap-5">
               <span class="text-[10px] font-bold tracking-[0.16em] text-fp">FLEXIPATH <b class="text-[22px]" data-ref="kpiFp">0.00</b> s</span>
               <span class="text-[10px] font-bold tracking-[0.16em] text-legacy">LEGACY OS <b class="text-[22px]" data-ref="kpiLg">0.00</b> s</span>
             </div>
           </div>
 
+          <div class="offscreen-chip" data-ref="offscreen" hidden aria-hidden="true"></div>
+
+          <div class="demo-caption" data-ref="caption" hidden role="status" aria-live="polite">
+            <div class="flex items-center justify-between gap-2">
+              <span class="step" data-ref="capStep"></span>
+              <div class="flex shrink-0 gap-1.5">
+                <button type="button" class="btn h-[24px]! px-2! text-[10.5px]!" data-ref="capNext"><i data-lucide="skip-forward"></i>Next</button>
+                <button type="button" class="btn h-[24px]! px-2! text-[10.5px]!" data-ref="capExit">Exit demo</button>
+              </div>
+            </div>
+            <div class="title" data-ref="capTitle"></div>
+            <div class="body" data-ref="capBody"></div>
+            <div class="mt-2 flex flex-wrap gap-1.5 empty:hidden" data-ref="capActions"></div>
+            <div class="bar"><span data-ref="capBar"></span></div>
+          </div>
+
+          <div class="intro-overlay" data-ref="intro" hidden>
+            <div class="intro-card">
+              <div class="hud-label">FLEXIPATH · SIMULATION PROTOTYPE</div>
+              <h2 class="mt-3">Connectivity shouldn’t wait for failure.</h2>
+              <p>Predict the degradation. Prepare the next path. Protect what matters. Continue without waiting for failure.</p>
+              <p class="text-[12px]! text-slate-400!">A predictive, traffic-aware connectivity engine for heterogeneous networks, shown beside a legacy break-before-make stack under identical simulated conditions.</p>
+              <div class="mt-5 flex flex-wrap justify-center gap-2">
+                <button type="button" class="btn btn-demo h-[36px]! px-4!" data-intro="demo"><i data-lucide="presentation"></i>Start guided demo</button>
+                <button type="button" class="btn h-[36px]! px-4!" data-intro="explore"><i data-lucide="play"></i>Explore freely</button>
+                <button type="button" class="btn h-[36px]! px-4!" data-intro="why"><i data-lucide="info"></i>Why FlexiPath?</button>
+              </div>
+            </div>
+          </div>
+
           <div class="overlay-glass pointer-events-none absolute bottom-3 left-3 hidden flex-col gap-1 px-2.5 py-2 md:flex" aria-label="Beam legend">
             ${[
-              ['eth0 · wired', INTERFACE_SPECS.eth0.color],
-              ['wlan0 · Wi-Fi 6', INTERFACE_SPECS.wlan0.color],
-              ['wwan0 · 5G SA', INTERFACE_SPECS.wwan0.color],
-              ['sat0 · LEO', INTERFACE_SPECS.sat0.color],
-              ['replication window', '#A855F7'],
-              ['legacy stall', '#F43F5E'],
+              ['Wired', INTERFACE_SPECS.eth0.color],
+              ['Wi-Fi 6', INTERFACE_SPECS.wlan0.color],
+              ['5G SA', INTERFACE_SPECS.wwan0.color],
+              ['LEO satellite', INTERFACE_SPECS.sat0.color],
+              ['replication', '#A855F7'],
+              ['prepared path (dashed)', '#60A5FA'],
+              ['failure', '#EF4444'],
             ]
               .map(([l, c]) => `<div class="flex items-center gap-2 font-mono text-[9.5px] text-slate-400"><span class="h-[3px] w-5 rounded-full" style="background:${c};box-shadow:0 0 8px ${c}"></span>${l}</div>`)
               .join('')}
@@ -262,32 +357,34 @@ export class Dashboard {
           <div class="overlay-glass absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-2 px-2 py-1.5">
             <button type="button" class="btn btn-primary w-[34px] px-0!" data-ref="play" aria-label="Pause simulation"><i data-lucide="pause"></i></button>
             <div class="seg p-[2px]!" role="group" aria-label="Simulation rate">
-              ${[1, 2, 4].map((r) => `<button type="button" class="h-[24px]! px-2.5! font-mono" data-rate="${r}" aria-pressed="${r === 1}">${r}×</button>`).join('')}
+              ${[0.5, 1, 2, 4].map((r) => `<button type="button" class="h-[24px]! px-2.5! font-mono" data-rate="${r}" aria-pressed="${r === 1}">${r}×</button>`).join('')}
             </div>
-            <span class="num px-1 text-[11px] text-slate-400" data-ref="simInfo">10 Hz</span>
+            <span class="num hidden px-1 text-[11px] text-slate-400 sm:inline" data-ref="simInfo">10 Hz</span>
           </div>
 
-          <div class="pointer-events-none absolute right-3 bottom-3 flex flex-col items-end gap-1.5">
+          <div class="pointer-events-none absolute right-3 bottom-3 hidden flex-col items-end gap-1.5 sm:flex">
             <span class="chip" data-ref="assets"><i data-lucide="box"></i>MODELS · LOADING</span>
           </div>
         </main>
 
-        <aside class="hud-scroll flex min-h-0 flex-col gap-2 xl:overflow-y-auto" aria-label="Controls deck" data-ref="rightDeck">
-          <section class="hud-panel shrink-0" data-ref="controls"></section>
-          <section class="hud-panel flex min-h-[230px] flex-1 flex-col" data-ref="log"></section>
+        <aside class="fp-deck hud-scroll flex min-h-0 flex-col gap-2 xl:overflow-y-auto" aria-label="Right deck" data-ref="rightDeck">
+          <section class="hud-panel shrink-0" data-ref="traffic" data-view="mission"></section>
+          <section class="hud-panel shrink-0" data-ref="controls" data-view="advanced"></section>
+          <section class="hud-panel flex min-h-[230px] flex-1 flex-col" data-ref="log" data-view="advanced"></section>
         </aside>
       </div>
 
-      <section class="grid shrink-0 grid-cols-1 gap-2 px-2 pb-2 sm:grid-cols-2 xl:h-[200px] xl:grid-cols-4" aria-label="Real-time graphs" data-ref="chartsRow">
+      <section class="fp-bottom hud-panel mx-2 mb-2 shrink-0" data-ref="lanes" data-view="mission" aria-label="Legacy vs FlexiPath"></section>
+      <section class="fp-bottom grid shrink-0 grid-cols-1 gap-2 px-2 pb-2 sm:grid-cols-2 xl:h-[200px] xl:grid-cols-4" aria-label="Real-time graphs" data-ref="chartsRow" data-view="advanced">
         ${chartCard('thr', 'Aggregated Throughput', 'Mbps')}
         ${chartCard('rtt', 'Critical-Flow Latency', 'ms · log')}
-        ${chartCard('loss', 'Packet Loss', '% · 1 s window')}
-        ${chartCard('qoe', 'QoE · MOS', 'ITU-T G.107')}
+        ${chartCard('loss', 'Packet Loss', '% · crit + RT · 1 s')}
+        ${chartCard('qoe', 'Voice QoE · MOS', 'ITU-T G.107')}
       </section>
     </div>
     <div class="toast-stack" data-ref="toasts" aria-live="polite"></div>
     <div class="modal-backdrop" hidden data-ref="modal" role="dialog" aria-modal="true">
-      <div class="hud-panel hud-scroll max-h-[90vh] w-[min(760px,100%)] overflow-y-auto" data-ref="modalBody"></div>
+      <div class="hud-panel hud-scroll max-h-[90vh] w-[min(900px,100%)] overflow-y-auto" data-ref="modalBody"></div>
     </div>`;
 
     this.refs = {};
@@ -301,11 +398,33 @@ export class Dashboard {
     this.rateButtons = [...this.root.querySelectorAll('[data-rate]')];
     for (const b of this.rateButtons) b.addEventListener('click', () => this.setRate(Number(b.dataset.rate)));
     this.refs.play.addEventListener('click', () => this.togglePause());
-    this.refs.help.addEventListener('click', () => this.openHelp());
+    this.refs.help.addEventListener('click', () => this.openInfo());
     this.refs.theatre.addEventListener('click', () => this.setTheatre(!this.view.theatre));
     this.refs.modal.addEventListener('click', (e) => {
       if (e.target === this.refs.modal) this.closeModal();
     });
+    for (const b of this.root.querySelectorAll('[data-intro]')) {
+      b.addEventListener('click', () => {
+        const act = b.dataset.intro;
+        if (act === 'demo') this.startDemo();
+        else if (act === 'why') this.openInfo();
+        else {
+          this.hideIntro();
+          this.togglePause(false);
+        }
+      });
+    }
+  }
+
+  _bindToolbar() {
+    this.modeButtons = [...this.root.querySelectorAll('[data-mode]')].filter((b) => b.tagName === 'BUTTON');
+    for (const b of this.modeButtons) b.addEventListener('click', () => this.setMode(b.dataset.mode));
+    this.refs.scenario.addEventListener('change', () => this.setScenario(this.refs.scenario.value));
+    for (const b of this.refs.toolbar.querySelectorAll('[data-fault]')) b.addEventListener('click', () => this.injectFault(b.dataset.fault));
+    this.refs.resetBtn.addEventListener('click', () => this.restart());
+    this.refs.demoBtn.addEventListener('click', () => this.startDemo());
+    this.refs.expBtn.addEventListener('click', () => this.openExperiments());
+    this.refs.infoBtn.addEventListener('click', () => this.openInfo());
   }
 
   _bindKeyboard() {
@@ -313,7 +432,11 @@ export class Dashboard {
       if (e.target.closest?.('input, textarea, select')) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const key = e.key.toLowerCase();
-      if (key === 'escape') return this.closeModal();
+      if (key === 'escape') {
+        if (!this.refs.modal.hidden) return this.closeModal();
+        if (this.demo.active) return this.demo.stop();
+        return;
+      }
       if (!this.refs.modal.hidden) return;
       const actions = {
         ' ': () => this.togglePause(),
@@ -328,9 +451,13 @@ export class Dashboard {
         },
         v: () => this.setGhost(!this.view.showGhost),
         t: () => this.setTheatre(!this.view.theatre),
+        m: () => this.setMode(this.view.mode === 'mission' ? 'advanced' : 'mission'),
+        d: () => this.startDemo(),
+        x: () => this.openExperiments(),
+        i: () => this.openInfo(),
         e: () => this.exportJSON(),
-        '?': () => this.openHelp(),
-        h: () => this.openHelp(),
+        '?': () => this.openInfo(),
+        h: () => this.openInfo(),
       };
       if (actions[key]) {
         e.preventDefault();
@@ -346,10 +473,17 @@ export class Dashboard {
       this.log.push(ev);
       if (ev.code === 'FAULT') this.toast(ev.message.replace('FAULT INJECTED · ', '⚠ '), 'warn');
     });
+    e.on('decision', (rec) => {
+      this.decision.push(rec);
+      this.dirty = true;
+    });
     e.on('reset', () => this._syncFromEngine());
     e.on('complete', (summary) => {
       this.dirty = true;
-      setTimeout(() => this.openSummary(summary), 900);
+      if (this.demo.active) return; // the guided demo shows its own experiment step
+      setTimeout(() => {
+        if (this.refs.modal.hidden) this.openSummary(summary);
+      }, 900);
     });
   }
 
@@ -364,10 +498,30 @@ export class Dashboard {
     this.stallBands = [];
     for (const c of Object.values(this.charts)) c.reset();
     this.log.rebuild(e.events);
+    this.decision.setRecords(e.decisions);
+    this.prediction.reset();
+    this.flows.setFlows(e.agents.flexipath.flows);
+    this._syncScenario();
     this._onTick(e.snapshot);
     this._renderCharts(e.snapshot.t);
     this._updatePlay();
     this.dirty = true;
+  }
+
+  _syncScenario() {
+    const sc = this.engine.scenario;
+    const sel = this.refs.scenario;
+    if (![...sel.options].some((o) => o.value === sc.id)) {
+      const o = document.createElement('option');
+      o.value = sc.id;
+      o.textContent = `${sc.code} · ${sc.label}`;
+      o.dataset.extra = '1';
+      sel.append(o);
+    }
+    for (const o of [...sel.options]) if (o.dataset.extra && o.value !== sc.id) o.remove();
+    sel.value = sc.id;
+    sel.title = sc.description;
+    this.refs.trafficChip.textContent = `TRAFFIC · ${TRAFFIC_PROFILES[sc.traffic].label.toUpperCase()}`;
   }
 
   // ── Per-tick data flow ──────────────────────────────────────────────────
@@ -382,8 +536,9 @@ export class Dashboard {
 
   _onTick(snap) {
     for (const c of Object.values(this.charts)) c.pushSnapshot(snap);
+    this.prediction.sample(snap);
     this._trackBand(this.replBands, snap.agents.flexipath.decision?.replicationActive, snap.t, SERIES_COLORS.replication, 'rgba(168,85,247,0.7)');
-    this._trackBand(this.stallBands, snap.agents.legacy.decision?.stalled, snap.t, SERIES_COLORS.stall, 'rgba(244,63,94,0.8)');
+    this._trackBand(this.stallBands, snap.agents.legacy.decision?.stalled, snap.t, SERIES_COLORS.stall, 'rgba(239,68,68,0.8)');
     this.dirty = true;
     this._chartDirty = true;
   }
@@ -405,7 +560,8 @@ export class Dashboard {
       this.dirty = false;
       this._updatePanels(snap);
     }
-    if (this._chartDirty && now - this._lastChart > 180) {
+    const chartsVisible = this.view.mode === 'advanced' && !this.view.theatre;
+    if (chartsVisible && this._chartDirty && now - this._lastChart > 180) {
       this._lastChart = now;
       this._renderCharts(snap.t);
     }
@@ -414,10 +570,20 @@ export class Dashboard {
   _updatePanels(snap) {
     const focus = this.view.focus;
     const agent = snap.agents[focus];
-    this.telemetry.update(agent, focus);
-    this.flows.update(agent, focus);
-    this.controls.update(snap);
+    this.loop.update(snap);
     this._updateHeader(snap);
+    if (this.view.mode === 'mission') {
+      this.prediction.update(snap);
+      this.decision.update(snap);
+      this.traffic.update(snap);
+      this.lanes.update(snap);
+    } else {
+      this.telemetry.update(agent, focus);
+      this.internals.update(snap);
+      this.flows.update(agent, focus);
+      this.controls.update(snap);
+      this._updateChartLegends(snap);
+    }
     if (this.view.theatre) {
       this.refs.kpiFp.textContent = snap.agents.flexipath.stats.stallTime.toFixed(2);
       this.refs.kpiLg.textContent = snap.agents.legacy.stats.stallTime.toFixed(2);
@@ -429,12 +595,15 @@ export class Dashboard {
     this.refs.markLg.style.left = `${Math.min(100, Math.max(0, (lgX / ROUTE_END_X) * 100))}%`;
     this.refs.markLg.style.display = this.view.showGhost || focus === 'legacy' ? '' : 'none';
     this.refs.markFp.style.display = this.view.showGhost || focus === 'flexipath' ? '' : 'none';
+  }
 
+  _updateChartLegends(snap) {
+    const na = (f) => (v) => (v === null || v === undefined || !Number.isFinite(v) ? 'n/a' : f(v));
     const fmt = {
-      thr: (v) => `${v.toFixed(0)}`,
-      rtt: (v) => (v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${v.toFixed(0)}ms`),
-      loss: (v) => `${v.toFixed(1)}%`,
-      qoe: (v) => v.toFixed(2),
+      thr: na((v) => `${v.toFixed(0)}`),
+      rtt: na((v) => (v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${v.toFixed(0)}ms`)),
+      loss: na((v) => `${v.toFixed(1)}%`),
+      qoe: na((v) => v.toFixed(2)),
     };
     const m = { fp: snap.agents.flexipath.metrics, lg: snap.agents.legacy.metrics };
     const pick = { thr: 'throughputMbps', rtt: 'latencyMs', loss: 'lossPct', qoe: 'mos' };
@@ -448,20 +617,28 @@ export class Dashboard {
     const d = agent.decision;
     if (engine === 'legacy') {
       if (d.stalled && d.stall) {
-        return { text: 'SOCKET STALLED · TCP RESET', detail: `${d.stall.remaining.toFixed(1)} s left`, color: '#F43F5E', pulse: true };
+        return { text: 'SIMULATED INTERRUPTION · TCP RESET', detail: `${d.stall.remaining.toFixed(1)} s left`, color: '#EF4444', pulse: true };
       }
+      const st = agent.trace.stage;
+      if (st === 'FAILED') return { text: 'LEGACY OS · ON A FAILED LINK', detail: `route ${d.primary ?? '—'} · waiting for floor`, color: '#F87171', pulse: true };
+      if (st === 'DEGRADING') return { text: 'LEGACY OS · LINK DEGRADING', detail: `route ${d.primary ?? '—'} · no prediction`, color: '#FACC15', pulse: false };
       return { text: 'LEGACY OS · BREAK-BEFORE-MAKE', detail: `route ${d.primary ?? '—'}`, color: '#FB7185', pulse: false };
     }
+    if (!d.primary) return { text: 'NO USABLE PATH', detail: 'buffering at anchor', color: '#EF4444', pulse: true };
     if (d.replicationActive) {
       return { text: 'PREDICTIVE REPLICATION ACTIVE', detail: `${d.primary} ⇉ ${d.replica}`, color: '#A855F7', pulse: true };
     }
+    if (d.protecting) return { text: 'PROTECTION WINDOW', detail: `bulk drained ${d.primary} → ${d.replica}`, color: '#60A5FA', pulse: true };
     const ls = d.lastSwitch;
     if (ls && t - ls.t < 2.5) {
       return ls.seamless
-        ? { text: 'HOT-SWAP COMPLETE', detail: `${ls.from} → ${ls.to} · session unbroken`, color: '#10B981', pulse: false }
+        ? { text: 'SWITCHED · 0 MS GAP', detail: `${ls.from} → ${ls.to} · sessions kept`, color: '#22C55E', pulse: false }
         : { text: 'UNPLANNED FAILOVER', detail: `${ls.from} → ${ls.to} · ${ls.blackoutMs} ms`, color: '#F59E0B', pulse: true };
     }
-    return { text: 'MULTI-LINK CONVERGED', detail: `primary ${d.primary ?? '—'}`, color: '#00F0FF', pulse: false };
+    if (d.watching) {
+      return { text: 'DEGRADATION PREDICTED', detail: `${d.primary}${d.prepared ? ` · next ${d.prepared} prepared` : ' · searching'}`, color: '#FACC15', pulse: false };
+    }
+    return { text: 'MONITORING ALL LINKS', detail: `primary ${d.primary}`, color: '#00F0FF', pulse: false };
   }
 
   _updateHeader(snap) {
@@ -480,10 +657,10 @@ export class Dashboard {
     let short;
     let color;
     if (other === 'legacy') {
-      short = od.stalled ? `LEGACY · STALLED ${od.stall?.remaining.toFixed(1) ?? ''}s` : `LEGACY · ROUTE ${od.primary ?? '—'}`;
-      color = od.stalled ? '#F43F5E' : '#FB7185';
+      short = od.stalled ? `LEGACY · INTERRUPTED ${od.stall?.remaining.toFixed(1) ?? ''}s` : `LEGACY · ROUTE ${od.primary ?? '—'}`;
+      color = od.stalled ? '#EF4444' : '#FB7185';
     } else {
-      short = od.replicationActive ? `FLEXIPATH · REPLICATING` : `FLEXIPATH · PRIMARY ${od.primary ?? '—'}`;
+      short = od.replicationActive ? 'FLEXIPATH · REPLICATING' : `FLEXIPATH · PRIMARY ${od.primary ?? '—'}`;
       color = od.replicationActive ? '#C084FC' : '#67E8F9';
     }
     if (this._pill2Key !== short) {
@@ -503,11 +680,20 @@ export class Dashboard {
   }
 
   // ── Actions ─────────────────────────────────────────────────────────────
-  setFocus(id) {
+  setMode(mode, { quiet = false } = {}) {
+    this.view.mode = mode === 'advanced' ? 'advanced' : 'mission';
+    this.refs.shell.dataset.mode = this.view.mode;
+    for (const b of this.modeButtons) b.setAttribute('aria-pressed', String(b.dataset.mode === this.view.mode));
+    this.dirty = true;
+    this._chartDirty = true;
+    if (!quiet) this.toast(this.view.mode === 'mission' ? 'Mission view · the decision story' : 'Advanced view · telemetry, internals, charts, log');
+  }
+
+  setFocus(id, { quiet = false } = {}) {
     this.view.focus = id;
     this.controls.setEngine(id);
     this.dirty = true;
-    this.toast(id === 'legacy' ? 'Focus: Legacy OS mode (break-before-make)' : 'Focus: FlexiPath mode (predictive multi-path)');
+    if (!quiet) this.toast(id === 'legacy' ? 'Focus: Legacy OS (break-before-make)' : 'Focus: FlexiPath (predict · prepare · protect)');
   }
 
   setGhost(on) {
@@ -516,14 +702,11 @@ export class Dashboard {
     this.dirty = true;
   }
 
-  /** Theatre mode: hide the decks and charts so the 3D twin fills the screen (demos / video capture). */
+  /** Theatre mode: hide decks, toolbar and bottom row so the 3D twin fills the screen (demos / video capture). */
   setTheatre(on) {
     this.view.theatre = on;
-    this.refs.leftDeck.hidden = on;
-    this.refs.rightDeck.hidden = on;
-    this.refs.chartsRow.hidden = on;
+    this.refs.shell.dataset.theatre = on ? '1' : '0';
     this.refs.kpi.hidden = !on;
-    this.refs.mainGrid.style.gridTemplateColumns = on ? 'minmax(0, 1fr)' : '';
     this.refs.theatre.innerHTML = `<i data-lucide="${on ? 'minimize-2' : 'maximize-2'}"></i>`;
     renderIcons(this.refs.theatre);
     this.dirty = true;
@@ -555,13 +738,19 @@ export class Dashboard {
     renderIcons(this.refs.play);
   }
 
-  restart(overrides = {}) {
+  restart(overrides = {}, { quiet = false } = {}) {
     this.closeModal();
     this.hooks.onBeforeReset?.();
     this.engine.reset(overrides);
     this.engine.setPaused(false);
     this._updatePlay();
-    this.toast(`Scenario reset · seed ${this.engine.config.seed}`);
+    if (!quiet) this.toast(`Scenario ${this.engine.scenario.code} · ${this.engine.scenario.label} · seed ${this.engine.config.seed}`);
+  }
+
+  setScenario(id) {
+    if (this.demo.active) this.demo.stop();
+    this.hideIntro();
+    this.restart({ scenario: id });
   }
 
   injectFault(type) {
@@ -574,8 +763,8 @@ export class Dashboard {
 
   exportJSON() {
     const data = this.engine.exportData();
-    downloadText(timestampedName('flexipath_experiment', 'json', this.engine.config.seed), toJSON(data), 'application/json');
-    this.toast(`Exported JSON · ${data.timeseries.length} samples · ${data.events.length} events`);
+    downloadText(timestampedName('flexipath_run', 'json', this.engine.config.seed), toJSON(data), 'application/json');
+    this.toast(`Exported JSON · ${data.timeseries.length} samples · ${data.decisions.length} decisions`);
   }
 
   exportCSV() {
@@ -599,6 +788,82 @@ export class Dashboard {
     this.refs.toasts.append(el);
     setTimeout(() => el.remove(), 2800);
     while (this.refs.toasts.childElementCount > 4) this.refs.toasts.firstElementChild.remove();
+  }
+
+  /**
+   * Edge marker for the comparison vehicle when the camera cannot see it.
+   * @param {{visible:boolean, x?:number, y?:number, angle?:number, text?:string, legacy?:boolean}} info
+   *   x / y in viewport pixels, angle = direction towards the vehicle (radians, screen space)
+   */
+  updateOffscreen(info) {
+    const el = this.refs.offscreen;
+    if (!info.visible) {
+      if (!el.hidden) el.hidden = true;
+      return;
+    }
+    if (el.hidden) el.hidden = false;
+    const html = `<span class="arr" style="transform:rotate(${info.angle.toFixed(2)}rad)">➤</span>${esc(info.text)}`;
+    if (this._offHtml !== html) {
+      this._offHtml = html;
+      el.innerHTML = html;
+      el.classList.toggle('is-fp', !info.legacy);
+    }
+    const host = this.refs.viewport;
+    const w = el.offsetWidth;
+    const h = el.offsetHeight;
+    const x = Math.min(host.clientWidth - w / 2 - 10, Math.max(w / 2 + 10, info.x));
+    const y = Math.min(host.clientHeight - h / 2 - 54, Math.max(h / 2 + 64, info.y));
+    el.style.left = `${x}px`;
+    el.style.top = `${y}px`;
+  }
+
+  // ── Intro, guided demo captions ─────────────────────────────────────────
+  showIntro() {
+    this.refs.intro.hidden = false;
+    this.engine.setPaused(true);
+    this._updatePlay();
+  }
+
+  hideIntro() {
+    this.refs.intro.hidden = true;
+  }
+
+  startDemo() {
+    this.demo.start();
+  }
+
+  showCaption({ step, title, body, holdMs = 0, onNext, onExit, actions = [] }) {
+    const r = this.refs;
+    r.capStep.textContent = step ?? '';
+    r.capTitle.textContent = title ?? '';
+    r.capBody.textContent = body ?? '';
+    r.caption.hidden = false;
+    this.refs.shell.dataset.demo = '1';
+    r.capNext.hidden = !onNext;
+    r.capNext.onclick = onNext ? () => onNext() : null;
+    r.capExit.onclick = () => onExit?.();
+    r.capActions.innerHTML = '';
+    for (const a of actions) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = `btn h-[26px]! px-2.5! text-[11px]! ${a.primary ? 'btn-primary' : ''}`;
+      b.textContent = a.label;
+      b.addEventListener('click', () => a.run());
+      r.capActions.append(b);
+    }
+    const bar = r.capBar;
+    bar.style.transition = 'none';
+    bar.style.width = '0%';
+    if (holdMs > 0) {
+      void bar.offsetWidth;
+      bar.style.transition = `width ${holdMs}ms linear`;
+      bar.style.width = '100%';
+    }
+  }
+
+  hideCaption() {
+    this.refs.caption.hidden = true;
+    this.refs.shell.dataset.demo = '0';
   }
 
   // ── Modals ──────────────────────────────────────────────────────────────
@@ -625,166 +890,81 @@ export class Dashboard {
   openSummary(summary) {
     const fp = summary.flexipath;
     const lg = summary.legacy;
-    const row = (label, a, b, better = 'lower') => {
-      const fpWins = better === 'lower' ? a.value <= b.value : a.value >= b.value;
-      return `<tr class="border-t border-slate-800/80">
-        <td class="py-2 pr-3 text-slate-400">${label}</td>
-        <td class="py-2 pr-3 text-right font-semibold ${fpWins ? 'text-fp' : 'text-slate-300'}">${a.text}</td>
-        <td class="py-2 text-right font-semibold ${fpWins ? 'text-legacy' : 'text-slate-300'}">${b.text}</td></tr>`;
-    };
-    const v = (value, text) => ({ value, text });
+    const sc = summary.meta.scenario;
+    const rows = [
+      ['Simulated interruption (total)', 'interruptionS', 's', 2],
+      ['Longest single interruption', 'longestInterruptionS', 's', 2],
+      ['Packet delivery (critical + real-time)', 'packetDeliveryPct', '%', 2],
+      ['Critical packet delivery', 'criticalDeliveryPct', '%', 2],
+      ['Critical packets lost', 'criticalLost', '', 0],
+      ['Mean throughput', 'meanThroughputMbps', 'Mbps', 1],
+      ['Mean critical-flow RTT', 'meanLatencyMs', 'ms', 1],
+      ['Voice QoE · mean MOS (G.107)', 'meanMos', '', 2],
+      ['Time below MOS 3.6', 'timeBelowMos36S', 's', 1],
+      ['Replication overhead · protected-flow bytes', 'replicationOverheadPct', '%', 2],
+      ['Replication overhead · all traffic bytes', 'replicationOverheadTotalPct', '%', 3],
+      ['Action time vs. path failure (mean)', 'actionVsFailureS', 's', 2],
+      ['Path failures acted on before failing', null, '', 0],
+      ['TCP connection resets', 'tcpResets', '', 0],
+      ['Journey time', 'journeyTimeS', 's', 1],
+    ];
+    const f = (v, d, u) => (typeof v === 'number' && Number.isFinite(v) ? `${v.toFixed(d)}${u ? ` ${u}` : ''}` : '—');
+    const body = rows
+      .map(([label, key, u, d]) => {
+        if (!key) {
+          return `<tr><td>${label}</td><td>${lg.predictedFailures}/${lg.pathFailures}</td><td>${fp.predictedFailures}/${fp.pathFailures}</td><td>—</td></tr>`;
+        }
+        const a = lg[key];
+        const b = fp[key];
+        const diff = typeof a === 'number' && typeof b === 'number' ? b - a : null;
+        const ds = diff === null ? '—' : `${diff > 0 ? '+' : diff < 0 ? '−' : '±'}${Math.abs(diff).toFixed(d)}${u ? ` ${u}` : ''}`;
+        return `<tr><td>${label}</td><td>${f(a, d, u)}</td><td>${f(b, d, u)}</td><td class="font-semibold">${ds}</td></tr>`;
+      })
+      .join('');
     const html = `
-      ${this._modalHeader('Run complete · FlexiPath vs Legacy OS', `seed ${summary.meta.seed} · ${summary.meta.speedKmh} km/h · ${summary.meta.simTimeS} s simulated · ${summary.faults.length} fault(s) injected`)}
+      ${this._modalHeader(`Run complete · ${esc(sc.code)} · ${esc(sc.label)}`, `seed ${summary.meta.seed} · ${summary.meta.speedKmh} km/h · ${summary.meta.simTimeS} s simulated · ${summary.faults.length} fault(s) · one paired run`)}
       <div class="px-5 py-4">
-        <p class="text-[13px] leading-relaxed text-slate-300">
-          FlexiPath carried every session across <b class="text-fp">${fp.seamlessHandovers} make-before-break hot-swaps</b>
-          with <b class="text-fp">${fp.stallTimeS.toFixed(2)} s</b> of stall, while the legacy stack broke
-          <b class="text-legacy">${lg.breakBeforeMakeHandovers} times</b>, stalled for <b class="text-legacy">${lg.stallTimeS.toFixed(2)} s</b>
-          and reset <b class="text-legacy">${lg.tcpResets} TCP sockets</b>.
-        </p>
-        <table class="num mt-4 w-full text-[12px]">
-          <thead><tr class="text-[10px] tracking-[0.14em] text-slate-500">
-            <th class="pb-2 text-left font-semibold">METRIC</th><th class="pb-2 text-right font-semibold text-fp">FLEXIPATH</th><th class="pb-2 text-right font-semibold text-legacy">LEGACY OS</th>
-          </tr></thead>
-          <tbody>
-            ${row('Handover stall time', v(fp.stallTimeS, `${fp.stallTimeS.toFixed(2)} s`), v(lg.stallTimeS, `${lg.stallTimeS.toFixed(2)} s`))}
-            ${row('Break-before-make stalls', v(fp.breakBeforeMakeHandovers, fp.breakBeforeMakeHandovers), v(lg.breakBeforeMakeHandovers, lg.breakBeforeMakeHandovers))}
-            ${row('TCP resets', v(fp.tcpResets, fp.tcpResets), v(lg.tcpResets, lg.tcpResets))}
-            ${row('Critical packets lost', v(fp.criticalLost, `${fp.criticalLost} (${fp.criticalLossPct.toFixed(2)}%)`), v(lg.criticalLost, `${lg.criticalLost} (${lg.criticalLossPct.toFixed(2)}%)`))}
-            ${row('Mean MOS (G.107)', v(fp.meanMos, fp.meanMos.toFixed(2)), v(lg.meanMos, lg.meanMos.toFixed(2)), 'higher')}
-            ${row('Worst MOS', v(fp.minMos, fp.minMos?.toFixed(2)), v(lg.minMos, lg.minMos?.toFixed(2)), 'higher')}
-            ${row(`Time below MOS ${MOS_THRESHOLD}`, v(fp.timeBelowMos36S, `${fp.timeBelowMos36S.toFixed(1)} s`), v(lg.timeBelowMos36S, `${lg.timeBelowMos36S.toFixed(1)} s`))}
-            ${row('Mean aggregate throughput', v(fp.meanThroughputMbps, `${fp.meanThroughputMbps.toFixed(1)} Mbps`), v(lg.meanThroughputMbps, `${lg.meanThroughputMbps.toFixed(1)} Mbps`), 'higher')}
-            ${row('Journey time (fail-safe braking)', v(fp.journeyTimeS ?? 1e9, fp.journeyTimeS ? `${fp.journeyTimeS.toFixed(1)} s` : '—'), v(lg.journeyTimeS ?? 1e9, lg.journeyTimeS ? `${lg.journeyTimeS.toFixed(1)} s` : '—'))}
-            <tr class="border-t border-slate-800/80"><td class="py-2 pr-3 text-slate-400">Replication cost</td>
-              <td class="py-2 pr-3 text-right text-repl">${fp.replicationTimeS.toFixed(1)} s · +${fp.replicationOverheadPct.toFixed(1)}% critical bytes · ${fp.duplicatesDiscarded} dups discarded</td>
-              <td class="py-2 text-right text-slate-500">n/a</td></tr>
-          </tbody>
-        </table>
+        <div class="mb-3 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400">${tag('measured')}<span>One simulated run, both stacks on identical conditions. A single run is an example; use paired trials for evidence.</span></div>
+        <div class="hud-scroll overflow-x-auto">
+          <table class="exp-table">
+            <thead><tr><th>Metric</th><th class="text-legacy!">Legacy</th><th class="text-fp!">FlexiPath</th><th>Difference (FP − LG)</th></tr></thead>
+            <tbody>${body}</tbody>
+          </table>
+        </div>
         <div class="mt-5 flex flex-wrap justify-end gap-2">
           <button type="button" class="btn" data-act="json"><i data-lucide="file-json"></i>Export JSON</button>
           <button type="button" class="btn" data-act="csv"><i data-lucide="file-spreadsheet"></i>Export CSV</button>
-          <button type="button" class="btn" data-act="new"><i data-lucide="dice-5"></i>New seed</button>
-          <button type="button" class="btn btn-primary" data-act="replay"><i data-lucide="repeat"></i>Replay seed ${summary.meta.seed}</button>
+          <button type="button" class="btn" data-act="replay"><i data-lucide="repeat"></i>Replay seed ${summary.meta.seed}</button>
+          <button type="button" class="btn btn-primary" data-act="trials"><i data-lucide="flask-conical"></i>Run 10 paired trials of this scenario</button>
         </div>
       </div>`;
     this.openModal(html);
-    const body = this.refs.modalBody;
-    body.querySelector('[data-act="json"]').addEventListener('click', () => this.exportJSON());
-    body.querySelector('[data-act="csv"]').addEventListener('click', () => this.exportCSV());
-    body.querySelector('[data-act="new"]').addEventListener('click', () => this.restart({ seed: 1 + Math.floor(Math.random() * 99999) }));
-    body.querySelector('[data-act="replay"]').addEventListener('click', () => this.restart());
+    const b = this.refs.modalBody;
+    b.querySelector('[data-act="json"]').addEventListener('click', () => this.exportJSON());
+    b.querySelector('[data-act="csv"]').addEventListener('click', () => this.exportCSV());
+    b.querySelector('[data-act="replay"]').addEventListener('click', () => this.restart());
+    b.querySelector('[data-act="trials"]').addEventListener('click', () =>
+      this.openExperiments({ scenario: sc.id === 'demo' ? 'A' : sc.id, trials: 10, autoRun: true }),
+    );
   }
 
+  openInfo() {
+    this.openModal(`${this._modalHeader('Why FlexiPath?', 'What makes it different · how the loop decides · what the numbers are')}${infoHTML()}`);
+  }
+
+  /** Kept for the keyboard map and older bindings. */
   openHelp() {
-    const keys = [
-      ['Space', 'Pause / resume'],
-      ['1 / 2', 'FlexiPath / Legacy focus'],
-      ['F', 'Inject rapid Wi-Fi fade'],
-      ['G', 'Inject 5G cell outage'],
-      ['R', 'Reset scenario (same seed)'],
-      ['C', 'Cycle camera mode'],
-      ['V', 'Toggle ghost vehicle'],
-      ['T', 'Theatre mode (full-screen twin)'],
-      ['E', 'Export experiment JSON'],
-    ];
-    this.openModal(`
-      ${this._modalHeader('How to read the twin', 'FlexiPath · DETECT → PREDICT → REPLICATE → SWITCH')}
-      <div class="grid gap-5 px-5 py-4 md:grid-cols-2">
-        <div class="space-y-2.5 text-[12px] leading-relaxed text-slate-300">
-          <p><b class="text-fp">Detect.</b> Every link is probed at 10 Hz: throughput, EWMA RTT, jitter, loss and RSSI/RSRP.</p>
-          <p><b class="text-fp">Predict.</b> ΔLoss over 1 s, RTT drift and signal time-to-failure flag a dying link <i>before</i> it drops.</p>
-          <p><b class="text-repl">Replicate.</b> Critical packets are mirrored onto the best candidate; the receiver keeps the first copy.</p>
-          <p><b class="text-cell">Switch.</b> When loss &gt; 15 % or the candidate scores 1.5× higher, the route hot-swaps behind the anchor IP ${ANCHOR_IP} — no socket resets.</p>
-          <p><b class="text-legacy">Legacy.</b> Stays on the link until −85 dBm, then tears it down: detect → attach → DHCP → TCP RST → reconnect = 3.8 s stall.</p>
-          <p class="font-mono text-[10.5px] text-slate-500">W = T<sup>a</sup> / (RTT<sup>b</sup> · (1 + 12·L²)) · critical a=0.4 b=1.2 · bulk a=1.5 b=0.5</p>
-        </div>
-        <div>
-          <div class="hud-label mb-2 flex items-center gap-1.5"><i data-lucide="keyboard" class="size-3.5"></i>Keyboard shortcuts</div>
-          <div class="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1.5 text-[11.5px] text-slate-300">
-            ${keys.map(([k, d]) => `<span class="kbd justify-self-start">${k}</span><span>${d}</span>`).join('')}
-          </div>
-          <p class="mt-4 font-mono text-[10px] leading-relaxed text-slate-500">URL parameters: ?seed=2026&amp;speed=90&amp;focus=legacy&amp;camera=overview</p>
-        </div>
-      </div>`);
+    this.openInfo();
   }
 
+  openExperiments(opts = {}) {
+    const sc = this.engine.scenario.id;
+    const scenario = opts.scenario ?? (SCENARIOS[sc]?.hidden ? 'A' : sc);
+    openExperiments(this, { ...opts, scenario });
+  }
+
+  /** Kept for older bindings. */
   openBenchmark() {
-    const scenarioOpts = Object.values(SCENARIOS)
-      .map((s) => `<label class="flex items-center gap-2 text-[11.5px] text-slate-300"><input type="checkbox" class="accent-cyan-400" name="scn" value="${s.id}" checked />${s.label}</label>`)
-      .join('');
-    const speedOpts = [30, 60, 90, 120]
-      .map((s) => `<label class="flex items-center gap-1.5 font-mono text-[11.5px] text-slate-300"><input type="checkbox" class="accent-cyan-400" name="spd" value="${s}" checked />${s}</label>`)
-      .join('');
-    this.openModal(`
-      ${this._modalHeader('Batch benchmark', 'Headless runs of the same engine · deterministic seeds · results exportable for submission')}
-      <div class="px-5 py-4">
-        <div class="grid gap-4 md:grid-cols-3">
-          <div><div class="hud-label mb-2">Seeds per cell</div>
-            <select class="hud-input w-full" name="seeds"><option value="3">3 seeds</option><option value="5" selected>5 seeds</option><option value="10">10 seeds</option></select></div>
-          <div><div class="hud-label mb-2">Speeds (km/h)</div><div class="flex flex-wrap gap-3">${speedOpts}</div></div>
-          <div><div class="hud-label mb-2">Scenarios</div><div class="flex flex-col gap-1.5">${scenarioOpts}</div></div>
-        </div>
-        <div class="mt-4 flex items-center gap-3">
-          <button type="button" class="btn btn-primary" data-act="run"><i data-lucide="flask-conical"></i>Run benchmark</button>
-          <div class="meter flex-1" style="--c:#00F0FF"><span data-ref="bar"></span></div>
-          <span class="num w-24 text-right text-[11px] text-slate-400" data-ref="status">idle</span>
-        </div>
-        <div class="mt-4" data-ref="results"></div>
-      </div>`);
-    const body = this.refs.modalBody;
-    const status = body.querySelector('[data-ref="status"]');
-    const bar = body.querySelector('[data-ref="bar"]');
-    const results = body.querySelector('[data-ref="results"]');
-    const runBtn = body.querySelector('[data-act="run"]');
-    runBtn.addEventListener('click', async () => {
-      const nSeeds = Number(body.querySelector('[name="seeds"]').value);
-      const speeds = [...body.querySelectorAll('[name="spd"]:checked')].map((i) => Number(i.value));
-      const scenarios = [...body.querySelectorAll('[name="scn"]:checked')].map((i) => i.value);
-      if (!speeds.length || !scenarios.length) return this.toast('Pick at least one speed and one scenario', 'warn');
-      const seeds = Array.from({ length: nSeeds }, (_, i) => 1000 + i * 7919);
-      const runner = new ExperimentRunner({ seeds, speeds, scenarios, failSafe: this.engine.config.failSafe });
-      runBtn.disabled = true;
-      this._benchAbort = new AbortController();
-      const res = await runner.run({
-        signal: this._benchAbort.signal,
-        onProgress: (done, total) => {
-          bar.style.width = `${(done / total) * 100}%`;
-          status.textContent = `${done}/${total} runs`;
-        },
-      });
-      this._benchAbort = null;
-      runBtn.disabled = false;
-      if (this.refs.modal.hidden) return;
-      status.textContent = `done · ${(res.meta.wallTimeMs / 1000).toFixed(1)} s`;
-      const table = ExperimentRunner.table(res, ['stallTimeS', 'criticalLossPct', 'meanMos', 'timeBelowMos36S', 'tcpResets']);
-      results.innerHTML = `
-        <table class="num w-full text-[11.5px]">
-          <thead><tr class="text-[9.5px] tracking-[0.12em] text-slate-500">
-            <th class="pb-2 text-left">SCENARIO</th><th class="pb-2 text-left">ENGINE</th><th class="pb-2 text-right">RUNS</th>
-            <th class="pb-2 text-right">STALL s</th><th class="pb-2 text-right">CRIT LOSS %</th><th class="pb-2 text-right">MEAN MOS</th><th class="pb-2 text-right">s &lt; MOS 3.6</th><th class="pb-2 text-right">TCP RST</th>
-          </tr></thead>
-          <tbody>${table
-            .map(
-              (r) => `<tr class="border-t border-slate-800/80 ${r.engine === 'flexipath' ? 'text-fp' : 'text-legacy'}">
-              <td class="py-1.5 text-slate-300">${SCENARIOS[r.scenario]?.label ?? r.scenario}</td><td class="py-1.5 font-semibold">${r.engine === 'flexipath' ? 'FlexiPath' : 'Legacy OS'}</td>
-              <td class="py-1.5 text-right text-slate-400">${r.runs}</td><td class="py-1.5 text-right">${r.stallTimeS.toFixed(2)}</td>
-              <td class="py-1.5 text-right">${r.criticalLossPct.toFixed(2)}</td><td class="py-1.5 text-right">${r.meanMos.toFixed(3)}</td>
-              <td class="py-1.5 text-right">${r.timeBelowMos36S.toFixed(1)}</td><td class="py-1.5 text-right">${r.tcpResets.toFixed(1)}</td></tr>`,
-            )
-            .join('')}</tbody>
-        </table>
-        <div class="mt-4 flex justify-end gap-2">
-          <button type="button" class="btn" data-act="bjson"><i data-lucide="download"></i>Download JSON</button>
-          <button type="button" class="btn btn-primary" data-act="bcsv"><i data-lucide="download"></i>Download CSV</button>
-        </div>`;
-      renderIcons(results);
-      results.querySelector('[data-act="bjson"]').addEventListener('click', () =>
-        downloadText(timestampedName('flexipath_benchmark', 'json'), toJSON(res), 'application/json'),
-      );
-      results.querySelector('[data-act="bcsv"]').addEventListener('click', () =>
-        downloadText(timestampedName('flexipath_benchmark', 'csv'), ExperimentRunner.toCSV(res), 'text/csv'),
-      );
-    });
+    this.openExperiments({ scenario: '__all__' });
   }
 }

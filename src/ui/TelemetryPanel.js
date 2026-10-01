@@ -95,7 +95,8 @@ export class TelemetryPanel {
     }
     if (!L.up) return ['DOWN', 'role-down', 'is-down'];
     if (id === d.primary) return ['PRIMARY', 'role-primary', 'is-primary'];
-    if (id === d.replica) return ['REPLICA', 'role-replica', 'is-replica'];
+    if (id === d.replica) return d.replicationActive ? ['REPLICA', 'role-replica', 'is-replica'] : ['NEXT PATH', 'role-prepared', ''];
+    if (id === d.prepared) return ['PREPARED', 'role-prepared', ''];
     const share = d.bulkShares?.[id] ?? 0;
     if (share > 0.001) return [`BULK ${(share * 100).toFixed(0)}%`, 'role-share', ''];
     return ['STANDBY', 'role-standby', ''];

@@ -5,10 +5,11 @@
  * otherwise an identical low-poly cyber-vehicle is built from primitives.
  * Each vehicle exposes an `AntennaAnchor` (roof antenna tip) where beams start.
  *
- * Visual state:
- *   FlexiPath  — cyan halo; purple pulsing halo + label while replicating
- *   Legacy     — crimson ghost; on a stall it flashes red, shakes (stutters),
- *                brakes (fail-safe) and shows "STALLED (3.8s)" with a countdown
+ * Visual state (all driven by the simulation snapshot):
+ *   FlexiPath  — cyan halo; label shows PREDICT / PROTECTING / SWITCHED; purple
+ *                pulsing halo while critical traffic is replicated
+ *   Legacy     — crimson ghost; on an interruption it flashes red, shakes (stutters),
+ *                brakes (fail-safe) and shows "SIMULATED INTERRUPTION · 3.8 s" with a countdown
  */
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
@@ -21,7 +22,7 @@ const PALETTE = {
 };
 const WHEEL_RADIUS = 0.36;
 const VEHICLE_SCALE = 1.3; // stylised: vehicles read clearly against 1.2 km of route
-const STALL_RED = new THREE.Color('#ff1f4b');
+const STALL_RED = new THREE.Color('#EF4444');
 const REPL_PURPLE = new THREE.Color('#a855f7');
 
 export function buildVehicle(kind = 'flexipath') {
@@ -349,19 +350,37 @@ export class VehicleManager {
       if (id === 'legacy') {
         if (stalled && d.stall) {
           const s = d.stall;
-          const total = s.total.toFixed(1);
-          const sub = s.waiting ? 'no carrier — waiting' : `${s.phaseLabel} · ${s.remaining.toFixed(1)} s`;
-          this._setLabel(v, 'is-stalled', `STALLED (${total}s)`, sub, s.elapsed / s.total);
+          const sub = s.waiting ? 'no carrier — waiting' : `stalled · ${s.phaseLabel} · ${s.remaining.toFixed(1)} s left`;
+          this._setLabel(v, 'is-stalled', `SIMULATED INTERRUPTION · ${s.total.toFixed(1)} s`, sub, s.elapsed / s.total);
         } else {
-          this._setLabel(v, '', `${d?.primary ?? '—'} · ${speed}`, braking ? 'fail-safe braking' : 'break-before-make', 0);
+          const st = agent.trace?.stage;
+          const sub = braking
+            ? 'fail-safe braking'
+            : st === 'FAILED'
+              ? 'link failed · still attached'
+              : st === 'DEGRADING'
+                ? 'link degrading · no prediction'
+                : 'break-before-make';
+          this._setLabel(v, '', `${d?.primary ?? '—'} · ${speed}`, sub, 0);
         }
       } else if (repl) {
-        this._setLabel(v, 'is-repl', `⇉ ${d.primary} + ${d.replica}`, `REPLICATING · ${d.replicationElapsed.toFixed(1)} s`, Math.min(1, d.replicationElapsed / 3));
+        const cls = d.replicate?.REALTIME ? 'critical + real-time' : 'critical';
+        this._setLabel(v, 'is-repl', `⇉ ${d.primary} + ${d.replica}`, `PROTECTING ${cls} · ${d.replicationElapsed.toFixed(1)} s`, Math.min(1, d.replicationElapsed / 3));
       } else {
         const ls = d?.lastSwitch;
         const recent = ls && snapshot.t - ls.t < 2.5;
-        const sub = recent ? (ls.seamless ? `HOT-SWAP ✓ ${ls.from} → ${ls.to}` : `FAILOVER ${ls.blackoutMs} ms`) : 'anchor 198.51.100.24';
-        this._setLabel(v, '', `${d?.primary ?? '—'} · ${speed}`, sub, 0);
+        if (recent) {
+          this._setLabel(v, 'is-ok', `${d?.primary ?? '—'} · ${speed}`, ls.seamless ? `SWITCHED ✓ ${ls.from} → ${ls.to} · 0 ms gap` : `FAILOVER ${ls.from} → ${ls.to} · ${ls.blackoutMs} ms`, 0);
+        } else if (d?.protecting) {
+          this._setLabel(v, 'is-predict', `${d.primary} · ${speed}`, `PROTECTION WINDOW · bulk drained → ${d.replica}`, 0);
+        } else if (d?.watching) {
+          const p = d.prediction;
+          const proj = Number.isFinite(p?.projectedTtf) ? p.projectedTtf : p?.ttf;
+          const ttf = Number.isFinite(proj) ? ` · failure ≈ ${proj < 1 ? proj.toFixed(2) : proj.toFixed(1)} s` : '';
+          this._setLabel(v, 'is-predict', `${d.primary} · ${speed}`, `PREDICT${ttf}${d.prepared ? ` · next ${d.prepared}` : ''}`, 0);
+        } else {
+          this._setLabel(v, '', `${d?.primary ?? '—'} · ${speed}`, 'monitoring · anchor 198.51.100.24', 0);
+        }
       }
     }
   }

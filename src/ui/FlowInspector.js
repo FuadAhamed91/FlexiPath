@@ -1,11 +1,16 @@
 /**
- * FlowInspector.js — live breakdown of active flows, their path(s),
+ * FlowInspector.js — live breakdown of active flows, their class, path(s),
  * replication status and the receiver-side duplicate-discard counter.
  */
 import { INTERFACE_SPECS } from '../simulation/LinkModel.js';
 import { FLOW_DEFS } from '../simulation/TrafficManager.js';
 
 const chip = (id, text = id) => `<span class="path-chip" style="--c:${INTERFACE_SPECS[id].color}">${text}</span>`;
+const BADGE = {
+  CRITICAL: ['CRIT', 'cls-badge cls-critical'],
+  REALTIME: ['RT', 'cls-badge cls-realtime'],
+  BULK: ['BULK', 'cls-badge cls-bulk'],
+};
 
 export class FlowInspector {
   constructor(root) {
@@ -18,15 +23,29 @@ export class FlowInspector {
       <div class="grid grid-cols-3 gap-2 px-3 pb-2">
         <div><div class="hud-label">Dups discarded</div><div class="num mt-1 text-[15px] font-bold text-repl" data-ref="dups">0</div></div>
         <div><div class="hud-label">Critical lost</div><div class="num mt-1 text-[15px] font-bold text-slate-100" data-ref="lost">0</div></div>
-        <div><div class="hud-label">Repl. time</div><div class="num mt-1 text-[15px] font-bold text-slate-100" data-ref="rtime">0.0s</div></div>
+        <div><div class="hud-label">Overhead</div><div class="num mt-1 text-[15px] font-bold text-slate-100" data-ref="rtime">0.0%</div></div>
       </div>
-      <div class="flex flex-col gap-1.5 px-2 pb-3" data-ref="flows">
-        ${FLOW_DEFS.map(
-          (f) => `
+      <div class="flex flex-col gap-1.5 px-2 pb-3" data-ref="flows"></div>`;
+    this.refs = {};
+    root.querySelectorAll('[data-ref]').forEach((n) => (this.refs[n.dataset.ref] = n));
+    this.cache = {};
+    this.setFlows(FLOW_DEFS);
+  }
+
+  /** Rebuild rows for the flows of the current scenario (traffic profile). */
+  setFlows(flows) {
+    const key = flows.map((f) => f.id).join(',');
+    if (key === this.flowKey) return;
+    this.flowKey = key;
+    this.refs.flows.innerHTML = [...flows]
+      .sort((a, b) => a.priority - b.priority)
+      .map((f) => {
+        const [text, cls] = BADGE[f.cls] ?? BADGE.BULK;
+        return `
           <div class="flow-row" data-flow="${f.id}">
             <div class="min-w-0">
               <div class="flex items-center gap-1.5">
-                <span class="role ${f.cls === 'CRITICAL' ? 'role-replica' : 'role-share'}" style="animation:none">${f.cls === 'CRITICAL' ? 'CRIT' : 'BULK'}</span>
+                <span class="${cls}">${text}</span>
                 <span class="font-mono text-[11px] font-semibold text-slate-100">${f.id}</span>
               </div>
               <div class="mt-0.5 truncate text-[10px] text-slate-500">${f.label}</div>
@@ -36,20 +55,15 @@ export class FlowInspector {
               <div class="num text-[9px] text-slate-500" data-ref="lat">—</div>
             </div>
             <div class="col-span-2 mt-1 flex min-h-[17px] flex-wrap items-center gap-1" data-ref="paths"></div>
-          </div>`,
-        ).join('')}
-      </div>`;
-    this.refs = {};
-    root.querySelectorAll('[data-ref]').forEach((n) => {
-      if (!n.closest('[data-flow]')) this.refs[n.dataset.ref] = n;
-    });
+          </div>`;
+      })
+      .join('');
     this.rows = {};
-    root.querySelectorAll('[data-flow]').forEach((row) => {
+    this.refs.flows.querySelectorAll('[data-flow]').forEach((row) => {
       const r = {};
       row.querySelectorAll('[data-ref]').forEach((n) => (r[n.dataset.ref] = n));
       this.rows[row.dataset.flow] = { el: row, refs: r, cache: {} };
     });
-    this.cache = {};
   }
 
   _set(el, key, value, cache = this.cache) {
@@ -73,10 +87,16 @@ export class FlowInspector {
     let replColor = '#64748b';
     if (engine === 'legacy') {
       replText = d.stalled ? 'SOCKETS STALLED' : 'NOT SUPPORTED';
-      replColor = d.stalled ? '#fb7185' : '#64748b';
+      replColor = d.stalled ? '#f87171' : '#64748b';
     } else if (d.replicationActive) {
       replText = `ACTIVE · ${d.replicationElapsed.toFixed(1)} s`;
       replColor = '#d8b4fe';
+    } else if (d.protecting) {
+      replText = 'PROTECTION · NO ELIGIBLE FLOWS';
+      replColor = '#93c5fd';
+    } else if (d.watching && d.prepared) {
+      replText = `ARMED · ${d.prepared} PREPARED`;
+      replColor = '#93c5fd';
     }
     if (this.cache.replText !== replText) {
       this.cache.replText = replText;
@@ -86,8 +106,8 @@ export class FlowInspector {
     }
     this._set(this.refs.dups, 'dups', st.duplicatesDiscarded.toLocaleString('en-US'));
     this._set(this.refs.lost, 'lost', st.criticalLost.toLocaleString('en-US'));
-    this.refs.lost.style.color = st.criticalLost > 0 && engine === 'legacy' ? '#fb7185' : '';
-    this._set(this.refs.rtime, 'rtime', `${st.replicationTime.toFixed(1)}s`);
+    this.refs.lost.style.color = st.criticalLost > 0 && engine === 'legacy' ? '#f87171' : '';
+    this._set(this.refs.rtime, 'rtime', `${(st.overheadPct ?? 0).toFixed(1)}%`);
 
     for (const f of tr.flows) {
       const row = this.rows[f.id];
@@ -95,7 +115,7 @@ export class FlowInspector {
       let rate;
       let lat;
       let paths;
-      if (f.cls === 'CRITICAL') {
+      if (f.mode === 'packet') {
         const pct = f.sent ? (f.delivered / f.sent) * 100 : 0;
         rate = `${pct.toFixed(pct === 100 ? 0 : 1)}% dlvd`;
         lat = f.delivered ? `${(f.oneWayMs * 2).toFixed(1)} ms RTT` : 'no delivery';

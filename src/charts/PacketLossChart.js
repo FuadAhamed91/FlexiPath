@@ -1,7 +1,7 @@
 /**
- * PacketLossChart.js — critical-flow packet loss (%, 1 s sliding window).
- * FlexiPath hugs the floor (replication covers every handover) while Legacy
- * climbs on its sticky, degrading link and spikes to 100 % during a stall.
+ * PacketLossChart.js — packet loss of the critical + real-time flows (%, 1 s sliding window).
+ * FlexiPath stays low while replication covers its handovers; Legacy climbs on its sticky,
+ * degrading link and reaches 100 % during a simulated interruption. Gaps = no packet flows.
  */
 import { BaseTimeSeriesChart } from './BaseTimeSeriesChart.js';
 

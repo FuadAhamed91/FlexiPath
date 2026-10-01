@@ -157,6 +157,18 @@ export class LegacyController {
     }
   }
 
+  /** The static rule the legacy stack is following right now (shown next to FlexiPath's decisions). */
+  _rule() {
+    const cur = this.current;
+    if (this.state === 'STALLED' && this.stall) return `Break-before-make: ${this.stall.phases[Math.min(this.stall.phaseIndex, this.stall.phases.length - 1)].label}`;
+    if (!cur) return 'Waiting for any carrier';
+    const floor = this.p.floors[cur];
+    const s = INTERFACE_SPECS[cur];
+    return floor !== undefined
+      ? `Stay on ${cur} until ${s.signalLabel} < ${floor} ${s.signalUnit} (static floor, no prediction)`
+      : `Stay on ${cur} until the carrier is lost (static route metric)`;
+  }
+
   update({ t, links }) {
     const events = [];
     for (const id of INTERFACE_IDS) {
@@ -206,6 +218,13 @@ export class LegacyController {
       primary: this.current,
       replica: null,
       replicationActive: false,
+      replicate: { CRITICAL: false, REALTIME: false, BULK: false },
+      backup: null, // no alternate is prepared: the fallback is only discovered after the failure
+      watching: false,
+      prepared: null,
+      rule: this._rule(),
+      records: [],
+      lastRecord: null,
       criticalPaths: this.current && !stalled ? [this.current] : [],
       bulkShares: this.current && !stalled ? { [this.current]: 1 } : {},
       blackoutMs: 0,

@@ -15,7 +15,7 @@ import { INTERFACE_IDS, INTERFACE_SPECS } from '../simulation/LinkModel.js';
 
 const CRITICAL = new THREE.Color('#e0fdff');
 const DUPLICATE = new THREE.Color('#d8b4fe');
-const LOST = new THREE.Color('#ff2340');
+const LOST = new THREE.Color('#EF4444');
 const PROBE = new THREE.Color('#64748b');
 
 export class PacketParticleManager {
@@ -80,15 +80,17 @@ export class PacketParticleManager {
     p.twin = twin;
   }
 
-  _rates(beam, repl) {
+  _rates(beam, repl, both) {
     // Visual packets per second (not 1:1 with simulated traffic — legible density).
     switch (beam.role) {
       case 'primary':
-        return { critical: repl ? 0 : 7, bulk: 5 + 12 * Math.max(beam.share, 0.3), dup: repl ? 7 : 0, probe: 0 };
+        return { critical: repl ? (both ? 0 : 3) : 7, bulk: 5 + 12 * Math.max(beam.share, 0.3), dup: repl ? (both ? 8 : 5) : 0, probe: 0 };
       case 'replica':
         return { critical: 0, bulk: 4 * beam.share, dup: 0, probe: 0 }; // twins spawned with primary
       case 'share':
         return { critical: 0, bulk: 3 + 14 * beam.share, dup: 0, probe: 0 };
+      case 'prepared':
+        return { critical: 0, bulk: 0, dup: 0, probe: 2.6 };
       case 'probe':
         return { critical: 0, bulk: 0, dup: 0, probe: 1.1 };
       default:
@@ -102,7 +104,7 @@ export class PacketParticleManager {
       if (visibility[beam.vehicleId] === false || beam.intensity < 0.12) continue;
       const agent = snapshot.agents[beam.vehicleId];
       const repl = !!agent.decision?.replicationActive;
-      const rates = this._rates(beam, repl);
+      const rates = this._rates(beam, repl, !!agent.decision?.replicate?.REALTIME);
       const key = beam.mesh.id;
       const acc = this.spawnAcc.get(key) ?? { critical: 0, bulk: 0, dup: 0, probe: 0 };
       for (const kind of ['critical', 'bulk', 'dup', 'probe']) {

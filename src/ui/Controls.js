@@ -19,12 +19,12 @@ export class Controls {
     this.h = handlers;
     root.innerHTML = `
       <div class="flex items-center justify-between px-3 pt-3 pb-2">
-        <h2 class="hud-title">Mission Control</h2>
+        <h2 class="hud-title">Simulation controls</h2>
         <span class="chip" data-ref="seedChip">SEED —</span>
       </div>
 
-      <section class="px-3" aria-label="Cumulative handover stall time">
-        <div class="hud-label mb-1.5">Cumulative handover stall time</div>
+      <section class="px-3" aria-label="Simulated interruption, cumulative">
+        <div class="hud-label mb-1.5">Simulated interruption · cumulative</div>
         <div class="grid grid-cols-2 gap-2">
           <div class="rounded-lg border border-fp/25 bg-fp/5 px-2.5 py-2">
             <div class="flex items-center gap-1.5 text-[9px] font-bold tracking-[0.18em] text-fp"><span class="legend-dot bg-fp"></span>FLEXIPATH</div>
@@ -89,7 +89,7 @@ export class Controls {
         <button type="button" class="btn btn-primary w-full" data-ref="exportJson" title="Full experiment record: config, summary, events, 10 Hz time series"><i data-lucide="file-json"></i>Export Experiment Data (JSON)</button>
         <div class="mt-1.5 grid grid-cols-2 gap-1.5">
           <button type="button" class="btn" data-ref="exportCsv" title="10 Hz time series for both engines"><i data-lucide="file-spreadsheet"></i>Export CSV</button>
-          <button type="button" class="btn" data-ref="bench" title="Seeds × speeds × fault scenarios, headless"><i data-lucide="flask-conical"></i>Batch benchmark</button>
+          <button type="button" class="btn" data-ref="bench" title="Paired Legacy vs FlexiPath trials across scenarios A–F"><i data-lucide="flask-conical"></i>Experiments</button>
         </div>
       </section>`;
 
@@ -164,8 +164,8 @@ export class Controls {
       this.refs.lgStall.firstChild.nodeValue = lgVal;
     }
     this.refs.lgStall.classList.toggle('is-ticking', !!stalled);
-    const fpSub = `${fp.seamlessHandovers} hot-swap${fp.seamlessHandovers === 1 ? '' : 's'} · ${fp.unplannedFailovers ? `${fp.unplannedFailovers} failover · ` : ''}${fp.criticalLost} lost`;
-    const lgSub = `${lg.stallEvents} stall${lg.stallEvents === 1 ? '' : 's'} · ${lg.tcpResets} TCP RST · ${lg.criticalLost} lost`;
+    const fpSub = `${fp.seamlessHandovers} switch${fp.seamlessHandovers === 1 ? '' : 'es'} · ${fp.unplannedFailovers ? `${fp.unplannedFailovers} failover · ` : ''}${fp.criticalLost} crit lost`;
+    const lgSub = `${lg.stallEvents} interruption${lg.stallEvents === 1 ? '' : 's'} · ${lg.tcpResets} TCP RST · ${lg.criticalLost} crit lost`;
     if (this.cache.fpSub !== fpSub) this.refs.fpSub.textContent = this.cache.fpSub = fpSub;
     if (this.cache.lgSub !== lgSub) this.refs.lgSub.textContent = this.cache.lgSub = lgSub;
   }

@@ -340,6 +340,13 @@ export class NetworkNodeManager {
     this.group.add(holder);
     const anchorObj = root.getObjectByName('BeamAnchor') ?? anchor(root, 0, 2, 0);
     const emissives = collectEmissives(root, 2.2);
+    if (id === 'eth0') {
+      // Keep the wired node in the HUD's wired colour whatever the asset was exported with.
+      for (const m of emissives) {
+        m.emissive.set(color);
+        m.userData.baseEmissiveColor = m.emissive.clone();
+      }
+    }
     const label = makeLabel(id, color, sub);
     const box = new THREE.Box3().setFromObject(root);
     label.obj.position.set(0, box.max.y - position.y + 1.6, 0);

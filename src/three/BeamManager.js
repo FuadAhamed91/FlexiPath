@@ -2,9 +2,9 @@
  * BeamManager.js — dynamic CatmullRom energy beams between each vehicle's
  * AntennaAnchor and every network node.
  *
- *   eth0  Royal Blue #2563EB · wlan0 Neon Cyan #00F0FF · wwan0 Emerald #10B981
- *   sat0  Warm Gold  #F59E0B · replication window: dual purple pulse #A855F7
- *   legacy stall: beam turns red, flickers and dies
+ *   eth0  Slate #64748B · wlan0 Neon Cyan #00F0FF · wwan0 Emerald #10B981
+ *   sat0  Warm Gold #F59E0B · replication window: dual purple pulse #A855F7
+ *   prepared next path: dashed beam · legacy interruption: beam turns red #EF4444, flickers and dies
  *
  * Tubes are rebuilt in place every frame (pre-allocated buffers, parallel-
  * transport frames) so beams stay attached to moving vehicles and satellites.
@@ -49,7 +49,7 @@ const BEAM_FRAG = /* glsl */ `
   }
 `;
 
-const RED = new THREE.Color('#ff2340');
+const RED = new THREE.Color('#EF4444');
 const PURPLE = new THREE.Color('#A855F7');
 const UP = new THREE.Vector3(0, 1, 0);
 const X_AXIS = new THREE.Vector3(1, 0, 0);
@@ -225,7 +225,10 @@ export class BeamManager {
           target = 1;
         } else if (lid === d?.replica) {
           role = 'replica';
-          target = 0.95;
+          target = d.replicationActive ? 0.95 : 0.6;
+        } else if (lid === d?.prepared) {
+          role = 'prepared'; // selected and validated next path, not yet carrying traffic
+          target = 0.45;
         } else if (share > 0.001) {
           role = 'share';
           target = 0.35 + 0.5 * share;
@@ -278,14 +281,14 @@ export class BeamManager {
         p1.lerpVectors(p0, p2, 0.5);
         if (lid === 'sat0') p1.y += dist * 0.06;
         else p1.y += Math.min(14, dist * 0.2);
-        const radius = r.role === 'primary' || r.role === 'failing' ? 0.13 : r.role === 'replica' ? 0.12 : 0.07;
+        const radius = r.role === 'primary' || r.role === 'failing' ? 0.13 : r.role === 'replica' ? 0.12 : r.role === 'prepared' ? 0.09 : 0.07;
         beam.tube.update(beam.curve, radius);
 
         const u = beam.uniforms;
         u.uTime.value = time;
         u.uIntensity.value = beam.intensity;
         u.uFlow.value = Math.min(2.4, Math.max(0.12, 9 / Math.max(3, beam.rttMs)));
-        u.uDash.value = r.role === 'probe' || r.role === 'attaching' ? 1 : 0;
+        u.uDash.value = r.role === 'probe' || r.role === 'attaching' || r.role === 'prepared' ? 1 : 0;
         const pulse = repl && (r.role === 'primary' || r.role === 'replica') ? 1 : 0;
         u.uPulse.value += (pulse - u.uPulse.value) * k;
         if (r.role === 'failing' || r.role === 'attaching') {

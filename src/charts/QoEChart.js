@@ -1,6 +1,7 @@
 /**
- * QoEChart.js — running Mean Opinion Score (ITU-T G.107 E-model, 1.0 – 4.5).
+ * QoEChart.js — running Mean Opinion Score of the VoIP flow (ITU-T G.107 E-model, 1.0 – 4.5).
  * The dashed line marks MOS 3.6 (R ≈ 70), below which users become dissatisfied.
+ * Scenarios without a voice flow leave the chart empty (no MOS is invented).
  */
 import { BaseTimeSeriesChart } from './BaseTimeSeriesChart.js';
 import { MOS_THRESHOLD } from '../simulation/SimulationEngine.js';

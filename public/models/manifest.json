@@ -2,7 +2,7 @@
   "generator": "blender/generate_all_models.py",
   "version": "1.0.0",
   "blender": "5.2.2 LTS",
-  "generatedAt": "2026-09-30T18:50:19Z",
+  "generatedAt": "2026-10-01T06:28:42Z",
   "conventions": {
     "up": "+Y (glTF)",
     "vehicleForward": "+X",
@@ -32,7 +32,7 @@
     },
     {
       "file": "wired_node.glb",
-      "bytes": 69336,
+      "bytes": 69332,
       "faces": 1180,
       "objects": 10
     },

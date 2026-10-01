@@ -1,17 +1,20 @@
 #!/usr/bin/env node
 /**
- * Headless benchmark: FlexiPath vs Legacy across seeds × speeds × scenarios.
+ * Headless experiments: FlexiPath vs Legacy, paired by seed, across scenarios × speeds.
  *
- *   npm run benchmark
- *   npm run benchmark -- --seeds 10 --speeds 30,60,90,120 --scenarios baseline,wifi-fade,cell-outage
- *   npm run benchmark -- --quick          (3 seeds, 60 km/h, all scenarios)
+ *   npm run benchmark                                   (scenarios A–F, 5 seeds, 30/60/90/120 km/h)
+ *   npm run benchmark -- --quick                        (3 seeds, 60 km/h)
+ *   npm run benchmark -- --seeds 10 --speeds 60 --scenarios A,D
+ *   npm run benchmark -- --scenarios baseline,wifi-fade,cell-outage   (original matrix)
  *
- * Writes results/benchmark_<stamp>.json and .csv (per-run rows, both engines side by side).
+ * Writes results/benchmark_<stamp>.json, .csv (per-run rows, both engines side by side) and
+ * _comparison.csv (Metric | Legacy | FlexiPath | Difference with 95 % CI). All numbers are
+ * measured simulation results, not real-world measurements.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ExperimentRunner, SCENARIOS } from '../src/simulation/ExperimentRunner.js';
+import { ExperimentRunner, EXPERIMENT_SCENARIOS, SCENARIOS, seedsFor } from '../src/simulation/ExperimentRunner.js';
 import { toJSON, timestampedName } from '../src/utils/Export.js';
 
 const args = process.argv.slice(2);
@@ -20,16 +23,21 @@ const opt = (name, fallback) => {
   return i >= 0 && args[i + 1] && !args[i + 1].startsWith('--') ? args[i + 1] : fallback;
 };
 const quick = args.includes('--quick');
-const nSeeds = Number(opt('seeds', quick ? 3 : 5));
-const seeds = Array.from({ length: nSeeds }, (_, i) => 1000 + i * 7919);
+const seeds = seedsFor(Number(opt('seeds', quick ? 3 : 5)));
 const speeds = opt('speeds', quick ? '60' : '30,60,90,120').split(',').map(Number);
-const scenarios = opt('scenarios', Object.keys(SCENARIOS).join(',')).split(',');
+const scenarios = opt('scenarios', EXPERIMENT_SCENARIOS.join(',')).split(',');
+const unknown = scenarios.filter((s) => !SCENARIOS[s]);
+if (unknown.length) {
+  console.error(`Unknown scenario(s): ${unknown.join(', ')} · available: ${Object.keys(SCENARIOS).join(', ')}`);
+  process.exit(1);
+}
 const failSafe = !args.includes('--no-failsafe');
 const outDir = resolve(dirname(fileURLToPath(import.meta.url)), '..', opt('out', 'results'));
 
 const runner = new ExperimentRunner({ seeds, speeds, scenarios, failSafe });
 const total = runner.plan.length;
-console.log(`FlexiPath benchmark · ${total} runs (${seeds.length} seeds × ${speeds.length} speeds × ${scenarios.length} scenarios)`);
+console.log(`FlexiPath experiments · ${total} paired runs (${seeds.length} seeds × ${speeds.length} speeds × ${scenarios.length} scenarios)`);
+console.log('All values are measured SIMULATION results (model, not hardware).');
 
 const results = await runner.run({
   yieldEvery: 50,
@@ -41,26 +49,28 @@ const results = await runner.run({
 });
 process.stdout.write('\n');
 
-const fmt = (v, d = 2) => (typeof v === 'number' ? v.toFixed(d) : '—');
-const rows = {};
-for (const a of results.aggregate) {
-  rows[`${a.scenario} · ${a.engine}`] = {
-    runs: a.runs,
-    'stall s': fmt(a.stallTimeS.mean),
-    'crit loss %': fmt(a.criticalLossPct.mean, 3),
-    'mean MOS': fmt(a.meanMos.mean, 3),
-    'min MOS': fmt(a.minMos.mean, 2),
-    's < MOS 3.6': fmt(a.timeBelowMos36S.mean, 1),
-    'TCP RST': fmt(a.tcpResets.mean, 1),
-    'hot-swaps': fmt(a.seamlessHandovers.mean, 1),
-    'journey s': fmt(a.journeyTimeS.mean, 1),
-  };
+const fmt = (v, d = 2) => (typeof v === 'number' && Number.isFinite(v) ? v.toFixed(d) : '—');
+const pick = ['interruptionS', 'longestInterruptionS', 'criticalDeliveryPct', 'packetLossPct', 'meanMos', 'replicationOverheadPct', 'replicationOverheadTotalPct', 'actionVsFailureS', 'meanThroughputMbps'];
+for (const scenario of scenarios) {
+  const table = results.comparison[scenario].filter((m) => pick.includes(m.key));
+  console.log(`\n${scenario} · ${SCENARIOS[scenario].label}`);
+  const rows = {};
+  for (const m of table) {
+    rows[m.label] = {
+      Legacy: fmt(m.legacy?.mean, m.digits),
+      FlexiPath: fmt(m.flexipath?.mean, m.digits),
+      'Δ (FP − LG)': m.diff ? `${m.diff.mean >= 0 ? '+' : ''}${fmt(m.diff.mean, m.digits)}${m.diff.ci95 !== null ? ` ± ${fmt(m.diff.ci95, m.digits)}` : ''}` : '—',
+      unit: m.unit,
+    };
+  }
+  console.table(rows);
 }
-console.table(rows);
 
 mkdirSync(outDir, { recursive: true });
 const jsonPath = resolve(outDir, timestampedName('benchmark', 'json'));
 const csvPath = resolve(outDir, timestampedName('benchmark', 'csv'));
+const cmpPath = resolve(outDir, timestampedName('benchmark_comparison', 'csv'));
 writeFileSync(jsonPath, toJSON(results));
 writeFileSync(csvPath, ExperimentRunner.toCSV(results));
-console.log(`wrote ${jsonPath}\nwrote ${csvPath}\n(${results.meta.wallTimeMs} ms wall time)`);
+writeFileSync(cmpPath, ExperimentRunner.comparisonCSV(results));
+console.log(`\nwrote ${jsonPath}\nwrote ${csvPath}\nwrote ${cmpPath}\n(${results.meta.wallTimeMs} ms wall time)`);

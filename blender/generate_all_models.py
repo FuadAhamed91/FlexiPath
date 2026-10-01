@@ -5,7 +5,7 @@ Creates, materials and exports the six glTF-binary assets used by the digital tw
 
     flexipath_vehicle.glb   low-poly cyber-vehicle · carbon chassis · glowing cyan cabin · AntennaAnchor
     legacy_vehicle.glb      identical chassis tinted crimson / burgundy
-    wired_node.glb          pedestal charging / docking dock with emissive blue terminal ring
+    wired_node.glb          pedestal charging / docking dock with emissive slate terminal ring
     wifi_node.glb           utility pole + dual-antenna Wi-Fi 6 access box (neon cyan)
     5g_tower.glb            hexagonal lattice tower + three angled panel antennas (emerald)
     leo_satellite.glb       CubeSat · gold-foil core · twin PV wings · downward transponder dish (amber)
@@ -392,12 +392,12 @@ def build_vehicle(kind):
 # ─────────────────────────────────────────────────────────────────────────────
 def build_wired_node():
     b = AssetBuilder("wired_node")
-    blue = "#3B82F6"
+    slate = "#64748B"  # HUD wired colour
     dark = b.mat("DockMetal", "#111827", metallic=0.85, roughness=0.35)
     body = b.mat("DockBody", "#0b1220", metallic=0.8, roughness=0.3)
     head = b.mat("DockHead", "#1e293b", metallic=0.8, roughness=0.25)
-    glow = b.mat("DockGlow", "#05080f", emission=blue, strength=4.0)
-    core = b.mat("DockCore", "#05080f", emission="#93C5FD", strength=3.0)
+    glow = b.mat("DockGlow", "#05080f", emission=slate, strength=4.0)
+    core = b.mat("DockCore", "#05080f", emission="#CBD5E1", strength=3.0)
     cable = b.mat("DockCable", "#0f172a", metallic=0.2, roughness=0.8)
 
     b.part("Plinth", lambda bm: bm_cyl(bm, 1.45, 1.25, 0.3, (0, 0, 0.15), segments=40), dark, smooth=False)

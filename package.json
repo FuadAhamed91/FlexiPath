@@ -1,8 +1,8 @@
 {
   "name": "flexipath",
   "private": true,
-  "version": "1.0.0",
-  "description": "FlexiPath - zero-disruption heterogeneous network mobility digital twin (ATRC Advanced Technology Pioneers 2026 - EDGE Challenge)",
+  "version": "1.1.0",
+  "description": "FlexiPath - predictive, traffic-aware connectivity engine for heterogeneous networks: simulation prototype and digital twin (ATRC Advanced Technology Pioneers 2026 - EDGE Challenge)",
   "type": "module",
   "scripts": {
     "dev": "vite",

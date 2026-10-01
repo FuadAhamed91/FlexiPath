@@ -67,6 +67,19 @@ export class SceneManager {
     this._tween = null;
     this._desired = new THREE.Vector3();
     this._delta = new THREE.Vector3();
+    this._off = new THREE.Vector3();
+    // Chase framing keeps both vehicles in view: it pulls back as the gap between them grows,
+    // on top of whatever distance the user chose with the mouse wheel.
+    this._autoZoom = 1;
+    this._baseLen = CHASE_OFFSET.length();
+    this._userDragging = false;
+    this.controls.addEventListener('start', () => {
+      this._userDragging = true;
+    });
+    this.controls.addEventListener('end', () => {
+      this._userDragging = false;
+      this._baseLen = this.camera.position.distanceTo(this.controls.target) / this._autoZoom;
+    });
 
     this._resizeObserver = new ResizeObserver(() => this.resize());
     this._resizeObserver.observe(container);
@@ -107,6 +120,16 @@ export class SceneManager {
     }
   }
 
+  /** Jump the chase camera to the focus vehicle (after a scenario reset moves it along the route). */
+  snapTo(focus) {
+    if (this.cameraMode !== 'chase') return;
+    this._tween = null;
+    this._autoZoom = 1;
+    this._baseLen = CHASE_OFFSET.length();
+    this.controls.target.copy(focus).add({ x: 7, y: 1, z: -1.5 });
+    this.camera.position.copy(this.controls.target).add(CHASE_OFFSET);
+  }
+
   /**
    * Camera rig update.
    * @param {number} dt seconds
@@ -117,21 +140,39 @@ export class SceneManager {
     const k = 1 - Math.exp(-dt * 4.5);
     if (this.cameraMode === 'chase') {
       this._desired.copy(focus).add({ x: 7, y: 1, z: -1.5 });
+      let wantZoom = 1;
       if (companion) {
+        // Keep both vehicles in frame: aim between them and pull back until a sphere around
+        // both fits inside the narrower half field of view.
         const sep = focus.distanceTo(companion);
-        if (sep > 14) this._desired.lerp(companion, Math.min(0.45, (sep - 14) / 90));
+        this._desired.lerp(companion, THREE.MathUtils.clamp((sep - 4) / 30, 0, 0.5));
+        const vHalf = THREE.MathUtils.degToRad(this.camera.fov / 2);
+        const hHalf = Math.atan(Math.tan(vHalf) * this.camera.aspect);
+        const need = (sep / 2 + 6) / Math.sin(Math.min(vHalf, hHalf));
+        wantZoom = THREE.MathUtils.clamp(need / this._baseLen, 1, 4.5);
       }
+      this._autoZoom += (wantZoom - this._autoZoom) * Math.min(1, k * 0.8);
       if (this._resetChaseOffset) {
         this._resetChaseOffset = false;
+        this._baseLen = CHASE_OFFSET.length();
         this._tween = { position: this._desired.clone().add(CHASE_OFFSET), target: this._desired.clone(), t: 0, follow: true };
       }
       if (this._tween?.follow) {
         this._tween.target.copy(this._desired);
-        this._tween.position.copy(this._desired).add(CHASE_OFFSET);
+        this._tween.position.copy(this._desired).add(this._off.copy(CHASE_OFFSET).multiplyScalar(this._autoZoom));
       } else {
         this._delta.subVectors(this._desired, this.controls.target).multiplyScalar(k);
         this.controls.target.add(this._delta);
         this.camera.position.add(this._delta);
+        if (!this._userDragging) {
+          const off = this._off.subVectors(this.camera.position, this.controls.target);
+          const len = off.length();
+          const want = this._baseLen * this._autoZoom;
+          if (len > 1e-3) {
+            off.multiplyScalar((len + (want - len) * Math.min(1, k * 0.8)) / len);
+            this.camera.position.copy(this.controls.target).add(off);
+          }
+        }
       }
     } else if (this.cameraMode === 'cinematic') {
       this.cinematicAngle += dt * 0.16;
