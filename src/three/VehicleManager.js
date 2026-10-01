@@ -6,8 +6,8 @@
  * Each vehicle exposes an `AntennaAnchor` (roof antenna tip) where beams start.
  *
  * Visual state (all driven by the simulation snapshot):
- *   FlexiPath  — cyan halo; label shows PREDICT / PROTECTING / SWITCHED; purple
- *                pulsing halo while critical traffic is replicated
+ *   FlexiPath  — cyan halo; label shows PREDICT / WARM PROBE / BURST TX / SWITCHED with the
+ *                radio power; purple pulsing halo while critical traffic is replicated
  *   Legacy     — crimson ghost; on an interruption it flashes red, shakes (stutters),
  *                brakes (fail-safe) and shows "SIMULATED INTERRUPTION · 3.8 s" with a countdown
  */
@@ -15,6 +15,10 @@ import * as THREE from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { loadGLB, collectEmissives } from './NetworkNodeManager.js';
 import { METERS_PER_UNIT } from '../simulation/MobilityModel.js';
+import { POWER_PARAMS } from '../simulation/PowerModel.js';
+import { RELAY_PARAMS } from '../simulation/RelayTunnelModel.js';
+
+const W = POWER_PARAMS.tierWatts;
 
 const PALETTE = {
   flexipath: { body: '#0b0f16', accent: '#00F0FF', cabin: '#00F0FF', trim: '#1f2937' },
@@ -365,21 +369,25 @@ export class VehicleManager {
         }
       } else if (repl) {
         const cls = d.replicate?.REALTIME ? 'critical + real-time' : 'critical';
-        this._setLabel(v, 'is-repl', `⇉ ${d.primary} + ${d.replica}`, `PROTECTING ${cls} · ${d.replicationElapsed.toFixed(1)} s`, Math.min(1, d.replicationElapsed / 3));
+        const win = d.burstWindowS ?? POWER_PARAMS.burstWindowS;
+        this._setLabel(v, 'is-repl', `⇉ ${d.primary} + ${d.replica}`, `BURST TX ${W[2]} W · ${cls} · ${Math.round(d.replicationElapsed * 1000)}/${Math.round(win * 1000)} ms`, Math.min(1, d.replicationElapsed / win));
       } else {
         const ls = d?.lastSwitch;
         const recent = ls && snapshot.t - ls.t < 2.5;
         if (recent) {
           this._setLabel(v, 'is-ok', `${d?.primary ?? '—'} · ${speed}`, ls.seamless ? `SWITCHED ✓ ${ls.from} → ${ls.to} · 0 ms gap` : `FAILOVER ${ls.from} → ${ls.to} · ${ls.blackoutMs} ms`, 0);
         } else if (d?.protecting) {
-          this._setLabel(v, 'is-predict', `${d.primary} · ${speed}`, `PROTECTION WINDOW · bulk drained → ${d.replica}`, 0);
+          this._setLabel(v, 'is-predict', `${d.primary} · ${speed}`, `PROTECTION WINDOW · bulk paced → ${d.replica}`, 0);
         } else if (d?.watching) {
           const p = d.prediction;
           const proj = Number.isFinite(p?.projectedTtf) ? p.projectedTtf : p?.ttf;
           const ttf = Number.isFinite(proj) ? ` · failure ≈ ${proj < 1 ? proj.toFixed(2) : proj.toFixed(1)} s` : '';
-          this._setLabel(v, 'is-predict', `${d.primary} · ${speed}`, `PREDICT${ttf}${d.prepared ? ` · next ${d.prepared}` : ''}`, 0);
+          const next = d.prepared ? ` · ${d.prepared} warm ✓` : d.warmTarget ? ` · waking ${d.warmTarget} (${W[1]} W)` : '';
+          this._setLabel(v, 'is-predict', `${d.primary} · ${speed}`, `PREDICT${ttf}${next}`, 0);
+        } else if (d?.warmTarget && (d.radio?.[d.warmTarget] === 'WARM' || d.radio?.[d.warmTarget] === 'WAKING')) {
+          this._setLabel(v, '', `${d.primary ?? '—'} · ${speed}`, `WARM PROBE ${d.warmTarget} · ${W[1]} W`, 0);
         } else {
-          this._setLabel(v, '', `${d?.primary ?? '—'} · ${speed}`, 'monitoring · anchor 198.51.100.24', 0);
+          this._setLabel(v, '', `${d?.primary ?? '—'} · ${speed}`, `DRX standby ${W[0]} W · relay ${RELAY_PARAMS.anchorIp}`, 0);
         }
       }
     }

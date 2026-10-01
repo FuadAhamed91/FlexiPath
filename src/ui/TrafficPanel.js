@@ -5,12 +5,14 @@
  * replication status with its reason, and QoE sensitivity. The replication state is read from the
  * controller decision and the per-flow traffic result of this tick; the bulk "would cost" figure is the
  * flow's current rate against the backup path's measured capacity. Overhead totals are measured.
+ * Replication only happens inside the ~400 ms handoff burst; bulk is moved with delay-compensated pacing.
  */
 import { TRAFFIC_CLASSES } from '../simulation/TrafficManager.js';
 import { FLEXIPATH_PARAMS } from '../simulation/FlexiPathController.js';
 import { classBadge, esc, fmtInt, linkChip, linkName, makeSetter, tag } from './format.js';
 
 const P = FLEXIPATH_PARAMS;
+const BURST_MS = Math.round(P.burstWindowS * 1000);
 
 export class TrafficPanel {
   constructor(root) {
@@ -33,7 +35,7 @@ export class TrafficPanel {
           <div class="kpi-cell"><div class="v text-slate-100" data-ref="ovAll">0.000%</div><div class="flow-meta mt-1">of all traffic bytes</div></div>
         </div>
         <div class="flow-meta mt-1.5" data-ref="ovSub">0 duplicates discarded at the receiver</div>
-        <div class="flow-meta mt-1" >Legacy OS: one path for every flow, no replication.</div>
+        <div class="flow-meta mt-1" >Legacy OS: one path for every flow, no replication · a loss stalls its TCP streams 200–500 ms (head-of-line).</div>
       </div>`;
     this.refs = {};
     root.querySelectorAll('[data-ref]').forEach((n) => (this.refs[n.dataset.ref] = n));
@@ -88,6 +90,7 @@ export class TrafficPanel {
     const perFlow = fp.stats.perFlow ?? {};
     const backup = d.prepared ?? d.backup ?? null;
     const watching = d.watching && !d.protecting;
+    const warming = watching && !d.prepared && d.warmTarget && (d.radio?.[d.warmTarget] === 'WARM' || d.radio?.[d.warmTarget] === 'WAKING') ? d.warmTarget : null;
 
     for (const f of flows) {
       const card = this.cards[f.id];
@@ -128,19 +131,22 @@ export class TrafficPanel {
         why = 'No usable path: packets are buffered at the anchor';
       } else if (f.cls === 'CRITICAL') {
         if (res.replicated) {
-          state = ['REPLICATING', 'st-active'];
-          why = `Sent on ${linkName(res.paths[0])} + ${linkName(res.paths[1])} · receiver keeps the first copy`;
+          state = ['BURST', 'st-active'];
+          why = `Sent on ${linkName(res.paths[0])} + ${linkName(res.paths[1])} for the ${BURST_MS} ms handoff window · receiver keeps the first copy of each sequence number, late duplicates discarded`;
         } else if (watching && d.prepared) {
           state = ['ARMED', 'st-armed'];
-          why = `${linkName(d.prepared)} prepared · replicates if time-to-failure < ${P.ttfTriggerS.toFixed(1)} s`;
+          why = `${linkName(d.prepared)} warm-validated · ${BURST_MS} ms burst if time-to-failure < ${P.ttfTriggerS.toFixed(1)} s`;
+        } else if (warming) {
+          state = ['PRIMING', 'st-standby'];
+          why = `Degradation predicted · ${linkName(warming)} woken to warm probe, being validated by heartbeats`;
         } else {
           state = ['SINGLE PATH', 'st-off'];
-          why = 'No degradation predicted · replicated as soon as one is';
+          why = 'No degradation predicted · sequence-numbered, so a burst never stalls delivery';
         }
       } else if (f.cls === 'REALTIME') {
         if (res.replicated) {
-          state = ['REPLICATING', 'st-active'];
-          why = `Joined: loss above its ${(P.realtimeLossBudget * 100).toFixed(0)} % budget or failure < ${P.realtimeTtfS.toFixed(0)} s away`;
+          state = ['BURST', 'st-active'];
+          why = `Joined the burst: loss above its ${(P.realtimeLossBudget * 100).toFixed(0)} % budget or failure < ${P.realtimeTtfS.toFixed(0)} s away`;
         } else if (d.protecting) {
           const loss = d.prediction?.loss ?? 0;
           state = ['STANDBY', 'st-standby'];
@@ -156,9 +162,13 @@ export class TrafficPanel {
         } else if (Number.isFinite(res.replicaCostPct) && backup) {
           why = `Replication overhead not justified for bulk priority: a copy would add ${res.mbps.toFixed(1)} Mbps ≈ ${res.replicaCostPct.toFixed(0)} % of ${linkName(backup)} capacity`;
         } else {
-          why = 'Replication overhead not justified for bulk priority: striped by bulk score instead';
+          why = 'Replication overhead not justified for bulk priority: kept on the primary (one radio awake), moved with delay-compensated pacing at a handoff';
         }
-        if (d.protecting && d.replica) why = `Drained ⇢ ${linkName(d.replica)} off the failing path · ${why.charAt(0).toLowerCase()}${why.slice(1)}`;
+        if (d.protecting && d.replica) {
+          const pc = res.pacing;
+          const paced = pc && pc.offsetMs > 0.5 ? ` · paced: ${linkName(pc.slowPath)} segments sent ${pc.offsetMs.toFixed(0)} ms ahead so they arrive in order` : '';
+          why = `Moved ⇢ ${linkName(d.replica)} within the burst${paced} · ${why.charAt(0).toLowerCase()}${why.slice(1)}`;
+        }
       }
       const stKey = state.join('|');
       if (S.cache.state !== stKey) {

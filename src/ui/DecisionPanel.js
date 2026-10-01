@@ -2,10 +2,11 @@
  * DecisionPanel.js — "WHY DID FLEXIPATH DO THAT?"
  *
  * Renders the structured decision records produced by FlexiPathController at the moment it acted:
- * current path, status, alternate, traffic, action and reason — built from the values the controller
- * measured at that tick. Thresholds quoted in the reason are model parameters. No confidence score is
- * shown because the predictor does not compute one.
+ * current path, status, alternate, traffic, radio power, action and reason — built from the values the
+ * controller measured at that tick. Thresholds quoted in the reason and the radio tier draws are model
+ * parameters. No confidence score is shown because the predictor does not compute one.
  */
+import { POWER_TIERS } from '../simulation/PowerModel.js';
 import { esc, fmtPct, fmtT, linkChip, makeSetter, tag } from './format.js';
 
 export const KIND_META = {
@@ -23,6 +24,14 @@ export const KIND_META = {
 };
 
 const secs = (v) => (v < 1 ? v.toFixed(2) : v.toFixed(1));
+const RADIO_WHAT = ['secondary modems asleep in DRX', 'one secondary modem awake, probing', 'both radios transmitting'];
+
+/** Radio power tier the decision puts the system in (model parameter per tier). */
+function radioText(p) {
+  if (!p) return '<span class="text-slate-500">—</span>';
+  const tier = POWER_TIERS[p.tier] ?? POWER_TIERS[0];
+  return `<span class="tier-badge" style="--c:${tier.color}">${esc(p.label ?? tier.label)}</span> <span class="num font-semibold text-slate-200">${p.watts.toFixed(1)} W</span> <span class="text-slate-500">· ${esc(RADIO_WHAT[p.tier] ?? '')}</span>`;
+}
 
 function currentText(c) {
   if (!c) return '—';
@@ -46,6 +55,10 @@ function statusText(c) {
 
 function altText(a) {
   if (!a) return '<span class="text-slate-500">none</span>';
+  if (a.estimated) {
+    // Asleep in DRX (or just woken): only its signal has been sampled — no RTT / loss measured yet.
+    return `${linkChip(a.link, a.name)} <span class="num text-slate-400">est. score ${a.score.toFixed(0)} · from its DRX signal, RTT / loss not measured yet</span>`;
+  }
   const bits = [`score ${a.score.toFixed(0)}`];
   if (Number.isFinite(a.loss)) bits.push(`loss ${fmtPct(a.loss)}`);
   if (Number.isFinite(a.rttMs)) bits.push(`RTT ${a.rttMs.toFixed(0)} ms`);
@@ -70,6 +83,7 @@ export class DecisionPanel {
           <dt>Status</dt><dd data-ref="status">—</dd>
           <dt data-ref="altLabel">Alternate</dt><dd data-ref="alt">—</dd>
           <dt>Traffic</dt><dd data-ref="traffic">—</dd>
+          <dt title="Radio subsystem draw in the tier this decision puts the system in (model parameter)">Radio</dt><dd data-ref="radio">—</dd>
           <dt>Action</dt><dd data-ref="action" class="font-semibold">—</dd>
           <dt>Reason</dt><dd data-ref="reason">—</dd>
         </dl>
@@ -139,6 +153,7 @@ export class DecisionPanel {
     R.altLabel.textContent = r.alternate?.label ?? 'Alternate';
     R.alt.innerHTML = altText(r.alternate);
     R.traffic.textContent = r.traffic?.text ?? '—';
+    R.radio.innerHTML = radioText(r.power);
     R.action.textContent = r.action;
     R.reason.textContent = r.reason;
     R.follow.hidden = this.pinned === null;

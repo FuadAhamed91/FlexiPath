@@ -6,9 +6,40 @@ import { FLEXIPATH_PARAMS } from '../simulation/FlexiPathController.js';
 import { LEGACY_PARAMS, LEGACY_WIRELESS_STALL_S } from '../simulation/LegacyController.js';
 import { TRAFFIC_CLASSES } from '../simulation/TrafficManager.js';
 import { ANCHOR_IP } from '../simulation/SimulationEngine.js';
+import { POWER_PARAMS } from '../simulation/PowerModel.js';
+import { HOL_PARAMS } from '../simulation/ReorderingBuffer.js';
+import { FIRST_LEASE } from '../simulation/RelayTunnelModel.js';
 import { esc, tag } from './format.js';
 
 const P = FLEXIPATH_PARAMS;
+const PW = POWER_PARAMS;
+const W = PW.tierWatts;
+const BURST_MS = Math.round(P.burstWindowS * 1000);
+
+// Engineering objections and how the model answers them (mechanisms; values are model parameters).
+const OBJECTIONS = [
+  [
+    'Battery drain',
+    'Three-tier radio sleep model',
+    `One radio carries the traffic; every other modem sleeps in 3GPP DRX (${W[0]} W system draw) and measures signal once per ${PW.drxCycleS} s. ` +
+      `A secondary wakes to Warm Probe (${W[1]} W, ${PW.heartbeatBytes}-byte heartbeats every ${PW.heartbeatIntervalS * 1000} ms) only when the primary's health falls to ≤ ${PW.healthWakeScore}, ` +
+      `its loss rises > ${(PW.lossDeltaWake * 100).toFixed(0)} % in 1 s, or degradation is predicted. Both radios transmit (${W[2]} W) only for the ~${BURST_MS} ms handoff burst.`,
+  ],
+  [
+    'Packet reordering',
+    'Sequence numbers + delay-compensated pacing',
+    `Critical packets carry a 32-bit sequence number: the receiver delivers the first copy and discards the late duplicate, so replication adds no head-of-line delay. ` +
+      `Bulk spanning two paths during a burst is paced: segments on the slower path are sent ahead by the one-way delay difference (ΔRTT / 2) so they arrive in order. ` +
+      `The legacy baseline is single-path TCP: a loss stalls in-order delivery until fast retransmit or a retransmission timeout (${HOL_PARAMS.rtoMinMs}–${HOL_PARAMS.rtoMaxStallMs} ms).`,
+  ],
+  [
+    'Carrier middleboxes & IP changes',
+    'Userspace UDP tunnel to an anchor relay',
+    `Every flow rides UDP to the anchor relay ${ANCHOR_IP}, which passes carrier middleboxes. The physical address changes with the network ` +
+      `(e.g. Wi-Fi ${FIRST_LEASE.flexipath.wlan0} → 5G CGNAT ${FIRST_LEASE.flexipath.wwan0}), and the relay re-learns it from the tunnel packets, including after a NAT rebinding. ` +
+      `Remote services only ever see ${ANCHOR_IP}, so no TCP session is reset. The legacy stack's sockets are bound to its physical address: every reattach changes its source IP.`,
+  ],
+];
 
 const WHY = [
   ['01', 'Predictive', 'Acts before the current path becomes unusable: a measured signal trend projects when the path will reach its failure level.'],
@@ -56,12 +87,12 @@ export function infoHTML() {
         </div>
         <div class="hud-label mt-4 mb-2">The loop</div>
         <ol class="space-y-1.5 text-[12px] leading-relaxed text-slate-300">
-          <li><b class="text-[#00F0FF]">Detect.</b> Every link is measured at 10 Hz: loss, RTT, throughput, signal (EWMA-smoothed probes).</li>
+          <li><b class="text-[#00F0FF]">Detect.</b> The primary is measured at 10 Hz (loss, RTT, throughput, signal; EWMA-smoothed probes). Other modems sleep in DRX (${W[0]} W) and report signal only.</li>
           <li><b class="text-[#FACC15]">Predict.</b> A 3 s trend of the signal is extrapolated to the level where loss reaches ${(P.switchLoss * 100).toFixed(0)} %. Within ${P.watchHorizonS} s, the path is watched.</li>
-          <li><b class="text-[#60A5FA]">Prepare.</b> The best alternate (critical score, loss ≤ ${(P.candidateMaxLoss * 100).toFixed(0)} %, up ≥ ${P.candidateMinUpS} s) is selected and kept validated.</li>
-          <li><b class="text-repl">Replicate.</b> When time-to-failure &lt; ${P.ttfTriggerS} s (or loss, RTT drift, rapid fade), critical packets go on both paths; real-time joins above ${(P.realtimeLossBudget * 100).toFixed(0)} % loss; bulk never.</li>
-          <li><b class="text-slate-100">Switch.</b> At primary loss &gt; ${(P.switchLoss * 100).toFixed(0)} % or a ${P.switchScoreRatio}× score advantage, the prepared path becomes primary.</li>
-          <li><b class="text-[#22C55E]">Continue.</b> Sessions keep the anchor IP ${ANCHOR_IP}, so no socket is reset by a path change.</li>
+          <li><b class="text-[#60A5FA]">Prepare.</b> The best alternate is woken to Warm Probe (${W[1]} W); after ${PW.warmValidateS} s of heartbeats (loss ≤ ${(P.candidateMaxLoss * 100).toFixed(0)} %, best critical score) it is validated.</li>
+          <li><b class="text-repl">Replicate.</b> When time-to-failure &lt; ${P.ttfTriggerS} s (or loss, RTT drift, rapid fade), critical packets go on both paths for a ${BURST_MS} ms burst (${W[2]} W); real-time joins above ${(P.realtimeLossBudget * 100).toFixed(0)} % loss; bulk never.</li>
+          <li><b class="text-slate-100">Switch.</b> At the end of the burst the validated path becomes primary and the old radio returns to DRX. An abrupt loss is a failover: ${P.failoverDetectMs} ms detection + ${PW.wakeLatencyS * 1000} ms DRX wake.</li>
+          <li><b class="text-[#22C55E]">Continue.</b> Flows are tunnelled to the anchor relay ${ANCHOR_IP}, so remote services see one address and no socket is reset by a path change.</li>
         </ol>
       </div>
       <div>
@@ -81,11 +112,19 @@ export function infoHTML() {
       </div>
     </div>
 
+    <div class="mt-5">
+      <div class="hud-label mb-2">Engineering objections, answered in the model</div>
+      <div class="grid gap-2.5 md:grid-cols-3">
+        ${OBJECTIONS.map(([q, a, d]) => `<div class="why-card"><div class="n">${esc(q.toUpperCase())}</div><h3>${esc(a)}</h3><p>${esc(d)}</p></div>`).join('')}
+      </div>
+      <p class="mt-2 text-[11px] leading-relaxed text-slate-500">Measured per run in the Battery · ordering · session panel, the Radio Power and Bulk HoL graphs and the experiment table (energy in J, duplicates discarded, HoL stalls, remote-visible IP changes).</p>
+    </div>
+
     <div class="mt-5 rounded-lg border border-slate-800 bg-slate-950/50 p-3">
       <div class="hud-label mb-2">What the numbers are</div>
       <div class="grid gap-2 text-[11.5px] leading-relaxed text-slate-400 md:grid-cols-3">
-        <div>${tag('param')}<div class="mt-1">Thresholds, link capacities, RF constants and the legacy recovery phases are set in the model.</div></div>
-        <div>${tag('measured')}<div class="mt-1">Interruptions, packet delivery, MOS, overhead and action-vs-failure times are measured from simulated runs.</div></div>
+        <div>${tag('param')}<div class="mt-1">Thresholds, link capacities, RF constants, radio tier power draws, TCP timer values and the legacy recovery phases are set in the model.</div></div>
+        <div>${tag('measured')}<div class="mt-1">Interruptions, packet delivery, MOS, overhead, energy, head-of-line stalls, duplicates discarded and action-vs-failure times are measured from simulated runs.</div></div>
         <div><span class="prov-tag" style="color:#94a3b8;border-color:rgba(148,163,184,.35)">REAL-WORLD MEASUREMENT</span><div class="mt-1">None. This is a simulation prototype; no hardware measurements are included.</div></div>
       </div>
     </div>

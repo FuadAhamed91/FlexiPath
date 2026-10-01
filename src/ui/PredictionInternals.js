@@ -4,9 +4,12 @@
  */
 import { FLEXIPATH_PARAMS } from '../simulation/FlexiPathController.js';
 import { INTERFACE_SPECS } from '../simulation/LinkModel.js';
+import { POWER_PARAMS, RADIO_STATES } from '../simulation/PowerModel.js';
 import { esc, linkName, makeSetter, tag } from './format.js';
 
 const P = FLEXIPATH_PARAMS;
+const PW = POWER_PARAMS;
+const BURST_MS = Math.round(P.burstWindowS * 1000);
 const ROWS = [
   ['dLoss', 'ΔLoss (1 s)', `> ${(P.deltaLossTrigger * 100).toFixed(0)} %`],
   ['loss', 'Loss (EWMA)', `> ${(P.lossTrigger * 100).toFixed(0)} %`],
@@ -16,7 +19,10 @@ const ROWS = [
   ['watch', 'Early warning (3 s trend)', `< ${P.watchHorizonS} s · within ${P.watchMarginDb} dB`],
   ['ploss', 'Predicted loss (2 s)', `> ${(P.switchLoss * 100).toFixed(0)} % ⇒ imminent`],
   ['rt', 'Real-time budget', `> ${(P.realtimeLossBudget * 100).toFixed(0)} % or TTF < ${P.realtimeTtfS} s`],
-  ['switch', 'Switch condition', `loss > ${(P.switchLoss * 100).toFixed(0)} % or ${P.switchScoreRatio}× score`],
+  ['health', 'Primary health (wake)', `≤ ${PW.healthWakeScore} ⇒ wake a secondary`],
+  ['wake', 'ΔLoss (1 s) · wake', `> ${(PW.lossDeltaWake * 100).toFixed(0)} % ⇒ wake a secondary`],
+  ['warm', 'Woken modem', `validated after ${PW.warmValidateS} s of ${PW.heartbeatBytes}-byte heartbeats`],
+  ['switch', 'Switch', `end of the ${BURST_MS} ms burst`],
 ];
 
 const secs = (v) => (v < 1 ? v.toFixed(2) : v.toFixed(1));
@@ -39,6 +45,7 @@ export class PredictionInternals {
       <p class="px-3 pb-3 font-mono text-[9.5px] leading-relaxed text-slate-500">
         Score W = T<sup>a</sup> / (RTT<sup>b</sup> · (1 + ${P.alpha}·L²)); critical a = 0.4, b = 1.2 · bulk a = 1.5, b = 0.5.
         The predictor extrapolates EWMA-smoothed probe signal linearly towards the level where packet loss reaches ${(P.switchLoss * 100).toFixed(0)} %.
+        Modems asleep in DRX report signal only (every ${PW.drxCycleS} s), so their scores are estimates until a wake reason fires.
       </p>`;
     this.refs = {};
     root.querySelectorAll('[data-ref]').forEach((n) => (this.refs[n.dataset.ref] = n));
@@ -77,8 +84,17 @@ export class PredictionInternals {
     this._row('watch', Number.isFinite(p.projectedTtf) ? `${secs(p.projectedTtf)} s` : '∞', d.watching ? 'armed' : null);
     this._row('ploss', `${(p.predictedLoss * 100).toFixed(1)} %`, p.predictedLoss > P.switchLoss ? 'fire' : null);
     this._row('rt', `${(p.loss * 100).toFixed(2)} %`, d.replicate?.REALTIME ? 'fire' : d.protecting ? 'armed' : null);
-    const prim = d.scores?.[d.primary]?.critical ?? 0;
-    const rep = d.replica ? d.scores?.[d.replica]?.critical ?? 0 : 0;
-    this._row('switch', d.replica ? `${(rep / Math.max(1e-9, prim)).toFixed(2)}× · loss ${(p.loss * 100).toFixed(1)} %` : '—', d.protecting ? 'armed' : null);
+    const wired = spec.tech === 'wired';
+    const h = d.health;
+    this._row('health', wired ? 'n/a (wired)' : Number.isFinite(h) ? h.toFixed(0) : '—', !wired && Number.isFinite(h) && h <= PW.healthWakeScore ? 'fire' : null);
+    this._row('wake', `${p.dLoss >= 0 ? '+' : ''}${(p.dLoss * 100).toFixed(2)} %`, p.dLoss > PW.lossDeltaWake ? 'fire' : null);
+    const w = d.prepared ?? d.warmTarget;
+    const ws = w ? d.radio?.[w] : null;
+    this._row(
+      'warm',
+      w ? `${linkName(w)} · ${d.prepared === w ? 'validated' : (RADIO_STATES[ws]?.badge ?? ws ?? '—').toLowerCase()}` : 'none · all DRX',
+      w && d.prepared === w ? 'fire' : ws === 'WARM' || ws === 'WAKING' ? 'armed' : null,
+    );
+    this._row('switch', d.protecting ? `${Math.round(d.replicationElapsed * 1000)} / ${BURST_MS} ms` : '—', d.protecting ? 'armed' : null);
   }
 }

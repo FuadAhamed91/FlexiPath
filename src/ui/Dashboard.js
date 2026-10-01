@@ -58,6 +58,8 @@ import { PredictionPanel } from './PredictionPanel.js';
 import { DecisionPanel } from './DecisionPanel.js';
 import { TrafficPanel } from './TrafficPanel.js';
 import { ComparisonLanes } from './ComparisonLanes.js';
+import { EngineeringPanel } from './EngineeringPanel.js';
+import { TunnelPanel } from './TunnelPanel.js';
 import { PredictionInternals } from './PredictionInternals.js';
 import { GuidedDemo } from './GuidedDemo.js';
 import { openExperiments } from './ExperimentPanel.js';
@@ -67,6 +69,9 @@ import { ThroughputChart } from '../charts/ThroughputChart.js';
 import { RTTChart } from '../charts/RTTChart.js';
 import { PacketLossChart } from '../charts/PacketLossChart.js';
 import { QoEChart } from '../charts/QoEChart.js';
+import { PowerChart } from '../charts/PowerChart.js';
+import { HolChart } from '../charts/HolChart.js';
+import { POWER_TIERS } from '../simulation/PowerModel.js';
 import { SERIES_COLORS } from '../charts/BaseTimeSeriesChart.js';
 import { ANCHOR_IP, DT, VERSION } from '../simulation/SimulationEngine.js';
 import { ZONES } from '../simulation/NetworkEnvironment.js';
@@ -161,6 +166,8 @@ export class Dashboard {
     this.decision = new DecisionPanel(this.refs.decision);
     this.traffic = new TrafficPanel(this.refs.traffic);
     this.lanes = new ComparisonLanes(this.refs.lanes);
+    this.engineering = new EngineeringPanel(this.refs.engineering);
+    this.tunnelPanel = new TunnelPanel(this.refs.tunnel);
     this.internals = new PredictionInternals(this.refs.internals);
     this.telemetry = new TelemetryPanel(this.refs.telemetry);
     this.flows = new FlowInspector(this.refs.flows);
@@ -187,6 +194,8 @@ export class Dashboard {
       rtt: new RTTChart(this.root.querySelector('[data-chart="rtt"]')),
       loss: new PacketLossChart(this.root.querySelector('[data-chart="loss"]')),
       qoe: new QoEChart(this.root.querySelector('[data-chart="qoe"]')),
+      pwr: new PowerChart(this.root.querySelector('[data-chart="pwr"]')),
+      hol: new HolChart(this.root.querySelector('[data-chart="hol"]')),
     };
     this.chartLegends = {};
     for (const key of Object.keys(this.charts)) {
@@ -240,9 +249,11 @@ export class Dashboard {
         </div>
         <div class="flex min-w-0 flex-wrap items-center gap-2">
           <span class="chip sim-badge" title="Everything on this screen is produced by the FlexiPath simulation model (seeded, deterministic). No real-world measurements are shown."><span class="dot"></span>SIMULATION · v${VERSION}</span>
-          <span class="chip border-fp/30!" title="Persistent anchor IP: applications keep one source address across every path change, so no socket is reset by a switch">
-            <i data-lucide="lock" class="text-fp"></i>ANCHOR <b class="text-slate-100">${ANCHOR_IP}</b>
+          <span class="chip border-fp/30!" title="Static anchor relay: FlexiPath tunnels every flow (userspace UDP) to this address, so remote services only ever see it and no socket is reset by a path change">
+            <i data-lucide="lock" class="text-fp"></i>ANCHOR RELAY <b class="text-slate-100">${ANCHOR_IP}</b>
           </span>
+          <span class="chip hidden min-[1700px]:inline-flex" data-ref="clientIp" title="FlexiPath's current physical (outer) address — changes with the network; remote services never see it">CLIENT IP —</span>
+          <span class="chip hidden min-[1440px]:inline-flex" data-ref="radioChip" title="FlexiPath radio power (three-tier sleep model)">RADIO 1.2 W</span>
           <span class="chip hidden 2xl:inline-flex"><i data-lucide="map-pin"></i><span data-ref="zone">ZONE 1</span></span>
           <span class="chip"><i data-lucide="timer"></i><span class="text-slate-100" data-ref="clock">T+00:00.0</span></span>
         </div>
@@ -277,6 +288,7 @@ export class Dashboard {
           <section class="hud-panel" data-ref="telemetry" data-view="advanced"></section>
           <section class="hud-panel" data-ref="internals" data-view="advanced"></section>
           <section class="hud-panel" data-ref="flows" data-view="advanced"></section>
+          <section class="hud-panel" data-ref="tunnel" data-view="advanced"></section>
         </aside>
 
         <main class="viewport hud-panel relative order-first h-[62vh] min-h-[380px] overflow-hidden xl:order-none xl:h-auto" data-ref="viewport">
@@ -347,7 +359,7 @@ export class Dashboard {
               ['5G SA', INTERFACE_SPECS.wwan0.color],
               ['LEO satellite', INTERFACE_SPECS.sat0.color],
               ['replication', '#A855F7'],
-              ['prepared path (dashed)', '#60A5FA'],
+              ['warm probe / next path (dashed)', '#60A5FA'],
               ['failure', '#EF4444'],
             ]
               .map(([l, c]) => `<div class="flex items-center gap-2 font-mono text-[9.5px] text-slate-400"><span class="h-[3px] w-5 rounded-full" style="background:${c};box-shadow:0 0 8px ${c}"></span>${l}</div>`)
@@ -369,17 +381,20 @@ export class Dashboard {
 
         <aside class="fp-deck hud-scroll flex min-h-0 flex-col gap-2 xl:overflow-y-auto" aria-label="Right deck" data-ref="rightDeck">
           <section class="hud-panel shrink-0" data-ref="traffic" data-view="mission"></section>
+          <section class="hud-panel shrink-0" data-ref="engineering" data-view="mission"></section>
           <section class="hud-panel shrink-0" data-ref="controls" data-view="advanced"></section>
           <section class="hud-panel flex min-h-[230px] flex-1 flex-col" data-ref="log" data-view="advanced"></section>
         </aside>
       </div>
 
       <section class="fp-bottom hud-panel mx-2 mb-2 shrink-0" data-ref="lanes" data-view="mission" aria-label="Legacy vs FlexiPath"></section>
-      <section class="fp-bottom grid shrink-0 grid-cols-1 gap-2 px-2 pb-2 sm:grid-cols-2 xl:h-[200px] xl:grid-cols-4" aria-label="Real-time graphs" data-ref="chartsRow" data-view="advanced">
+      <section class="fp-bottom grid shrink-0 grid-cols-1 gap-2 px-2 pb-2 sm:grid-cols-2 lg:grid-cols-3 xl:h-[200px] xl:grid-cols-6" aria-label="Real-time graphs" data-ref="chartsRow" data-view="advanced">
         ${chartCard('thr', 'Aggregated Throughput', 'Mbps')}
         ${chartCard('rtt', 'Critical-Flow Latency', 'ms · log')}
         ${chartCard('loss', 'Packet Loss', '% · crit + RT · 1 s')}
         ${chartCard('qoe', 'Voice QoE · MOS', 'ITU-T G.107')}
+        ${chartCard('pwr', 'Radio Power', 'W · 3-tier')}
+        ${chartCard('hol', 'Bulk HoL Stall', 'ms · TCP')}
       </section>
     </div>
     <div class="toast-stack" data-ref="toasts" aria-live="polite"></div>
@@ -577,10 +592,12 @@ export class Dashboard {
       this.decision.update(snap);
       this.traffic.update(snap);
       this.lanes.update(snap);
+      this.engineering.update(snap);
     } else {
       this.telemetry.update(agent, focus);
       this.internals.update(snap);
       this.flows.update(agent, focus);
+      this.tunnelPanel.update(snap);
       this.controls.update(snap);
       this._updateChartLegends(snap);
     }
@@ -604,9 +621,11 @@ export class Dashboard {
       rtt: na((v) => (v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${v.toFixed(0)}ms`)),
       loss: na((v) => `${v.toFixed(1)}%`),
       qoe: na((v) => v.toFixed(2)),
+      pwr: na((v) => `${v.toFixed(1)}W`),
+      hol: na((v) => `${v.toFixed(0)}ms`),
     };
     const m = { fp: snap.agents.flexipath.metrics, lg: snap.agents.legacy.metrics };
-    const pick = { thr: 'throughputMbps', rtt: 'latencyMs', loss: 'lossPct', qoe: 'mos' };
+    const pick = { thr: 'throughputMbps', rtt: 'latencyMs', loss: 'lossPct', qoe: 'mos', pwr: 'powerW', hol: 'bulkHolMs' };
     for (const [key, legend] of Object.entries(this.chartLegends)) {
       legend.fp.textContent = `FP ${fmt[key](m.fp[pick[key]])}`;
       legend.lg.textContent = `LG ${fmt[key](m.lg[pick[key]])}`;
@@ -626,9 +645,9 @@ export class Dashboard {
     }
     if (!d.primary) return { text: 'NO USABLE PATH', detail: 'buffering at anchor', color: '#EF4444', pulse: true };
     if (d.replicationActive) {
-      return { text: 'PREDICTIVE REPLICATION ACTIVE', detail: `${d.primary} ⇉ ${d.replica}`, color: '#A855F7', pulse: true };
+      return { text: 'PREDICTIVE REPLICATION ACTIVE', detail: `${d.primary} ⇉ ${d.replica} · burst ${agent.power?.watts?.toFixed(1) ?? ''} W`, color: '#A855F7', pulse: true };
     }
-    if (d.protecting) return { text: 'PROTECTION WINDOW', detail: `bulk drained ${d.primary} → ${d.replica}`, color: '#60A5FA', pulse: true };
+    if (d.protecting) return { text: 'PROTECTION WINDOW', detail: `bulk paced ${d.primary} → ${d.replica}`, color: '#60A5FA', pulse: true };
     const ls = d.lastSwitch;
     if (ls && t - ls.t < 2.5) {
       return ls.seamless
@@ -636,9 +655,17 @@ export class Dashboard {
         : { text: 'UNPLANNED FAILOVER', detail: `${ls.from} → ${ls.to} · ${ls.blackoutMs} ms`, color: '#F59E0B', pulse: true };
     }
     if (d.watching) {
-      return { text: 'DEGRADATION PREDICTED', detail: `${d.primary}${d.prepared ? ` · next ${d.prepared} prepared` : ' · searching'}`, color: '#FACC15', pulse: false };
+      const next = d.prepared ?? d.warmTarget;
+      return {
+        text: 'DEGRADATION PREDICTED',
+        detail: `${d.primary}${next ? ` · next ${next} ${d.prepared ? 'validated' : 'waking'} · ${agent.power?.watts?.toFixed(1) ?? ''} W` : ' · searching'}`,
+        color: '#FACC15',
+        pulse: false,
+      };
     }
-    return { text: 'MONITORING ALL LINKS', detail: `primary ${d.primary}`, color: '#00F0FF', pulse: false };
+    const warm = d.warmTarget && (d.radio?.[d.warmTarget] === 'WARM' || d.radio?.[d.warmTarget] === 'WAKING') ? d.warmTarget : null;
+    if (warm) return { text: 'MONITORING · WARM PROBE', detail: `primary ${d.primary} · ${warm} awake · ${agent.power?.watts?.toFixed(1) ?? ''} W`, color: '#60A5FA', pulse: false };
+    return { text: 'MONITORING · DRX STANDBY', detail: `primary ${d.primary} · others asleep · ${agent.power?.watts?.toFixed(1) ?? ''} W`, color: '#00F0FF', pulse: false };
   }
 
   _updateHeader(snap) {
@@ -677,6 +704,20 @@ export class Dashboard {
       this.refs.zone.style.color = zone.color;
     }
     this.refs.clock.textContent = fmtClock(snap.t);
+    const fpa = snap.agents.flexipath;
+    const ip = fpa.tunnel?.clientIp ? `CLIENT IP ${fpa.tunnel.clientIp} · ${fpa.tunnel.clientIface}` : 'CLIENT IP —';
+    if (this._ipKey !== ip) {
+      this._ipKey = ip;
+      this.refs.clientIp.textContent = ip;
+    }
+    const tier = POWER_TIERS[fpa.power?.tier ?? 0];
+    const rk = `${fpa.power?.watts}|${tier.key}`;
+    if (this._radioKey !== rk) {
+      this._radioKey = rk;
+      this.refs.radioChip.textContent = `RADIO ${(fpa.power?.watts ?? 0).toFixed(1)} W · ${tier.key}`;
+      this.refs.radioChip.style.color = tier.color;
+      this.refs.radioChip.style.borderColor = `${tier.color}66`;
+    }
   }
 
   // ── Actions ─────────────────────────────────────────────────────────────

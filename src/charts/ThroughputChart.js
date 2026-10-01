@@ -1,7 +1,8 @@
 /**
  * ThroughputChart.js — aggregated goodput (Mbps), 60 s rolling window.
- * FlexiPath stripes bulk traffic across the score-weighted links, so its aggregate
- * keeps flowing through its handovers; Legacy drops to zero during an interruption.
+ * FlexiPath keeps bulk on the primary (one radio awake) and moves it within the handoff
+ * burst, so its aggregate keeps flowing through its handovers; Legacy drops to zero during
+ * an interruption.
  */
 import { BaseTimeSeriesChart } from './BaseTimeSeriesChart.js';
 

@@ -7,10 +7,12 @@
  * record and measured values of that tick. At the end it runs paired trials for the experiment table.
  */
 import { LEGACY_PARAMS, LEGACY_WIRELESS_STALL_S } from '../simulation/LegacyController.js';
-import { FAILSAFE_OUTAGE_S } from '../simulation/SimulationEngine.js';
+import { FAILSAFE_OUTAGE_S, ANCHOR_IP } from '../simulation/SimulationEngine.js';
+import { POWER_PARAMS } from '../simulation/PowerModel.js';
 import { linkName } from './format.js';
 
 const HOLD = { intro: 5200, beat: 5200, short: 4200 };
+const sentence = (s) => (!s ? '' : /[.!?]$/.test(s.trim()) ? s.trim() : `${s.trim()}.`);
 
 export class GuidedDemo {
   constructor(dash) {
@@ -111,12 +113,11 @@ export class GuidedDemo {
     if (ev.engine === 'flexipath') {
       if (ev.code === 'PREDICT' && !this.seen.has('repl') && once('predict')) {
         const r = this._lastRecord('PREDICT');
-        const alt = r?.alternate;
         this.predictBeats = (this.predictBeats ?? 0) + 1;
         this._beat({
           step: '1 / 6 · DETECT → PREDICT → PREPARE',
           title: `${r?.current?.name ?? 'The current link'} is degrading — FlexiPath predicts it`,
-          body: `${r?.reason ?? ev.message}. ${alt ? `${alt.name} is prepared as the next path (score ${alt.score.toFixed(0)}). ` : ''}The Legacy OS keeps using ${r?.current?.name ?? 'the link'}: it has no prediction.`,
+          body: `${sentence(r?.reason ?? ev.message)} ${r?.action ? `Action: ${sentence(r.action)} ` : ''}Until now that modem slept in DRX to save battery. The Legacy OS keeps using ${r?.current?.name ?? 'the link'}: it has no prediction.`,
           hold: this.predictBeats > 1 ? HOLD.short : HOLD.beat,
         });
       } else if (ev.code === 'TREND_OFF' && this.seen.has('predict') && !this.seen.has('repl')) {
@@ -125,7 +126,7 @@ export class GuidedDemo {
         this._beat({
           step: '1 / 6 · PREDICT',
           title: 'Trend reversed — prediction released',
-          body: 'The signal recovered (shadowing), so FlexiPath released the prediction without replicating anything: no overhead was spent. It keeps measuring every link.',
+          body: 'The signal recovered (shadowing), so FlexiPath released the prediction without replicating anything: no overhead was spent. The woken modem goes back to DRX sleep after its dwell.',
           pause: false,
         });
       } else if (ev.code === 'REPL_ON' && once('repl')) {
@@ -133,7 +134,7 @@ export class GuidedDemo {
         this._beat({
           step: '2 / 6 · REPLICATE · DECISION ENGINE',
           title: r?.headline ?? 'Critical flow protection enabled',
-          body: `Action: ${r?.action ?? ''}. Reason: ${r?.reason ?? ''}. Purple packets carry critical traffic on both paths; the receiver keeps the first copy. Video and file sync are not duplicated: the overhead is not justified for bulk priority.`,
+          body: `Action: ${sentence(r?.action)} Reason: ${sentence(r?.reason)} Purple packets carry critical traffic on both paths for this window only; the receiver keeps the first copy of each sequence number and discards the late duplicate, so delivery never waits (HoL 0 ms). Video and file sync are not duplicated: bulk moves with delay-compensated pacing.`,
         });
         this.dash.setRate(0.5); // slow motion while both paths carry critical traffic
       } else if (ev.code === 'REPL_RT' && this.seen.has('repl') && once('rt')) {
@@ -157,7 +158,7 @@ export class GuidedDemo {
         this._beat({
           step: '3 / 6 · FAILURE → SWITCH → CONTINUE',
           title: r?.headline ?? `Switched to ${linkName(ev.to)}`,
-          body: `${r?.reason ?? ''}.${failure} FlexiPath so far: ${fp.stats.stallTime.toFixed(2)} s of simulated interruption, ${fp.stats.criticalLost} critical packets lost. The vehicle continues.`,
+          body: `${sentence(r?.reason)}${failure} FlexiPath so far: ${fp.stats.stallTime.toFixed(2)} s of simulated interruption, ${fp.stats.criticalLost} critical packets lost. The old radio is back in DRX; the vehicle continues.`,
         });
       }
     } else if (ev.engine === 'legacy') {
@@ -167,7 +168,7 @@ export class GuidedDemo {
         this._beat({
           step: '4 / 6 · LEGACY OS',
           title: 'Legacy reacts only now: CONNECTION INTERRUPTED',
-          body: `${ev.message.replace(' → break-before-make · all sockets stalled', '')}. It tears the link down first, then looks for another one. Simulated recovery: ${ph} = ${LEGACY_WIRELESS_STALL_S.toFixed(1)} s (model parameters).`,
+          body: `${ev.message.replace(' → break-before-make · all sockets stalled', '')}. It tears the link down first, then looks for another one. Simulated recovery: ${ph} = ${LEGACY_WIRELESS_STALL_S.toFixed(1)} s (model parameters). Its sockets are bound to its physical address, so the new one will reset every TCP session.`,
         });
       } else if (ev.code === 'FAILSAFE' && this.seen.has('lost') && once('failsafe')) {
         this._beat({
@@ -178,11 +179,14 @@ export class GuidedDemo {
         });
       } else if (ev.code === 'RECONNECTED' && this.seen.has('lost') && once('recovered')) {
         const s = this.engine.snapshot.agents;
+        const A = this.engine.agents;
+        const fpT = A.flexipath.tunnel.state;
+        const lgT = A.legacy.tunnel.state;
         this._beat({
           step: '5 / 6 · RESULT OF THIS RUN',
           title: 'Legacy recovered — same road, same radio conditions',
-          body: `${ev.message}. Simulated interruption so far: FlexiPath ${s.flexipath.stats.stallTime.toFixed(2)} s · Legacy ${s.legacy.stats.stallTime.toFixed(2)} s. Replication cost FlexiPath ${s.flexipath.stats.overheadPct.toFixed(1)} % of its protected-flow bytes (${s.flexipath.stats.overheadTotalPct.toFixed(3)} % of all traffic).`,
-          hold: HOLD.short,
+          body: `${sentence(ev.message)} Simulated interruption so far: FlexiPath ${s.flexipath.stats.stallTime.toFixed(2)} s · Legacy ${s.legacy.stats.stallTime.toFixed(2)} s. Remote services saw Legacy's source address change ${lgT.remoteIpChanges}× (sessions reset); FlexiPath's stayed ${ANCHOR_IP} (${fpT.remoteIpChanges} changes). Mean radio power FlexiPath ${A.flexipath.power.state.meanWatts.toFixed(2)} W · Legacy ${A.legacy.power.state.meanWatts.toFixed(2)} W (both radios always on: ${POWER_PARAMS.tierWatts[2]} W, model parameter). Replication cost ${s.flexipath.stats.overheadPct.toFixed(1)} % of protected-flow bytes.`,
+          hold: HOLD.beat,
         });
       }
     }

@@ -81,7 +81,7 @@ export const SCENARIOS = {
     id: 'F',
     code: 'F',
     label: 'Bulk traffic during handover',
-    description: 'Scenario A carrying only bulk flows: replication never engages; bulk is striped and drained instead.',
+    description: 'Scenario A carrying only bulk flows: replication never engages; bulk is moved to the next path with delay-compensated pacing instead.',
     ...CORRIDOR,
     faults: [],
     traffic: 'bulk',

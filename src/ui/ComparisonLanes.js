@@ -7,6 +7,9 @@
  */
 import { fmtRel, fmtT, linkName, makeSetter } from './format.js';
 import { METERS_PER_UNIT } from '../simulation/MobilityModel.js';
+import { POWER_PARAMS } from '../simulation/PowerModel.js';
+
+const BURST = `${Math.round(POWER_PARAMS.burstWindowS * 1000)} ms · ${POWER_PARAMS.tierWatts[2]} W`;
 
 const C = {
   predict: '#facc15',
@@ -50,6 +53,11 @@ export class ComparisonLanes {
             <span class="num text-[12px] font-bold text-fp" data-ref="fpPred">0/0</span>
             <span class="num text-[12px] font-bold text-legacy" data-ref="lgPred">0/0</span>
           </div>
+          <div class="kpi-cell flex items-baseline gap-3" title="Mean radio power so far. Tier draws (1.2 / 1.8 / 3.4 W) are model parameters; the mean is measured from the run">
+            <span class="hud-label">Radio W</span>
+            <span class="num text-[12px] font-bold text-fp" data-ref="fpPw">—</span>
+            <span class="num text-[12px] font-bold text-legacy" data-ref="lgPw">—</span>
+          </div>
           <div class="kpi-cell flex items-baseline gap-2" title="Distance between the two vehicles along the route (lost to interruptions and fail-safe stops)">
             <span class="hud-label">Gap</span>
             <span class="num text-[12px] font-bold text-slate-200" data-ref="gap">level</span>
@@ -89,7 +97,7 @@ export class ComparisonLanes {
       const prim = snapshot.agents.flexipath.decision?.primary;
       return {
         what: prim ? `on ${linkName(prim)} · monitoring` : 'no path',
-        steps: ['Degradation predicted', 'Next path prepared', 'Critical traffic replicated', 'Path failed', 'Next path primary', 'Vehicle continues'].map((t1) => ({ t1, t2: 'waiting', state: '', color: C.neutral })),
+        steps: ['Degradation predicted', 'Next path warm-validated', 'Burst replication', 'Path failed', 'Next path primary', 'Vehicle continues'].map((t1) => ({ t1, t2: 'waiting', state: '', color: C.neutral })),
       };
     }
     const S = ep.stages;
@@ -103,13 +111,13 @@ export class ComparisonLanes {
     if (ep.skipped.PREDICT) push('Not predictable', null, C.neutral, { skip: true, t2: ep.kind === 'abrupt' ? 'abrupt outage, no trend before it' : 'no degradation (better path)' });
     else push('Degradation predicted', S.PREDICT, C.predict);
     if (ep.skipped.PREPARE) push('No time to prepare', null, C.neutral, { skip: true, t2: 'unplanned failover' });
-    else push(`${to} prepared`, S.PREPARE, C.prepare);
+    else push(ep.emergency ? `${to} woken (emergency)` : `${to} warm-validated`, S.PREPARE, C.prepare, ep.emergency && S.PREPARE !== null ? { t2: `${at(S.PREPARE, ref)} · failure imminent` } : {});
     if (ep.skipped.REPLICATE && S.REPLICATE === null) {
-      push(ep.kind === 'abrupt' ? 'Nothing replicated' : 'Bulk drained', ep.kind === 'abrupt' ? null : ep.actionT, C.prepare, {
+      push(ep.kind === 'abrupt' ? 'Nothing replicated' : 'Bulk paced', ep.kind === 'abrupt' ? null : ep.actionT, C.prepare, {
         skip: ep.kind === 'abrupt',
         t2: ep.kind === 'abrupt' ? 'no warning' : at(ep.actionT, ref),
       });
-    } else push('Critical traffic replicated', S.REPLICATE, C.repl);
+    } else push('Burst replication', S.REPLICATE, C.repl, { t2: S.REPLICATE !== null ? `${at(S.REPLICATE, ref)} · ${BURST}` : '' });
     if (ep.kind === 'upgrade') push('No failure', null, C.neutral, { skip: true, t2: 'voluntary upgrade' });
     else push(`${from} failed`, ep.failureT, C.fail, { alarm: true, t2: ep.failureT !== null ? at(ep.failureT, ref) : live ? 'not yet' : 'did not fail' });
     push(`${to} primary`, S.SWITCH, C.switch, {
@@ -217,6 +225,8 @@ export class ComparisonLanes {
     this.set.text(this.refs.lgInt, 'lgInt', A.legacy.stats.stallTime.toFixed(2));
     this.set.text(this.refs.fpLost, 'fpLost', A.flexipath.stats.criticalLost.toLocaleString('en-US'));
     this.set.text(this.refs.lgLost, 'lgLost', A.legacy.stats.criticalLost.toLocaleString('en-US'));
+    this.set.text(this.refs.fpPw, 'fpPw', A.flexipath.power ? A.flexipath.power.meanWatts.toFixed(2) : '—');
+    this.set.text(this.refs.lgPw, 'lgPw', A.legacy.power ? A.legacy.power.meanWatts.toFixed(2) : '—');
     const gapM = (A.flexipath.vehicle.s - A.legacy.vehicle.s) * METERS_PER_UNIT;
     this.set.text(this.refs.gap, 'gap', Math.abs(gapM) < 2 ? 'level' : `Legacy ${Math.abs(gapM).toFixed(0)} m ${gapM > 0 ? 'behind' : 'ahead'}`);
     const c = (a) => a.trace.counts ?? null;

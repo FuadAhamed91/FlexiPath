@@ -113,6 +113,37 @@ export function failureSignalLevel(spec, loss = SWITCH_LOSS) {
   return snr;
 }
 
+/**
+ * Expected link metrics from a signal reading alone, using the same PHY curves as `sample()` but
+ * without fading or probe noise. This is all a controller knows about a modem sleeping in DRX: it
+ * wakes once per cycle to measure signal (RSRP / RSSI / SNR) but carries no traffic and no probes.
+ * @param {object} spec interface spec
+ * @param {number} signal dBm (Wi-Fi, 5G) or dB SNR (satellite)
+ * @param {{rttBase?: number}} [opts] base RTT override (e.g. satellite elevation)
+ */
+export function estimateLinkFromSignal(spec, signal, { rttBase } = {}) {
+  if (spec.tech === 'wired') {
+    return { throughputMbps: spec.maxThroughput * (1 - spec.baseLoss), rttMs: spec.baseRtt, lossRate: spec.baseLoss };
+  }
+  if (!Number.isFinite(signal)) return { throughputMbps: 0, rttMs: Infinity, lossRate: 1 };
+  let snr;
+  if (spec.tech === 'wifi') snr = signal - spec.noiseFloor;
+  else if (spec.tech === 'cellular') snr = signal + spec.sinrOffset;
+  else snr = signal;
+  const loss = spec.baseLoss + (1 - spec.baseLoss) * edgeLoss(snr, spec.edge);
+  const se = Math.log2(1 + 10 ** (snr / 10)) / Math.log2(1 + 10 ** (spec.snrRef / 10));
+  const capacity = spec.maxThroughput * clamp(se, 0, 1);
+  const lr = Math.min(loss, 0.97);
+  let rtt = (rttBase ?? spec.baseRtt) + spec.retxRttMs * (lr / (1 - lr));
+  if (spec.tech === 'cellular') rtt += Math.max(0, 12 - snr);
+  return { throughputMbps: capacity * (1 - loss), rttMs: rtt, lossRate: loss };
+}
+
+/** Metrics of the link at its nominal operating point (used to express health as % of nominal). */
+export function nominalLinkMetrics(spec) {
+  return { throughputMbps: spec.maxThroughput * (1 - spec.baseLoss), rttMs: spec.baseRtt, lossRate: spec.baseLoss };
+}
+
 function downState(spec, signal = null) {
   return {
     id: spec.id,

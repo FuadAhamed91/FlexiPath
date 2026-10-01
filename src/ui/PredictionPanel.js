@@ -3,13 +3,17 @@
  *
  * Every value is the controller's own measurement at this tick (EWMA-smoothed probes, 3 s trend,
  * extrapolated time-to-failure). The sparkline plots the measured signal of the current primary,
- * the 15 %-loss failure level and the trend extrapolated to where it crosses that level.
+ * the 15 %-loss failure level and the trend extrapolated to where it crosses that level. The next path
+ * is shown with its radio state: a modem asleep in DRX only has a signal-based estimate.
  */
 import { INTERFACE_SPECS } from '../simulation/LinkModel.js';
 import { FLEXIPATH_PARAMS } from '../simulation/FlexiPathController.js';
+import { POWER_PARAMS } from '../simulation/PowerModel.js';
 import { esc, fmtPct, fmtSignal, linkChip, linkName, makeSetter, tag } from './format.js';
 
 const P = FLEXIPATH_PARAMS;
+const W = POWER_PARAMS.tierWatts;
+const BURST_MS = Math.round(P.burstWindowS * 1000);
 const HIST_S = 8;
 const FUT_S = 8;
 const secs = (v) => (v < 1 ? v.toFixed(2) : v.toFixed(1));
@@ -32,7 +36,7 @@ export class PredictionPanel {
         <canvas class="pred-canvas mt-2.5" data-ref="canvas" role="img" aria-label="Measured signal of the current link with failure level and trend extrapolation"></canvas>
         <div class="mt-2.5 flex items-center justify-between gap-2">
           <span class="hud-label">Action</span>
-          <span class="flow-meta truncate" title="Model parameters">protect if TTF &lt; ${P.ttfTriggerS.toFixed(1)} s · switch at loss &gt; ${(P.switchLoss * 100).toFixed(0)} %</span>
+          <span class="flow-meta truncate" title="Model parameters">burst at TTF &lt; ${P.ttfTriggerS.toFixed(1)} s · ${BURST_MS} ms window · failure = loss &gt; ${(P.switchLoss * 100).toFixed(0)} %</span>
         </div>
         <div class="action-box mt-1.5" data-ref="action">—</div>
       </div>`;
@@ -132,47 +136,68 @@ export class PredictionPanel {
     S.html(r.pred, 'pred', predText);
 
     // Next path.
-    const next = d.prepared ?? d.backup;
+    const next = d.prepared ?? d.warmTarget ?? d.backup;
     let nextText = '<span class="text-slate-500">No alternate available</span>';
     if (next) {
       const sc = d.scores?.[next];
       const m = sc?.metrics;
-      const detail = m
-        ? `score ${sc.norm.critical.toFixed(0)} · loss ${fmtPct(m.lossRate)} · RTT ${Number.isFinite(m.rttMs) ? m.rttMs.toFixed(0) : '—'} ms`
-        : '';
-      const role = d.replica === next ? (d.replicationActive ? 'carrying replicas' : 'engaged') : d.prepared === next ? 'prepared' : 'standby';
-      nextText = `${linkChip(next)} <span class="${role === 'prepared' || role === 'carrying replicas' ? 'text-sky-300' : 'text-slate-400'} font-semibold">${role}</span> <span class="num text-slate-500">· ${detail}</span>`;
+      const radio = d.radio?.[next];
+      let detail = '';
+      if (m && sc.estimated) detail = `est. score ${sc.norm.critical.toFixed(0)} from its DRX signal (no RTT / loss while asleep)`;
+      else if (m) detail = `score ${sc.norm.critical.toFixed(0)} · loss ${fmtPct(m.lossRate)} · RTT ${Number.isFinite(m.rttMs) ? m.rttMs.toFixed(0) : '—'} ms`;
+      let role;
+      if (d.replica === next) role = d.replicationActive ? `burst TX · ${W[2]} W` : 'bulk moving';
+      else if (d.prepared === next) role = 'warm-validated';
+      else if (radio === 'WAKING') role = 'waking from DRX';
+      else if (radio === 'WARM') role = 'warm probe · validating';
+      else if (radio === 'DRX') role = 'DRX standby';
+      else role = 'standby';
+      const hot = d.replica === next || d.prepared === next || radio === 'WARM' || radio === 'WAKING';
+      nextText = `${linkChip(next)} <span class="${hot ? 'text-sky-300' : 'text-slate-400'} font-semibold">${role}</span>${detail ? ` <span class="num text-slate-500">· ${detail}</span>` : ''}`;
     }
     S.html(r.next, 'next', nextText);
 
     // Action.
     const cls = d.replicate?.REALTIME ? 'critical + real-time' : 'critical';
     if (d.protecting && !d.replicationActive) {
-      this._action(`Draining bulk traffic to ${linkName(d.replica)} (no critical or real-time flows to replicate) · switch when ${linkName(id)} loss > ${(P.switchLoss * 100).toFixed(0)} %`, 'is-warn');
+      this._action(`Moving bulk traffic to ${linkName(d.replica)} with delay-compensated pacing (no critical or real-time flows to replicate) · ${linkName(d.replica)} primary after the ${BURST_MS} ms window`, 'is-warn');
       this._draw(snapshot, id, pred);
       return;
     }
+    const warm = d.warmTarget && (d.radio?.[d.warmTarget] === 'WARM' || d.radio?.[d.warmTarget] === 'WAKING') ? d.warmTarget : null;
     switch (stage) {
       case 'PREDICT':
-        this._action(d.prepared ? `Prepare ${linkName(d.prepared)}` : 'Search for an alternate path', 'is-warn');
+        this._action(
+          d.prepared
+            ? `Keep ${linkName(d.prepared)} in Warm Probe (${W[1]} W)`
+            : warm
+              ? `Wake ${linkName(warm)} to Warm Probe (${W[1]} W) and validate it with 64-byte heartbeats`
+              : 'Search for an alternate path',
+          'is-warn',
+        );
         break;
       case 'PREPARE':
-        this._action(`Keep ${linkName(d.prepared)} ready · replicate critical traffic if time-to-failure < ${P.ttfTriggerS.toFixed(1)} s`, 'is-warn');
+        this._action(`Keep ${linkName(d.prepared)} in Warm Probe (${W[1]} W) · burst-replicate critical traffic for ${BURST_MS} ms (${W[2]} W) if time-to-failure < ${P.ttfTriggerS.toFixed(1)} s`, 'is-warn');
         break;
       case 'REPLICATE':
         this._action(
           d.replicationActive
-            ? `Replicating ${cls} traffic on ${linkName(id)} + ${linkName(d.replica)} · switch when ${linkName(id)} loss > ${(P.switchLoss * 100).toFixed(0)} %`
-            : `Draining bulk traffic to ${linkName(d.replica)} (nothing to replicate) · switch when ${linkName(id)} loss > ${(P.switchLoss * 100).toFixed(0)} %`,
+            ? `BURST TX (${W[2]} W): ${cls} traffic on ${linkName(id)} + ${linkName(d.replica)} · ${linkName(d.replica)} becomes primary after the ${BURST_MS} ms window`
+            : `Moving bulk traffic to ${linkName(d.replica)} with delay-compensated pacing (nothing to replicate) · switch after the ${BURST_MS} ms window`,
           d.replicationActive ? 'is-repl' : 'is-warn',
         );
         break;
       case 'SWITCH':
       case 'CONTINUE':
-        this._action(`${linkName(id)} is primary · sessions continue on the anchor IP`, 'is-ok');
+        this._action(`${linkName(id)} is primary · old radio back to DRX · sessions continue via the anchor relay`, 'is-ok');
         break;
       default:
-        this._action('Monitor every link · no action needed', '');
+        this._action(
+          warm
+            ? `${linkName(warm)} kept in Warm Probe (${W[1]} W): ${d.warmReason ?? 'dwell'} · no degradation predicted`
+            : `Monitor ${linkName(id)} at 10 Hz · other modems asleep in DRX (${W[0]} W) · no action needed`,
+          '',
+        );
     }
     this._draw(snapshot, id, pred);
   }

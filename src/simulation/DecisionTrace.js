@@ -10,6 +10,7 @@
  * "acted before / after the failure" is measured the same way for both.
  */
 import { INTERFACE_IDS, INTERFACE_SPECS, SWITCH_LOSS } from './LinkModel.js';
+import { POWER_PARAMS } from './PowerModel.js';
 import { EWMA } from '../utils/Metrics.js';
 
 export const LOOP_STAGES = ['DETECT', 'PREDICT', 'PREPARE', 'REPLICATE', 'SWITCH', 'CONTINUE'];
@@ -21,6 +22,7 @@ export const TRACE_PARAMS = {
   degradeLoss: 0.05, // "degrading" marker: EWMA of true loss above 5 %
   failLoss: SWITCH_LOSS, // "failed": EWMA of true loss above 15 % (or link down)
   lossAlpha: 0.3,
+  failureWatchS: 12, // keep watching a path FlexiPath left early, so its later failure is still measured
 };
 
 /** EWMA of the *true* per-link loss (ground truth the controllers never see). */
@@ -74,6 +76,7 @@ export class FlexiPathTrace {
     this.episode = null;
     this.last = null;
     this.history = [];
+    this.pending = [];
     this.count = 0;
   }
 
@@ -110,12 +113,21 @@ export class FlexiPathTrace {
     this.last = ep;
     this.history.push(ep);
     if (this.history.length > 60) this.history.shift();
+    // FlexiPath often switches seconds before the old path fails: keep watching it for a while.
+    if (ep.failureT === null && ep.kind !== 'upgrade' && ep.stages.SWITCH !== null) this.pending.push(ep);
     this.episode = null;
   }
 
   update({ t, decision: d, events, links, totals, stats, before }) {
     this.truth.update(links);
     const ev = byCode(events);
+    for (let i = this.pending.length - 1; i >= 0; i--) {
+      const pe = this.pending[i];
+      if (this.truth.failed(pe.from)) {
+        pe.failureT = t;
+        this.pending.splice(i, 1);
+      } else if (t - pe.stages.SWITCH > TRACE_PARAMS.failureWatchS) this.pending.splice(i, 1);
+    }
     const marks = before ?? {
       critical: totals.criticalLost,
       realtime: totals.realtimeLost,
@@ -161,8 +173,11 @@ export class FlexiPathTrace {
     if (S.PREPARE === null && ep.kind !== 'abrupt' && d.prepared) {
       S.PREPARE = Math.max(S.PREDICT ?? ep.start, d.preparedSince ?? t);
       ep.to = d.prepared;
+      ep.emergency = !!d.emergency;
       const sc = d.scores?.[d.prepared]?.norm.critical;
-      ep.notes.PREPARE = `${nm(d.prepared)} selected${Number.isFinite(sc) ? ` · score ${sc.toFixed(0)}` : ''}`;
+      ep.notes.PREPARE = d.emergency
+        ? `${nm(d.prepared)} woken · used before full validation (failure imminent)`
+        : `${nm(d.prepared)} warm-validated${Number.isFinite(sc) ? ` · score ${sc.toFixed(0)}` : ''}`;
     }
     if (ev.REPL_ON) {
       ep.windows++;
@@ -175,12 +190,12 @@ export class FlexiPathTrace {
       ep.windows++;
       ep.actionT ??= t;
       ep.to = d.replica;
-      ep.skipped.REPLICATE = 'No critical or real-time flows: nothing to replicate. Bulk drained to the prepared path instead';
-      ep.notes.REPLICATE = `bulk drained ⇢ ${nm(d.replica)}`;
+      ep.skipped.REPLICATE = 'No critical or real-time flows: nothing to replicate. Bulk moved to the prepared path with delay-compensated pacing instead';
+      ep.notes.REPLICATE = `bulk paced ⇢ ${nm(d.replica)}`;
     }
     if (d.replicationActive) {
       const cls = d.replicate?.REALTIME ? 'critical + real-time' : 'critical';
-      ep.notes.REPLICATE = `${cls} ⇉ ${nm(d.replica)}`;
+      ep.notes.REPLICATE = `${cls} ⇉ ${nm(d.replica)} · ${Math.round((d.burstWindowS ?? POWER_PARAMS.burstWindowS) * 1000)} ms burst`;
       ep.to = d.replica;
     }
     if (ev.REPL_ABORT) {
@@ -194,8 +209,8 @@ export class FlexiPathTrace {
       ep.from = sw.from ?? ep.from;
       ep.to = sw.to ?? d.primary;
       ep.switchKind = ev.HOT_SWAP ? 'seamless' : 'failover';
-      ep.blackoutMs = d.blackoutMs || 0;
-      ep.notes.SWITCH = `${nm(ep.from)} → ${nm(ep.to)}${ep.switchKind === 'failover' ? ` · ${ep.blackoutMs} ms detection gap` : ' · 0 ms gap'}`;
+      ep.blackoutMs = d.blackoutTotalMs || d.blackoutMs || 0; // the whole gap (detection + any DRX wake)
+      ep.notes.SWITCH = `${nm(ep.from)} → ${nm(ep.to)}${ep.switchKind === 'failover' ? ` · ${ep.blackoutMs} ms gap` : ' · 0 ms gap'}`;
     }
     if (S.SWITCH !== null && S.CONTINUE === null && t > S.SWITCH + 1e-9) S.CONTINUE = t;
 

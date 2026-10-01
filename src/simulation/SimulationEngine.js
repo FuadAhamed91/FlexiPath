@@ -22,11 +22,14 @@ import { LegacyController, LEGACY_PARAMS } from './LegacyController.js';
 import { QoEModel } from './QoEModel.js';
 import { FlexiPathTrace, LegacyTrace, TRACE_PARAMS } from './DecisionTrace.js';
 import { resolveScenario } from './Scenarios.js';
+import { PowerTracker, POWER_PARAMS } from './PowerModel.js';
+import { RelayTunnelModel, RELAY_PARAMS } from './RelayTunnelModel.js';
+import { HOL_PARAMS } from './ReorderingBuffer.js';
 
-export const VERSION = '1.1.0';
+export const VERSION = '1.2.0';
 export const TICK_HZ = 10;
 export const DT = 1 / TICK_HZ;
-export const ANCHOR_IP = '198.51.100.24';
+export const ANCHOR_IP = RELAY_PARAMS.anchorIp;
 export const FAILSAFE_OUTAGE_S = 0.3; // teleop policy: brake if critical telemetry is silent > 300 ms
 export const MOS_THRESHOLD = 3.6;
 
@@ -48,6 +51,16 @@ export const DEFAULT_CONFIG = {
 };
 
 const NO_QOE = Object.freeze({ r: null, mos: null, mosInstant: null });
+
+/** Seconds to cover `d` metres from speed `v`, accelerating at `a` up to `vMax`. */
+function timeToCover(d, v, a, vMax) {
+  if (d <= 0) return 0;
+  if (!(a > 0) || v >= vMax) return d / Math.max(0.1, v);
+  const tAcc = (vMax - v) / a;
+  const dAcc = v * tAcc + 0.5 * a * tAcc * tAcc;
+  if (dAcc >= d) return (-v + Math.sqrt(v * v + 2 * a * d)) / a;
+  return tAcc + (d - dAcc) / vMax;
+}
 
 export class SimulationEngine {
   constructor(config = {}) {
@@ -103,7 +116,7 @@ export class SimulationEngine {
       engine: 'sys',
       level: 'info',
       code: 'ARMED',
-      message: `Scenario ${sc.code} · ${sc.label} · seed ${this.config.seed} · ${this.config.speedKmh} km/h · ${TRAFFIC_PROFILES[sc.traffic].label} · anchor IP ${ANCHOR_IP}`,
+      message: `Scenario ${sc.code} · ${sc.label} · seed ${this.config.seed} · ${this.config.speedKmh} km/h · ${TRAFFIC_PROFILES[sc.traffic].label} · anchor relay ${ANCHOR_IP}`,
     });
     this.step();
     this._silent = false;
@@ -147,6 +160,9 @@ export class SimulationEngine {
       traffic: new TrafficManager({ rng: rng.fork('traffic'), flows }),
       qoe: new QoEModel(),
       trace: id === 'flexipath' ? new FlexiPathTrace() : new LegacyTrace(),
+      power: new PowerTracker(),
+      tunnel: new RelayTunnelModel({ engineId: id, rng: rng.fork('tunnel'), tunnel: id === 'flexipath' }),
+      holRecent: [],
       linkStates: null,
       decision: null,
       trafficResult: null,
@@ -273,11 +289,13 @@ export class SimulationEngine {
     return this.snapshot;
   }
 
-  _context(mob) {
+  _context(mob, mobility) {
     const docked = mob.cx < RF.dock.releaseX;
     const dockRelease = docked && mob.speedMps > 0.15;
+    // Time to the end of the dock from the vehicle's own speed plan (accelerating to cruise), not a
+    // constant-speed guess: right after departure the vehicle is still slow.
     const dockTtf = dockRelease
-      ? Math.max(0, ((RF.dock.releaseX - mob.cx) * METERS_PER_UNIT) / Math.max(0.1, mob.speedMps))
+      ? timeToCover((RF.dock.releaseX - mob.cx) * METERS_PER_UNIT, mob.speedMps, mobility?.opts.accel ?? 0, mobility?.targetMps ?? mob.speedMps)
       : Infinity;
     const dockDistM = docked ? (RF.dock.releaseX - mob.cx) * METERS_PER_UNIT : null;
     return { x: mob.cx, speedMps: mob.speedMps, docked, dockRelease, dockTtf, dockDistM };
@@ -305,8 +323,8 @@ export class SimulationEngine {
     const linkStates = {};
     for (const id of INTERFACE_IDS) linkStates[id] = agent.links[id].sample(this.env.signal(id, pos, mob), t);
 
-    const decision = agent.controller.update({ t, links: linkStates, ctx: this._context(mob) });
-    const traffic = agent.traffic.step(decision, linkStates, DT);
+    const decision = agent.controller.update({ t, links: linkStates, ctx: this._context(mob, mobility) });
+    const traffic = agent.traffic.step(decision, linkStates, DT, t);
     const qoe = traffic.voice ? agent.qoe.update(traffic.voice) : NO_QOE;
 
     const crit = traffic.critical;
@@ -332,10 +350,11 @@ export class SimulationEngine {
     } else {
       agent.stallRun = 0;
     }
-    if (decision.blackoutMs) {
-      S.stallTime += decision.blackoutMs / 1000;
+    // A failover gap can span ticks: time is counted per tick, the event once.
+    if (decision.blackoutMs) S.stallTime += decision.blackoutMs / 1000;
+    if (decision.blackoutEvent) {
       S.stallEvents++;
-      S.longestInterruption = Math.max(S.longestInterruption, decision.blackoutMs / 1000);
+      S.longestInterruption = Math.max(S.longestInterruption, (decision.blackoutTotalMs || decision.blackoutMs) / 1000);
     }
     if (decision.replicationActive) S.replicationTime += DT;
     if (qoe.mos !== null) {
@@ -361,6 +380,12 @@ export class SimulationEngine {
       if (e.code === 'TCP_RST') S.tcpResets += agent.controller.p.socketsReset ?? 0;
       agentEvents.push(ev);
     }
+
+    // Radio power (three-tier sleep model) and the session's addresses (relay tunnel / physical IP).
+    agent.power.update(decision.radio, DT, { active: !mob.finished });
+    for (const e of agent.tunnel.update({ t, links: linkStates, decision, radio: decision.radio })) agentEvents.push(e);
+    agent.holRecent.push(traffic.hol?.bulkStallMs ?? 0);
+    if (agent.holRecent.length > 10) agent.holRecent.shift();
 
     agent.trace.update({ t, decision, events: agentEvents, links: linkStates, totals: T, stats: S, before });
     for (const rec of decision.records ?? []) {
@@ -403,6 +428,13 @@ export class SimulationEngine {
       traffic: tr,
       qoe: agent.qoeResult,
       trace: agent.trace.view(agent.lastT, agent.decision),
+      power: agent.power.state,
+      tunnel: agent.tunnel.state,
+      hol: {
+        ...(tr?.hol ?? {}),
+        recentStallMs: agent.holRecent.length ? Math.max(...agent.holRecent) : 0,
+        stats: agent.traffic.holStats(),
+      },
       flows: agent.flows,
       hasVoice: agent.hasVoice,
       hasCritical: agent.hasCritical,
@@ -411,6 +443,8 @@ export class SimulationEngine {
         latencyMs: agent.hasCritical ? agent.latencyMs : null,
         lossPct: agent.hasPacket ? (tr ? tr.packet.windowLossRate * 100 : 0) : null,
         mos: agent.qoeResult.mos,
+        powerW: agent.power.watts,
+        bulkHolMs: agent.traffic.hasClass.BULK ? (tr ? tr.hol.bulkStallMs : 0) : null,
       },
       stats: {
         stallTime: S.stallTime,
@@ -436,6 +470,8 @@ export class SimulationEngine {
         perFlow: T.perFlow,
         meanMos: S.mos.count ? S.mos.mean : agent.qoeResult.mos,
         timeBelowMos: S.timeBelowMos,
+        energyJ: agent.power.energyJ,
+        meanPowerW: agent.power.state.meanWatts,
       },
     };
   }
@@ -483,6 +519,15 @@ export class SimulationEngine {
         satSnr: L.sat0.up ? round(L.sat0.signal, 1) : null,
         stallTime: round(a.stats.stallTime, 2),
         overheadPct: round(a.stats.overheadPct, 3),
+        powerW: a.power.watts,
+        powerTier: a.power.tier,
+        energyJ: round(a.power.energyJ, 2),
+        radio: Object.entries(a.power.radio).map(([k, v]) => `${k}:${v}`).join(' '),
+        clientIp: a.tunnel.clientIp ?? '',
+        remoteIp: a.tunnel.remoteIp ?? '',
+        holStallMs: a.metrics.bulkHolMs === null ? null : round(a.metrics.bulkHolMs, 1),
+        inOrderWaitMs: round(a.hol.inOrderWaitMs ?? 0, 2),
+        dupsDiscarded: a.stats.duplicatesDiscarded,
       };
     }
     this.history.push(row);
@@ -518,6 +563,9 @@ export class SimulationEngine {
 
   // ── Results ─────────────────────────────────────────────────────────────
   _summarizeAgent(agent) {
+    const PW = agent.power.state;
+    const H = agent.traffic.holStats();
+    const TU = agent.tunnel.state;
     const S = agent.stats;
     const T = agent.traffic.totals;
     const mob = agent.mobility.state;
@@ -576,6 +624,31 @@ export class SimulationEngine {
       maxLatencyMs: S.latency.count ? round(S.latency.max, 2) : null,
       meanThroughputMbps: round(S.throughput.mean, 2),
       bulkDeliveredGB: round(T.bulkMbit / 8000, 3),
+      // Radio power — three-tier sleep model (model parameters: 1.2 / 1.8 / 3.4 W)
+      meanPowerW: round(PW.meanWatts, 3),
+      energyJ: round(PW.energyJ, 1),
+      peakPowerW: PW.peakWatts,
+      drxTimeS: round(PW.tierTimeS[0], 1),
+      warmTimeS: round(PW.tierTimeS[1], 1),
+      burstTimeS: round(PW.tierTimeS[2], 2),
+      bursts: PW.bursts,
+      radioWakes: PW.wakes,
+      probeBytes: Math.round(PW.probeBytes),
+      // Receiver ordering and head-of-line blocking
+      criticalHolStallMs: round(H.packetHolMaxMs, 3),
+      inOrderWaitMeanMs: round(H.inOrderWaitMeanMs, 3),
+      inOrderWaitMaxMs: round(H.inOrderWaitMaxMs, 2),
+      reorderedArrivals: H.reordered,
+      bulkHolMeanMs: H.bulkHolMeanMs === null ? null : round(H.bulkHolMeanMs, 3),
+      bulkHolUnpacedMeanMs: H.bulkHolUnpacedMeanMs === null ? null : round(H.bulkHolUnpacedMeanMs, 3),
+      bulkHolPeakMs: H.bulkHolPeakMs === null ? null : round(H.bulkHolPeakMs, 1),
+      bulkRtoStalls: H.bulkRtoEvents,
+      pacingMaxOffsetMs: round(H.pacingMaxOffsetMs, 1),
+      // Session persistence (relay tunnel vs. physical address)
+      physicalIpChanges: TU.physicalIpChanges,
+      remoteIpChanges: TU.remoteIpChanges,
+      tunnelRebinds: TU.rebinds,
+      natRebinds: TU.natRebinds,
     };
   }
 
@@ -602,6 +675,7 @@ export class SimulationEngine {
       simTimeS: round(this.t, 2),
       ticks: this.tick,
       anchorIp: ANCHOR_IP,
+      anchorRelay: `${RELAY_PARAMS.anchorIp}:${RELAY_PARAMS.relayPort} (${RELAY_PARAMS.encapsulation})`,
       metersPerUnit: METERS_PER_UNIT,
       routeLengthM: round((sc.endX - sc.startX) * METERS_PER_UNIT, 1),
     };
@@ -623,6 +697,9 @@ export class SimulationEngine {
         flexipathParams: FLEXIPATH_PARAMS,
         legacyParams: LEGACY_PARAMS,
         traceParams: TRACE_PARAMS,
+        powerParams: POWER_PARAMS,
+        holParams: HOL_PARAMS,
+        relayParams: RELAY_PARAMS,
       },
       summary: this.getSummary(),
       decisions: this.decisions.map((d) => ({ ...d, t: round(d.t, 2) })),

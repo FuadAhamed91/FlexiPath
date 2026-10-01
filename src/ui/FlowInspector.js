@@ -121,15 +121,16 @@ export class FlowInspector {
         lat = f.delivered ? `${(f.oneWayMs * 2).toFixed(1)} ms RTT` : 'no delivery';
         if (!f.paths.length) paths = `<span class="role role-stalled">STALLED · TCP RST</span>`;
         else if (f.paths.length > 1) {
-          paths = `${chip(f.paths[0])}<span class="text-[11px] font-bold text-repl">⇉</span>${chip(f.paths[1])}<span class="num ml-auto text-[9px] text-repl">+${f.dups} dups</span>`;
-        } else paths = chip(f.paths[0]);
+          paths = `${chip(f.paths[0])}<span class="text-[11px] font-bold text-repl">⇉</span>${chip(f.paths[1])}<span class="num ml-auto text-[9px] text-repl">${f.dups} late dup${f.dups === 1 ? '' : 's'} discarded</span>`;
+        } else paths = `${chip(f.paths[0])}<span class="num ml-auto text-[9px] text-slate-500">HoL 0 ms · seq #${f.seqNext}</span>`;
       } else {
         rate = `${f.mbps.toFixed(1)} Mbps`;
-        lat = `demand ${f.demandMbps}`;
+        lat = f.holStallMs > 0 ? `HoL ${f.holStallMs.toFixed(0)} ms${f.rto ? ' · RTO' : ''}` : 'HoL 0 ms';
         const entries = Object.entries(f.alloc || {}).filter(([, v]) => v > 0.05);
         const total = entries.reduce((a, [, v]) => a + v, 0) || 1;
         paths = entries.length
-          ? entries.map(([id, v]) => chip(id, `${id} ${Math.round((v / total) * 100)}%`)).join('')
+          ? entries.map(([id, v]) => chip(id, `${id} ${Math.round((v / total) * 100)}%`)).join('') +
+            (f.pacing ? `<span class="num ml-auto text-[9px] text-sky-300">paced: ${f.pacing.slowPath} +${f.pacing.offsetMs.toFixed(0)} ms</span>` : '')
           : `<span class="role role-stalled">STALLED</span>`;
       }
       this._set(row.refs.rate, 'rate', rate, row.cache);

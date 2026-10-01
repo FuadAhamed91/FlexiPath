@@ -1,10 +1,13 @@
 /**
  * TelemetryPanel.js — left telemetry deck: one health card per interface
  * (eth0 / wlan0 / wwan0 / sat0) with live RSSI/RSRP bars, throughput, RTT,
- * loss, jitter and the 0–100 utility score, as seen by the focused engine.
+ * loss, jitter, the 0–100 utility score and the radio's power state, as seen by
+ * the focused engine. A modem asleep in DRX only reports signal, so its data
+ * metrics are greyed out and its score is an estimate from that signal.
  */
 import { INTERFACE_IDS, INTERFACE_SPECS } from '../simulation/LinkModel.js';
 import { LEGACY_PARAMS } from '../simulation/LegacyController.js';
+import { RADIO_STATES, POWER_TIERS, POWER_PARAMS } from '../simulation/PowerModel.js';
 
 const ICON = { eth0: 'cable', wlan0: 'wifi', wwan0: 'radio-tower', sat0: 'satellite' };
 const BAR_HEIGHTS = [3, 5, 7, 9, 12];
@@ -31,6 +34,7 @@ function cardHTML(id) {
         <span class="font-mono text-[12px] font-bold text-slate-100">${id}</span>
         <span class="truncate text-[10px] text-slate-500">${s.label}</span>
       </div>
+      <span class="radio-badge" data-ref="radio">—</span>
       <span class="role role-standby" data-ref="role">STANDBY</span>
     </header>
     <div class="mt-2 flex items-center gap-2">
@@ -39,7 +43,7 @@ function cardHTML(id) {
       <div class="sig-bars" data-ref="bars">${BAR_HEIGHTS.map((h) => `<i style="height:${h}px"></i>`).join('')}</div>
       <span class="num ml-auto truncate text-[9px] text-slate-500" data-ref="extra"></span>
     </div>
-    <div class="mt-1.5 grid grid-cols-4 gap-1">
+    <div class="iface-metrics mt-1.5 grid grid-cols-4 gap-1">
       <div><div class="hud-label">Thr</div><div class="num text-[11px] text-slate-200"><span data-ref="thr">—</span><span class="text-[8px] text-slate-500"> Mb</span></div></div>
       <div><div class="hud-label">RTT</div><div class="num text-[11px] text-slate-200"><span data-ref="rtt">—</span><span class="text-[8px] text-slate-500"> ms</span></div></div>
       <div><div class="hud-label">Loss</div><div class="num text-[11px]"><span data-ref="loss">—</span><span class="text-[8px] text-slate-500"> %</span></div></div>
@@ -60,12 +64,18 @@ export class TelemetryPanel {
   constructor(root) {
     this.root = root;
     root.innerHTML = `
-      <div class="flex items-center justify-between px-3 pt-3 pb-2">
+      <div class="flex items-center justify-between px-3 pt-3 pb-1">
         <h2 class="hud-title">Interface Health</h2>
         <span class="chip" data-ref="focus">FLEXIPATH VIEW</span>
       </div>
+      <div class="flex items-center justify-between gap-2 px-3 pb-2">
+        <span class="hud-label">Radio power</span>
+        <span class="flex items-center gap-2"><b class="num text-[15px] text-slate-100" data-ref="watts">1.2 W</b><span class="tier-badge" data-ref="tier">DRX STANDBY</span></span>
+      </div>
       <div class="flex flex-col gap-2 px-2 pb-2">${INTERFACE_IDS.map(cardHTML).join('')}</div>`;
     this.focusChip = root.querySelector('[data-ref="focus"]');
+    this.wattsEl = root.querySelector('[data-ref="watts"]');
+    this.tierEl = root.querySelector('[data-ref="tier"]');
     this.cards = {};
     for (const id of INTERFACE_IDS) {
       const el = root.querySelector(`[data-id="${id}"]`);
@@ -97,6 +107,7 @@ export class TelemetryPanel {
     if (id === d.primary) return ['PRIMARY', 'role-primary', 'is-primary'];
     if (id === d.replica) return d.replicationActive ? ['REPLICA', 'role-replica', 'is-replica'] : ['NEXT PATH', 'role-prepared', ''];
     if (id === d.prepared) return ['PREPARED', 'role-prepared', ''];
+    if (id === d.warmTarget) return ['VALIDATING', 'role-prepared', ''];
     const share = d.bulkShares?.[id] ?? 0;
     if (share > 0.001) return [`BULK ${(share * 100).toFixed(0)}%`, 'role-share', ''];
     return ['STANDBY', 'role-standby', ''];
@@ -105,16 +116,38 @@ export class TelemetryPanel {
   update(agent, engine) {
     this._setFocus(engine);
     const d = agent.decision;
+    const pw = agent.power;
+    if (pw) {
+      const tier = POWER_TIERS[pw.tier];
+      const key = `${pw.watts}|${tier.key}`;
+      if (this._powerKey !== key) {
+        this._powerKey = key;
+        this.wattsEl.textContent = `${pw.watts.toFixed(1)} W`;
+        this.tierEl.textContent = tier.label;
+        this.tierEl.style.setProperty('--c', tier.color);
+      }
+    }
     for (const id of INTERFACE_IDS) {
       const card = this.cards[id];
       const L = agent.links[id];
       const spec = INTERFACE_SPECS[id];
+      const radio = pw?.radio?.[id] ?? d?.radio?.[id] ?? 'OFF';
+      const asleep = radio === 'DRX' || radio === 'WAKING';
       const [roleText, roleCls, cardCls] = this._roleFor(id, L, d, engine);
-      if (card.cache.role !== roleText) {
+      const cls = `iface-card ${cardCls}${asleep ? ' is-asleep' : ''}`;
+      if (card.cache.role !== roleText || card.cache.cls !== cls) {
         card.cache.role = roleText;
+        card.cache.cls = cls;
         card.refs.role.textContent = roleText;
         card.refs.role.className = `role ${roleCls}`;
-        card.el.className = `iface-card ${cardCls}`;
+        card.el.className = cls;
+      }
+      if (card.cache.radio !== radio) {
+        card.cache.radio = radio;
+        const R = RADIO_STATES[radio] ?? RADIO_STATES.OFF;
+        card.refs.radio.textContent = R.badge;
+        card.refs.radio.title = R.desc;
+        card.refs.radio.style.setProperty('--c', R.color);
       }
 
       this._set(card, 'signal', fmt.signal(id, L.signal));
@@ -128,30 +161,37 @@ export class TelemetryPanel {
       else if (L.up && L.snr !== null && spec.tech !== 'wired') extra = `${spec.tech === 'cellular' ? 'SINR' : 'SNR'} ${L.snr.toFixed(0)} dB`;
       this._set(card, 'extra', extra);
 
-      this._set(card, 'thr', L.up ? fmt.mbps(L.throughputMbps) : '—');
-      this._set(card, 'rtt', L.up ? fmt.ms(L.rttMs) : '—');
-      this._set(card, 'loss', L.up ? fmt.pct(L.lossRate) : '100');
+      // A sleeping modem carries no traffic and no probes: nothing to show but its signal.
+      const live = L.up && !asleep;
+      this._set(card, 'thr', live ? fmt.mbps(L.throughputMbps) : '—');
+      this._set(card, 'rtt', live ? fmt.ms(L.rttMs) : '—');
+      this._set(card, 'loss', live ? fmt.pct(L.lossRate) : L.up ? '—' : '100');
       const lossColor = !L.up || L.lossRate > 0.15 ? '#fb7185' : L.lossRate > 0.05 ? '#fbbf24' : '#e2e8f0';
       if (card.cache.lossColor !== lossColor) {
         card.cache.lossColor = lossColor;
         card.refs.loss.parentElement.style.color = lossColor;
       }
-      this._set(card, 'jit', L.up ? fmt.ms(L.jitterMs) : '—');
+      this._set(card, 'jit', live ? fmt.ms(L.jitterMs) : '—');
 
       if (engine === 'legacy') {
         const floor = LEGACY_PARAMS.floors[id];
         this._set(card, 'scoreLabel', 'Metric');
         this._set(card, 'score', String(spec.legacyMetric));
         this._set(card, 'meter', `${Math.round(L.quality * 100)}%`, 'width');
-        this._set(card, 'sub', floor !== undefined ? `hard floor ${floor} ${spec.signalUnit}` : 'carrier-sense only');
+        this._set(card, 'sub', radio === 'SCAN' ? 'scanning + attaching after the failure' : floor !== undefined ? `hard floor ${floor} ${spec.signalUnit}` : 'carrier-sense only');
         this._set(card, 'pred', id === d.primary ? 'no prediction' : '');
       } else {
         const sc = d.scores?.[id];
         const norm = sc?.norm ?? { general: 0, critical: 0, bulk: 0 };
-        this._set(card, 'scoreLabel', 'Score');
+        this._set(card, 'scoreLabel', sc?.estimated ? 'Est.' : 'Score');
         this._set(card, 'score', String(Math.round(norm.general)));
         this._set(card, 'meter', `${norm.general.toFixed(0)}%`, 'width');
-        this._set(card, 'sub', L.up ? `crit ${norm.critical.toFixed(0)} · bulk ${norm.bulk.toFixed(0)}` : 'probing…');
+        let sub;
+        if (!L.up) sub = 'not available here';
+        else if (asleep) sub = `DRX · signal only, every ${POWER_PARAMS.drxCycleS} s`;
+        else if (radio === 'WARM') sub = `warm probe · 64 B heartbeats · crit ${norm.critical.toFixed(0)}`;
+        else sub = `crit ${norm.critical.toFixed(0)} · bulk ${norm.bulk.toFixed(0)}${id === d.primary && Number.isFinite(sc?.health) ? ` · health ${sc.health.toFixed(0)}` : ''}`;
+        this._set(card, 'sub', sub);
         let pred = '';
         const p = d.prediction;
         if (p && id === d.primary) {

@@ -157,6 +157,28 @@ export class LegacyController {
     }
   }
 
+  /**
+   * Radio state per interface: one active radio, the others idle in DRX. During a break the target
+   * radio scans and attaches (SCAN, 1.8 W tier); the legacy stack never transmits on two radios.
+   */
+  _radio(links) {
+    const out = {};
+    const st = this.stall;
+    const phase = st ? st.phases[Math.min(st.phaseIndex, st.phases.length - 1)].key : null;
+    for (const id of INTERFACE_IDS) {
+      const wired = INTERFACE_SPECS[id].tech === 'wired';
+      let s;
+      if (!links[id].up) s = 'OFF';
+      else if (st && id === st.to && phase === 'attach') s = 'SCAN';
+      else if (st && id === st.to && (phase === 'dhcp' || phase === 'reconnect')) s = 'ACTIVE';
+      else if (st && id === st.from && phase === 'detect') s = 'ACTIVE'; // still retrying the dying link
+      else if (!st && id === this.current) s = 'ACTIVE';
+      else s = wired ? 'IDLE' : 'DRX';
+      out[id] = s;
+    }
+    return out;
+  }
+
   /** The static rule the legacy stack is following right now (shown next to FlexiPath's decisions). */
   _rule() {
     const cur = this.current;
@@ -228,6 +250,8 @@ export class LegacyController {
       criticalPaths: this.current && !stalled ? [this.current] : [],
       bulkShares: this.current && !stalled ? { [this.current]: 1 } : {},
       blackoutMs: 0,
+      pacing: false,
+      radio: this._radio(links),
       stalled,
       stall: st
         ? {

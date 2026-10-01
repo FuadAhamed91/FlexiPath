@@ -50,7 +50,7 @@ const results = await runner.run({
 process.stdout.write('\n');
 
 const fmt = (v, d = 2) => (typeof v === 'number' && Number.isFinite(v) ? v.toFixed(d) : '—');
-const pick = ['interruptionS', 'longestInterruptionS', 'criticalDeliveryPct', 'packetLossPct', 'meanMos', 'replicationOverheadPct', 'replicationOverheadTotalPct', 'actionVsFailureS', 'meanThroughputMbps'];
+const pick = ['interruptionS', 'criticalDeliveryPct', 'meanMos', 'replicationOverheadPct', 'actionVsFailureS', 'meanPowerW', 'energyJ', 'bulkHolMeanMs', 'bulkHolPeakMs', 'bulkRtoStalls', 'remoteIpChanges', 'meanThroughputMbps'];
 for (const scenario of scenarios) {
   const table = results.comparison[scenario].filter((m) => pick.includes(m.key));
   console.log(`\n${scenario} · ${SCENARIOS[scenario].label}`);

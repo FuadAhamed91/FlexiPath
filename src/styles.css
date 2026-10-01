@@ -1571,6 +1571,45 @@ body {
   color: #475569;
   font-style: normal;
 }
+/* ── Phase 2: radio power, ordering, session ───────────────────────────── */
+.eng-row {
+  padding: 8px 9px;
+  border-radius: 9px;
+  border: 1px solid rgba(148, 163, 184, 0.1);
+  background: rgba(2, 6, 23, 0.45);
+}
+.tier-badge {
+  --c: #22c55e;
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 7px;
+  border-radius: 5px;
+  font: 800 8.5px/1 var(--font-mono);
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--c) 35%, white);
+  border: 1px solid color-mix(in srgb, var(--c) 60%, transparent);
+  background: color-mix(in srgb, var(--c) 14%, transparent);
+}
+.radio-badge {
+  --c: #94a3b8;
+  display: inline-flex;
+  align-items: center;
+  height: 17px;
+  padding: 0 6px;
+  border-radius: 4px;
+  font: 700 8.5px/1 var(--font-mono);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  color: color-mix(in srgb, var(--c) 40%, white);
+  background: color-mix(in srgb, var(--c) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c) 50%, transparent);
+}
+.iface-card.is-asleep .iface-metrics {
+  opacity: 0.35;
+}
+
 .offscreen-chip {
   position: absolute;
   z-index: 4;

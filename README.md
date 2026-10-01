@@ -11,6 +11,11 @@ FlexiPath side by side with a **legacy break-before-make baseline** under identi
 decision HUD, controlled experiments, and a Blender pipeline that generates every 3D asset. No real-world
 measurements are included; every number below is a *measured simulation result* unless marked as a model parameter.
 
+**Phase 2** answers the three engineering objections a multipath design usually meets: **battery drain** (a
+three-tier radio sleep model), **packet reordering** (sequence-numbered replication, a TCP head-of-line model and
+delay-compensated pacing) and **carrier middleboxes / IP changes** (a userspace UDP tunnel to a static anchor relay).
+Each is modelled in the simulation, measured per run and shown in the HUD.
+
 ---
 
 ## What the demo shows
@@ -19,40 +24,73 @@ Open the app and you get the **Mission view**:
 
 | Area | What it answers |
 | --- | --- |
-| **Decision loop** — DETECT → PREDICT → PREPARE → REPLICATE → SWITCH → CONTINUE | Which stage the controller is in right now, when it reached each stage, and which stages were skipped (e.g. an abrupt outage cannot be predicted). |
-| **Prediction · live** | Is the current path degrading? Current link, 3 s signal trend, projected time to the failure level, next path, action — plus a sparkline of the measured signal with the trend extrapolated to the 15 %-loss level. |
-| **Why did FlexiPath do that?** | Every decision as a record: current path, status, alternate, traffic, action, reason — built from the values measured when the decision was taken. Shown next to the static rule the legacy stack follows. |
-| **Traffic-aware protection** | Which traffic needs protection: class, priority, path, backup path, replication state and its reason, QoE sensitivity, and the measured replication overhead. |
-| **Legacy vs FlexiPath** | Both vehicles' latest transition step by step, timed relative to the moment the path *actually* failed, with the simulated interruption, critical packets lost, failures acted on before they happened, and the distance gap. |
-| **3D twin** | Two vehicles on the same route; the camera keeps both in frame and an edge marker points to the other vehicle if it falls out of view. |
+| **Decision loop** — DETECT → PREDICT → PREPARE → REPLICATE → SWITCH → CONTINUE | Which stage the controller is in right now, when it reached each stage, which stages were skipped (e.g. an abrupt outage cannot be predicted), and the radio state each stage runs at (DRX standby, warm probe, burst). |
+| **Prediction · live** | Is the current path degrading? Current link, 3 s signal trend, projected time to the failure level, next path with its radio state (a sleeping modem only has a signal-based estimate), action — plus a sparkline of the measured signal with the trend extrapolated to the 15 %-loss level. |
+| **Why did FlexiPath do that?** | Every decision as a record: current path, status, alternate, traffic, **radio power tier**, action, reason — built from the values measured when the decision was taken. Shown next to the static rule the legacy stack follows. |
+| **Traffic-aware protection** | Which traffic needs protection: class, priority, path, backup path, replication state and its reason (incl. the 400 ms burst and the bulk pacing offset), QoE sensitivity, and the measured replication overhead. |
+| **Battery · ordering · session** | Radio power of both stacks with each interface's radio badge (`DRX SLEEP` · `WARM PROBE` · `BURST TX`) and journey energy; head-of-line blocking (critical stall and late duplicates discarded, bulk HoL for both stacks with TCP timeout stalls); the relay tunnel (client physical IP → anchor relay → what remote services see) next to the legacy stack's changing source IP. |
+| **Legacy vs FlexiPath** | Both vehicles' latest transition step by step, timed relative to the moment the path *actually* failed, with the simulated interruption, critical packets lost, failures acted on before they happened, mean radio power and the distance gap. |
+| **3D twin** | Two vehicles on the same route; the camera keeps both in frame and an edge marker points to the other vehicle if it falls out of view. Sleeping modems draw no probe beams (a faint blink marks each DRX signal sample); a warm modem shows dashed heartbeat beams; both beams pulse purple during the burst. |
 
-The **Advanced view** (`M`) keeps the full engineering HUD: interface health, prediction internals (every trigger with
-its live value and threshold), flow inspector, controls, event log and four 60 s charts. **Guided demo** (`D`)
-replays scenario A and captions each real decision as it happens; **Experiments** (`X`) runs paired trials.
+The header carries the static **anchor relay** address, the current client IP and the FlexiPath radio power chip (both on
+wide screens).
+
+The **Advanced view** (`M`) keeps the full engineering HUD: interface health (radio power and a radio badge per modem;
+a modem asleep in DRX shows signal only), prediction internals (every trigger with its live value and threshold,
+including the radio wake triggers), flow inspector (sequence numbers, per-flow HoL, pacing offset), relay tunnel
+(session ID, outer addresses, leases, rebinds), controls, event log and six 60 s charts (throughput, latency, loss,
+MOS, **radio power**, **bulk HoL stall**). **Guided demo** (`D`) replays scenario A and captions each real decision as it
+happens; **Experiments** (`X`) runs paired trials.
 
 ## Measured results (simulation)
 
 `npm run benchmark` — scenarios A–F, 5 seeds × 4 speeds (30/60/90/120 km/h), 20 paired runs per scenario. In each run
-FlexiPath and Legacy drive together on the same seed, route, RF field and fault timing.
+FlexiPath and Legacy drive together on the same seed, route, RF field and fault timing. Values are means over the 20
+pairs.
+
+**Continuity**
 
 | Scenario | Simulated interruption (s) LG / FP | Critical packets delivered (%) LG / FP | Voice MOS LG / FP | FP replication overhead: protected / all bytes | Action vs. path failure (s) LG / FP |
 | --- | --- | --- | --- | --- | --- |
-| A · Wi-Fi → 5G | 3.80 / 0.00 | 84.9 / 99.1 | 3.71 / 4.29 | 9.1 % / 0.030 % | +1.43 / −3.19 |
-| B · Wi-Fi → 5G → LEO | 7.52 / 0.00 | 84.1 / 98.8 | 3.66 / 4.26 | 10.2 % / 0.047 % | +1.91 / −3.70 |
-| C · 5G degradation → LEO | 3.73 / 0.00 | 82.8 / 98.6 | 3.59 / 4.25 | 12.6 % / 0.086 % | +2.28 / −4.61 |
-| D · Multiple degradation | 16.37 / 0.06 | 77.3 / 98.5 | 3.38 / 4.21 | 5.6 % / 0.030 % | +1.00 / −1.58 |
-| E · Critical traffic only | 3.80 / 0.00 | 84.9 / 99.1 | 3.71 / 4.29 | 9.1 % / 9.08 % | +1.43 / −3.19 |
-| F · Bulk traffic only | 3.80 / 0.00 | — (no packet flows) | — (no voice) | 0 % / 0 % | +1.43 / −3.19 |
+| A · Wi-Fi → 5G | 3.80 / 0.00 | 84.9 / 99.0 | 3.71 / 4.30 | 1.11 % / 0.005 % | +1.43 / −3.38 |
+| B · Wi-Fi → 5G → LEO | 7.52 / 0.00 | 84.1 / 98.6 | 3.66 / 4.25 | 1.24 % / 0.007 % | +1.92 / −3.78 |
+| C · 5G degradation → LEO | 3.73 / 0.00 | 82.8 / 98.2 | 3.59 / 4.22 | 1.36 % / 0.009 % | +2.27 / −4.60 |
+| D · Multiple degradation | 16.37 / 0.16 | 77.3 / 98.2 | 3.38 / 4.19 | 0.90 % / 0.006 % | +1.00 / −1.25 |
+| E · Critical traffic only | 3.80 / 0.00 | 84.9 / 99.0 | 3.71 / 4.30 | 1.11 % / 1.11 % | +1.43 / −3.38 |
+| F · Bulk traffic only | 3.80 / 0.00 | — (no packet flows) | — (no voice) | 0 % / 0 % | +1.43 / −3.38 |
+
+**Battery · ordering · session (Phase 2)**
+
+| Scenario | Mean radio power (W) LG / FP | Radio energy per journey (J) LG / FP | FP burst time (s) | Late duplicates discarded (FP) | Bulk HoL mean (ms) LG / FP | Bulk HoL peak (ms) LG / FP | TCP timeout stalls LG / FP | Client IP changes seen remotely LG / FP |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| A | 1.216 / 1.315 | 42.8 / 39.0 | 0.40 | 43 | 7.6 / 1.2 | 390 / 102 | 15.0 / 0.5 | 1.00 / 0 |
+| B | 1.216 / 1.315 | 88.1 / 81.7 | 0.84 | 102 | 7.8 / 2.5 | 411 / 133 | 27.4 / 0.6 | 1.95 / 0 |
+| C | 1.217 / 1.316 | 43.4 / 40.8 | 0.40 | 54 | 8.3 / 3.2 | 394 / 65 | 12.3 / 0.0 | 0.95 / 0 |
+| D | 1.221 / 1.254 | 113.6 / 90.7 | 1.00 | 111 | 6.4 / 3.9 | 421 / 257 | 25.8 / 2.2 | 5.20 / 0 |
+| E | 1.216 / 1.315 | 42.8 / 39.0 | 0.40 | 43 | — (no bulk) | — | — | 1.00 / 0 |
+| F | 1.221 / 1.315 | 36.3 / 39.0 | 0.40 | 0 | 9.1 / 1.1 | 390 / 102 | 15.0 / 0.5 | 1.00 / 0 |
 
 How to read it:
 
 - **Interruption** is the time every flow was cut off. Each legacy break lasts a model-defined time (3.8 s, see below),
-  so this row measures how *often* each stack breaks the session. FlexiPath's 0.06 s in D is the 60 ms detection gap of
-  an abrupt cell outage that no trend predicted.
+  so this row measures how *often* each stack breaks the session. FlexiPath's 0.16 s in D is an abrupt cell outage that
+  no trend predicted: 60 ms detection + 100 ms to wake the sleeping fallback modem from DRX.
 - **Action vs. path failure** compares when each stack acted with the instant the path it was leaving actually failed
   (EWMA of the true loss > 15 % or link down). Negative = acted before the failure.
-- **Overhead** is replicated bytes / original bytes. E (only protected traffic) shows the cost side of replication;
-  F shows that bulk traffic is never duplicated.
+- **Overhead** is replicated bytes / original bytes. Replication is confined to the ~400 ms handoff burst, so it costs
+  ≈ 1 % of protected-flow bytes (Phase 1 replicated for the whole risk window: 9–13 %). E (only protected traffic)
+  shows the cost side; F shows that bulk traffic is never duplicated.
+- **Radio power**: FlexiPath draws ≈ 8 % more radio power on average than the single-radio legacy stack (1.32 vs
+  1.22 W in A–C) — the price of warm-probing the next modem (1.8 W) and of the 400 ms dual-radio burst (3.4 W). Keeping
+  both radios on all the time would cost 3.4 W. **Energy per journey** is lower for FlexiPath in A–E only because the
+  legacy vehicle brakes to a fail-safe stop and arrives later; in F (no critical telemetry, so no stop and identical
+  journey times) FlexiPath uses 7 % more energy (39.0 vs 36.3 J). Both are reported.
+- **Head-of-line**: the critical / real-time HoL stall is **0 ms in every run** — the receiver delivers the first copy
+  of each sequence number and discards the late duplicate. Bulk HoL comes from the TCP model: a loss that fast
+  retransmit cannot repair stalls the legacy stream for a retransmission timeout (200–500 ms); FlexiPath's bulk stays on
+  a healthy path and is paced across the burst.
+- **IP changes**: remote services only ever see FlexiPath's anchor relay; the legacy stack's source address changes at
+  every reattach, and each change resets its TCP sessions (4 sockets per break).
 - The CSV export adds per-metric standard deviations and the 95 % confidence interval of each paired difference.
 
 ---
@@ -61,22 +99,22 @@ How to read it:
 
 ```mermaid
 flowchart LR
-  D[DETECT<br/>10 Hz probes] --> P[PREDICT<br/>3 s trend → time to failure]
-  P --> R[PREPARE<br/>select + validate next path]
-  R --> X[REPLICATE<br/>critical · real-time on need · bulk never]
-  X --> S[SWITCH<br/>loss > 15 % or 1.5× score]
-  S --> C[CONTINUE<br/>anchor IP keeps sessions]
+  D[DETECT<br/>primary at 10 Hz · others in DRX] --> P[PREDICT<br/>3 s trend → time to failure]
+  P --> R[PREPARE<br/>wake → warm probe → validate]
+  R --> X[REPLICATE<br/>400 ms burst · critical · RT on need · bulk paced]
+  X --> S[SWITCH<br/>end of burst · old radio to DRX]
+  S --> C[CONTINUE<br/>relay tunnel keeps sessions]
   C --> D
 ```
 
 | Stage | Rule in the controller (`FlexiPathController.js`) | Model parameters |
 | --- | --- | --- |
-| Detect | EWMA of measured loss, RTT, throughput and signal on every link; the controller never sees the true channel. | 10 Hz, α ≈ 0.3 |
+| Detect | The primary carries all traffic and is measured at 10 Hz (EWMA of loss, RTT, throughput, signal; the controller never sees the true channel). Every other modem sleeps in 3GPP DRX and reports its signal once per DRX cycle — no RTT or loss, so its score is an estimate. | 10 Hz, α ≈ 0.3, DRX cycle 1.28 s |
 | Predict | Early warning: a 3 s regression of the primary's signal projects the 15 %-loss level within 8 s (only within 20 dB of it), or a loss / RTT trigger is already true. | horizon 8 s, margin 20 dB, release 1 s |
-| Prepare | Best alternate by critical score with loss ≤ 12 % and up ≥ 0.3 s, kept selected and re-validated every tick. | — |
-| Replicate | Act when ΔLoss > 3 %/s, loss > 5 %, RTT drift, time-to-failure (1 s trend, within 10 dB, confirmed 2 ticks) < 3 s, a rapid fade (< −12 dB/s) or dock release — and the prepared path beats the primary's predicted score or failure is imminent. | TTF < 3.0 s |
-| Switch | Primary loss > 15 % or prepared path scores > 1.5× the primary, confirmed over 2 ticks; 3 s hold-down. | 15 %, 1.5× |
-| Continue | Sessions ride the persistent anchor IP `198.51.100.24`; abrupt outages are caught by 3 missed probes. | 60 ms |
+| Prepare | A secondary is woken when degradation is predicted, the primary's loss rises > 2 % in 1 s, or its health score (critical utility as % of nominal) falls to ≤ 75. After 0.1 s wake-up it sends 64-byte heartbeats every 100 ms; after 0.3 s of heartbeats with loss ≤ 12 % and the best critical score it is the validated next path. | wake 0.1 s, validate 0.3 s, back to DRX after 2 s without a reason |
+| Replicate | Act when ΔLoss > 3 %/s, loss > 5 %, RTT drift, time-to-failure (1 s trend, within 10 dB, confirmed 2 ticks) < 3 s, a rapid fade (< −12 dB/s) or dock release — and the validated path beats the primary's predicted score or failure is imminent. Both radios then transmit for the handoff burst. If failure is imminent and the woken modem is not yet validated, it is used anyway (shown as an emergency). | TTF < 3.0 s, burst 400 ms |
+| Switch | At the end of the burst the validated path becomes primary and the old radio returns to DRX; 3 s hold-down. Upgrades to a much better path need 1.5× the score, 20 dB inside coverage and 1.5 s of dwell. | 400 ms, 1.5×, 20 dB |
+| Continue | Flows ride the relay tunnel to the anchor relay `198.51.100.24`, so no socket is reset; abrupt outages are caught by 3 missed probes (+ a DRX wake if the fallback was asleep). | 60 ms (+ 100 ms) |
 
 Link utility: `W = T^a / (RTT^b · (1 + 12·L²))` — critical `a = 0.4, b = 1.2`, bulk `a = 1.5, b = 0.5`.
 
@@ -84,19 +122,22 @@ Link utility: `W = T^a / (RTT^b · (1 + 12·L²))` — critical `a = 0.4, b = 1.
 
 | Class | Flows | Protection | Why |
 | --- | --- | --- | --- |
-| **CRITICAL** (P1) | EMS telemetry (ECG + CAN) | Replicated for the whole risk window once degradation is predicted | Loss- and latency-sensitive; small (≈ 0.3 Mbit/s) |
-| **REAL-TIME** (P2) | VoIP (G.711, 20 ms) | Replicated in a risk window only once its measured loss exceeds 2 % or failure is < 1 s away | Packet-loss concealment hides ≤ 2 % loss (< 0.2 MOS); copying earlier is overhead |
-| **BULK** (P3+) | HD video uplink, OTA / map file sync | Never replicated: striped across links by bulk score and drained off a failing link | A copy would add tens of Mbit/s; reliable transport recovers bulk losses |
+| **CRITICAL** (P1) | EMS telemetry (ECG + CAN) | Replicated on both paths during the ~400 ms handoff burst | Loss- and latency-sensitive; small (≈ 0.3 Mbit/s) |
+| **REAL-TIME** (P2) | VoIP (G.711, 20 ms) | Joins the burst only once its measured loss exceeds 2 % or failure is < 1 s away | Packet-loss concealment hides ≤ 2 % loss (< 0.2 MOS); copying earlier is overhead |
+| **BULK** (P3+) | HD video uplink, OTA / map file sync | Never replicated: carried on the primary (one radio awake) and moved to the next path within the burst with delay-compensated pacing | A copy would add tens of Mbit/s; reliable transport recovers bulk losses |
 
-The receiver keeps the first copy of a replicated packet and discards duplicates. Overhead is counted per byte:
+Every packet of a critical or real-time flow carries a 32-bit sequence number. The receiver delivers the first copy
+and discards the late duplicate, so replication never adds head-of-line delay. Overhead is counted per byte:
 `replicated bytes / original packet-flow bytes` and `replicated bytes / all bytes`.
 
 ### Explainable decisions
 
 Each important decision produces a record (`decision.records`, exported in the JSON): `ATTACH`, `PREDICT`, `PREPARE`,
-`PROTECT`, `PROTECT_RT`, `UPGRADE`, `RETARGET`, `SWITCH`, `FAILOVER`, `STAND_DOWN`, `NO_PATH`. A record holds the current
-path and its measured status, the alternate with its score, the traffic treatment, the action and the reason with the
-thresholds it crossed. The predictor computes no confidence score, so none is shown.
+`PROTECT`, `PROTECT_RT`, `UPGRADE`, `SWITCH`, `FAILOVER`, `NO_PATH`. A record holds the current path and its measured
+status, the alternate with its score (marked as an estimate while that modem sleeps), the traffic treatment, the radio
+power tier the decision puts the system in, the action and the reason with the thresholds it crossed. Example action:
+*"5G modem primed to Warm Probe state (1.8 W): 64-byte heartbeats validate it; replicate critical traffic in a 400 ms
+burst if time-to-failure < 3.0 s"*. The predictor computes no confidence score, so none is shown.
 
 ### The legacy baseline
 
@@ -112,7 +153,51 @@ Stock OS behaviour: static metric order `eth0 > wlan0 > wwan0 > sat0`, sticky un
 | **Simulated interruption** | **3.8 s** | **2.0 s** |
 
 A preferred interface coming back (e.g. Wi-Fi after a fade) triggers a voluntary switch-back with a 1.8 s interruption.
-With the default fail-safe policy, a vehicle whose critical telemetry is silent for > 300 ms brakes to a stop.
+With the default fail-safe policy, a vehicle whose critical telemetry is silent for > 300 ms brakes to a stop. The
+legacy stack uses one radio at a time (the others idle in DRX, the scan / attach phase counts as a second awake radio),
+binds its sockets to its physical address and runs single-path TCP.
+
+---
+
+## Phase 2 — battery, ordering and carrier transparency
+
+### Battery drain: three-tier radio sleep model (`PowerModel.js`)
+
+| Tier | System draw (model parameter) | When |
+| --- | --- | --- |
+| 0 · DRX standby | 1.2 W | One radio carries the traffic; every other modem sleeps in 3GPP DRX while the primary's health is > 75. A sleeping modem wakes once per 1.28 s DRX cycle to sample signal only. |
+| 1 · Warm probing | 1.8 W | One secondary is awake: woken by a predicted degradation, a > 2 % rise of the primary's loss within 1 s, or primary health ≤ 75. It sends 64-byte heartbeats every 100 ms. |
+| 2 · Burst replication | 3.4 W | Both radios transmit — only during the ~400 ms handoff window. |
+
+Power is integrated per tick into energy (J) for each vehicle until it completes its route. The HUD shows the live
+watts and tier, each interface's radio state, journey energy, mean power, time per tier, bursts, wakes and heartbeat
+bytes.
+
+### Packet reordering and head-of-line blocking (`ReorderingBuffer.js`)
+
+- **Critical / real-time** — `SequenceReorderBuffer`: 32-bit sequence numbers with RFC 1982 serial arithmetic and a
+  4096-sequence duplicate window. First arrival delivered, late duplicate discarded, so the HoL stall is 0 ms by
+  construction. As a counterfactual, the buffer also measures how long strict in-order delivery *would* have waited.
+- **Bulk (legacy and FlexiPath)** — `TcpHolModel`: a single TCP stream per flow with an RFC 6298 RTT estimator and a
+  Mathis-model congestion window (`1.22 / √p`, capped by the bandwidth-delay product). A lost segment is repaired by
+  fast retransmit (≈ 1 RTT stall) when the window can produce 3 duplicate ACKs, otherwise by a retransmission timeout
+  `max(200 ms, SRTT + 4·RTTVAR)` with at most one back-off — a 200–500 ms stall of the whole byte stream. The mean
+  delay added to a byte is `Σ stall² / (2·T)`.
+- **Delay-compensated pacing** — while bulk spans two paths during a burst, segments on the slower path are sent ahead
+  by the one-way delay difference (ΔRTT / 2); the residual misalignment is the paths' jitter.
+
+### Carrier middleboxes and IP changes (`RelayTunnelModel.js`)
+
+FlexiPath carries every flow in a **userspace UDP tunnel** (48-byte header: IPv6 + UDP + session ID) to an **anchor
+relay** at `198.51.100.24:443`. Each interface gets its own address from its network — depot LAN DHCP, Wi-Fi private
+DHCP (e.g. `192.168.1.104`), 5G carrier CGNAT (e.g. `100.84.12.9`), LEO operator CGNAT — with a new lease on every
+reattach, and carrier NATs rebind the outer port after 30 s idle. The relay re-learns the outer address from the
+tunnel packets themselves, so a path change or NAT rebinding is a `REBIND` event and remote services keep seeing the
+relay's static address: no TCP reset. UDP encapsulation also passes middleboxes that drop unknown transport protocols.
+The legacy stack's sockets are bound to its physical address, so every reattach is a remote-visible source IP change
+(`SRC_IP`) and resets its TCP sessions.
+
+---
 
 ### Scenarios
 
@@ -154,11 +239,14 @@ Keys: `Space` pause · `M` mission / advanced · `D` guided demo · `X` experime
 
 ### Exports
 
-- **Run JSON** — meta (scenario, seed, data source), model parameters, per-engine summary, decision records, episodes,
-  event log and the 10 Hz time series.
+- **Run JSON** — meta (scenario, seed, data source, anchor relay), model parameters (incl. power, HoL and relay
+  parameters), per-engine summary, decision records, episodes, event log and the 10 Hz time series.
 - **Run CSV** — one row per tick with both engines side by side (`fp_*`, `lg_*`), including loop stage, primary,
-  replica, prepared path, replication flags and cumulative overhead.
-- **Experiments** — per-run rows and the paired comparison (means, SDs, mean difference, 95 % CI, pairs).
+  replica, prepared path, replication flags, cumulative overhead, radio power (W), tier, energy (J), per-interface radio
+  states, client and remote-visible IPs, HoL stall, in-order wait and duplicates discarded.
+- **Experiments** — per-run rows (mean / peak power in W, energy in J, burst and warm time, duplicates discarded,
+  critical and bulk HoL latency, TCP timeout stalls, physical and remote-visible IP changes, tunnel and NAT rebinds,
+  next to every continuity metric) and the paired comparison (means, SDs, mean difference, 95 % CI, pairs).
 
 ---
 
@@ -166,14 +254,14 @@ Keys: `Space` pause · `M` mission / advanced · `D` guided demo · `X` experime
 
 | Label | Meaning |
 | --- | --- |
-| `MODEL PARAMETER` | Set in the model: thresholds, link capacities, RF constants, legacy recovery phases. |
-| `MEASURED · SIM` | Measured from simulated runs: interruptions, delivery, MOS, overhead, action-vs-failure times. |
+| `MODEL PARAMETER` | Set in the model: thresholds, link capacities, RF constants, legacy recovery phases, radio tier draws (1.2 / 1.8 / 3.4 W), DRX cycle and wake latency, TCP timer bounds, NAT idle timeout, addresses. |
+| `MEASURED · SIM` | Measured from simulated runs: interruptions, delivery, MOS, overhead, action-vs-failure times, energy and mean power, HoL stalls, duplicates discarded, IP changes. |
 | `REAL-WORLD MEASUREMENT` | None. This is a simulation prototype. |
 
 The HUD labels interruptions as *simulated*, shows a `SIMULATION` badge, and reports differences without a score or
 "winner". FlexiPath does not claim zero loss, universal handover or real satellite performance: packets are still lost
-(≈ 1 % of critical packets in the runs above), an abrupt outage still costs a detection gap, and the RF and satellite
-models are stylised.
+(≈ 1–2 % of critical packets in the runs above), an abrupt outage still costs a detection gap (plus a DRX wake), the
+radio power is higher than a single-radio stack's, and the RF, satellite and power models are stylised.
 
 ---
 
@@ -185,10 +273,14 @@ flowchart LR
     SC[Scenarios] --> ENG[SimulationEngine]
     ENV[NetworkEnvironment<br/>4-zone RF + faults] --> LM[LinkModel ×4<br/>per vehicle]
     MOB[MobilityModel] --> LM
-    LM --> FP[FlexiPathController<br/>predict · prepare · replicate · switch]
+    LM --> FP[FlexiPathController<br/>predict · wake · burst · switch]
     LM --> LG[LegacyController]
-    FP --> TM1[TrafficManager<br/>classes · replication · overhead]
+    FP --> TM1[TrafficManager<br/>classes · replication · ReorderingBuffer]
     LG --> TM2[TrafficManager]
+    FP --> PW1[PowerModel<br/>radio tiers · energy]
+    LG --> PW2[PowerModel]
+    FP --> RT1[RelayTunnelModel<br/>leases · rebinds]
+    LG --> RT2[RelayTunnelModel<br/>no tunnel]
     FP --> DT1[DecisionTrace<br/>loop stages · episodes]
     LG --> DT2[DecisionTrace]
     ENG --> RUN[ExperimentRunner<br/>paired trials]
@@ -198,8 +290,8 @@ flowchart LR
 ```
 
 The simulation never imports the renderer, and the HUD holds no simulation state of its own: the loop stages,
-decision records and episodes are computed in the engine and read from its snapshots. The same engine drives the
-60 fps twin and the headless experiments in Node.
+decision records, episodes, radio states, HoL statistics and tunnel addresses are computed in the engine and read from
+its snapshots. The same engine drives the 60 fps twin and the headless experiments in Node.
 
 ## 3D assets (Blender)
 
@@ -245,13 +337,14 @@ FlexiPath/
     ├── main.js · styles.css            entry point, Tailwind v4 theme + HUD components
     ├── simulation/                     SimulationEngine, Scenarios, NetworkEnvironment, LinkModel, MobilityModel,
     │                                   TrafficManager, FlexiPathController, LegacyController, DecisionTrace,
-    │                                   QoEModel, ExperimentRunner
+    │                                   PowerModel, ReorderingBuffer, RelayTunnelModel, QoEModel, ExperimentRunner
     ├── three/                          SceneManager, VehicleManager, NetworkNodeManager, BeamManager,
     │                                   PacketParticleManager, EnvironmentManager
     ├── ui/                             Dashboard, SystemLoop, PredictionPanel, DecisionPanel, TrafficPanel,
-    │                                   ComparisonLanes, PredictionInternals, ExperimentPanel, GuidedDemo,
-    │                                   InfoContent, TelemetryPanel, FlowInspector, EventLog, Controls, format
-    ├── charts/                         BaseTimeSeriesChart + Throughput / RTT / PacketLoss / QoE charts
+    │                                   EngineeringPanel, ComparisonLanes, PredictionInternals, TunnelPanel,
+    │                                   ExperimentPanel, GuidedDemo, InfoContent, TelemetryPanel, FlowInspector,
+    │                                   EventLog, Controls, format
+    ├── charts/                         BaseTimeSeriesChart + Throughput / RTT / PacketLoss / QoE / Power / HoL charts
     └── utils/                          Metrics (EWMA, trends), Random (Mulberry32), Export (CSV/JSON)
 ```
 
@@ -269,6 +362,13 @@ Stack: Vite 8 · Three.js r186 · Chart.js 4 · Tailwind CSS 4 · Lucide.
   applied identically to both engines.
 - Prediction is a linear trend extrapolation. It cannot foresee abrupt outages (scenario D shows the resulting
   failover gap) and it can release a prediction when a trend reverses — both are shown, not hidden.
+- **Power** is three system-level tiers (assumptions for a multi-modem telematics unit, not measurements): no per-bit
+  transmit-power scaling, no per-technology difference between Wi-Fi and cellular modems, no RRC tail states beyond the
+  tiers. A DRX modem's score is estimated from its signal with the same PHY curves as the link model, without fading.
+- **Head-of-line**: critical and real-time flows are packet-level; bulk TCP is an analytical per-tick model (loss
+  repair by fast retransmit or RTO), not a packet-level TCP implementation.
+- **Tunnel**: the relay is assumed close to the vehicle's networks (no extra relay latency); addresses are illustrative
+  (`198.51.100.0/24` is RFC 5737 documentation space, `100.64.0.0/10` is RFC 6598 CGNAT space).
 - Everything is deterministic per seed: the same seed and inputs reproduce the same run.
 
 ## License

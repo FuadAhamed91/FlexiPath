@@ -4,18 +4,23 @@
  * Driven only by the simulation: the active stage and the stage times come from the FlexiPath
  * decision trace (DecisionTrace.js) in the snapshot — when the controller actually reached each
  * stage in the current episode. Skipped stages (e.g. an abrupt, unpredictable outage) say so.
+ * Captions include the radio power state (DRX standby / warm probe / burst) the stage runs at.
  */
 import { LOOP_STAGES } from '../simulation/DecisionTrace.js';
 import { INTERFACE_IDS } from '../simulation/LinkModel.js';
+import { POWER_PARAMS } from '../simulation/PowerModel.js';
 import { esc, fmtRel, fmtT, linkName, makeSetter } from './format.js';
 
+const W = POWER_PARAMS.tierWatts;
+const BURST_MS = Math.round(POWER_PARAMS.burstWindowS * 1000);
+
 export const STAGE_META = {
-  DETECT: { color: '#00F0FF', question: 'Measure every link at 10 Hz' },
+  DETECT: { color: '#00F0FF', question: `Measure the primary at 10 Hz · other modems in DRX (${W[0]} W)` },
   PREDICT: { color: '#FACC15', question: 'Is the current path degrading?' },
-  PREPARE: { color: '#60A5FA', question: 'Which path should be next?' },
-  REPLICATE: { color: '#A855F7', question: 'Protect only the traffic that needs it' },
+  PREPARE: { color: '#60A5FA', question: `Wake and validate the next path (warm probe, ${W[1]} W)` },
+  REPLICATE: { color: '#A855F7', question: `Burst-protect critical traffic for ${BURST_MS} ms (${W[2]} W)` },
   SWITCH: { color: '#E2E8F0', question: 'Make the prepared path primary' },
-  CONTINUE: { color: '#22C55E', question: 'Sessions continue on the anchor IP' },
+  CONTINUE: { color: '#22C55E', question: 'Sessions continue via the anchor relay' },
 };
 
 const KIND_LABEL = {
@@ -73,8 +78,14 @@ export class SystemLoop {
     const pred = d?.prediction;
     switch (stage) {
       case 'DETECT': {
-        const up = INTERFACE_IDS.filter((id) => fp.links?.[id]?.up).length;
-        return d?.primary ? `${up} links measured · primary ${linkName(d.primary)}` : 'No usable link';
+        if (!d?.primary) return 'No usable link';
+        const radio = d.radio ?? {};
+        const drx = INTERFACE_IDS.filter((id) => radio[id] === 'DRX').length;
+        const warm = d.warmTarget && (radio[d.warmTarget] === 'WARM' || radio[d.warmTarget] === 'WAKING') ? d.warmTarget : null;
+        if (warm) return `${linkName(d.primary)} at 10 Hz · ${linkName(warm)} ${radio[warm] === 'WAKING' ? 'waking' : 'warm probe'} (${d.warmReason ?? 'dwell'})`;
+        const standby = !d.protecting && fp.power?.tier === 0 ? ` · ${W[0]} W` : '';
+        if (!drx) return `${linkName(d.primary)} measured at 10 Hz · no other link in coverage${standby}`;
+        return `${linkName(d.primary)} measured at 10 Hz · ${drx} modem${drx === 1 ? '' : 's'} asleep in DRX${standby}`;
       }
       case 'PREDICT': {
         if (!pred) return ep?.notes.PREDICT ?? '';
@@ -84,15 +95,22 @@ export class SystemLoop {
       }
       case 'PREPARE': {
         const id = d?.prepared;
-        if (!id) return 'no alternate ready yet';
+        if (!id) {
+          const w = d?.warmTarget;
+          const st = w ? d.radio?.[w] : null;
+          if (st === 'WAKING') return `waking ${linkName(w)} from DRX…`;
+          if (st === 'WARM') return `${linkName(w)} warm probe · validating · ${W[1]} W`;
+          return 'no alternate ready yet';
+        }
         const sc = d.scores?.[id]?.norm.critical;
-        return `${linkName(id)} ready${Number.isFinite(sc) ? ` · score ${sc.toFixed(0)}` : ''}`;
+        return `${linkName(id)} warm-validated${Number.isFinite(sc) ? ` · score ${sc.toFixed(0)}` : ''} · ${W[1]} W`;
       }
       case 'REPLICATE': {
         if (!d?.protecting) return ep?.notes.REPLICATE ?? '';
-        if (!d.replicationActive) return `bulk drained ⇢ ${linkName(d.replica)}`;
+        const ms = `${Math.round(d.replicationElapsed * 1000)}/${Math.round((d.burstWindowS ?? POWER_PARAMS.burstWindowS) * 1000)} ms`;
+        if (!d.replicationActive) return `bulk paced ⇢ ${linkName(d.replica)} · ${ms}`;
         const cls = d.replicate.REALTIME ? 'critical + real-time' : 'critical';
-        return `${cls} ⇉ ${linkName(d.replica)} · ${d.replicationElapsed.toFixed(1)} s`;
+        return `BURST ${ms} · ${cls} ⇉ ${linkName(d.replica)} · ${W[2]} W`;
       }
       default:
         return ep?.notes[stage] ?? '';

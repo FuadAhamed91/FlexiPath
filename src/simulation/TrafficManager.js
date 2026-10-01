@@ -1,24 +1,27 @@
 /**
- * TrafficManager.js — traffic classes, flow generator and packet-fate engine.
+ * TrafficManager.js — traffic classes, flow generator, packet-fate engine and receiver ordering.
  *
- * Not all traffic is treated the same. Every flow belongs to a class whose
- * protection matches what it actually needs:
+ * Not all traffic is treated the same. Every flow belongs to a class whose protection matches what
+ * it actually needs:
  *
  *   CRITICAL  (P1)  emergency / control, medical telemetry
- *                   per-packet · replicated for the whole risk window once degradation is predicted
+ *                   per-packet · replicated during the ~400 ms handoff burst
  *   REAL-TIME (P2)  VoIP, interactive sessions
- *                   per-packet · replicated in a risk window only once its loss budget is exceeded
- *                   or failure is less than a second away (packet-loss concealment hides the rest)
+ *                   per-packet · replicated in the burst only once its loss budget is exceeded or
+ *                   failure is less than a second away (packet-loss concealment hides the rest)
  *   BULK      (P3+) video upload, file transfer
- *                   fluid · never replicated: water-filled across links by bulk score and drained off
- *                   a failing link (reliable transport recovers its own losses)
+ *                   fluid · never replicated: carried by the active radio and moved to the new path
+ *                   with delay-compensated pacing during the burst (reliable transport recovers losses)
  *
  * The controller decides *which classes* are replicated (decision.replicate); this module executes the
- * decision. A replicated packet is sent on [primary, replica]; the receiver keeps the first copy to arrive
- * and discards the rest. Every duplicate byte is counted, so replication overhead is measured, not assumed.
+ * decision. Every packet carries a 32-bit sequence number. A replicated packet is sent on [primary,
+ * replica]; the receiver (ReorderingBuffer) delivers the first copy to arrive and discards the later one.
+ * Bulk flows run through a TCP-like in-order model that measures head-of-line blocking. Every duplicate
+ * byte is counted, so replication overhead is measured, not assumed.
  */
 import { clamp, WindowRatio, RunningStats } from '../utils/Metrics.js';
 import { INTERFACE_IDS } from './LinkModel.js';
+import { SequenceReorderBuffer, TcpHolModel, delayCompensatedPacing, seqAdd } from './ReorderingBuffer.js';
 
 export const TRAFFIC_CLASSES = {
   CRITICAL: {
@@ -28,7 +31,7 @@ export const TRAFFIC_CLASSES = {
     color: '#F8FAFC',
     examples: 'Emergency / control · medical telemetry · safety data',
     sensitivity: 'Loss + latency',
-    policy: 'Replicated for the whole risk window once degradation is predicted',
+    policy: 'Replicated during the ~400 ms handoff burst; first copy delivered, late duplicate discarded',
   },
   REALTIME: {
     id: 'REALTIME',
@@ -37,7 +40,7 @@ export const TRAFFIC_CLASSES = {
     color: '#7DD3FC',
     examples: 'VoIP · interactive sessions',
     sensitivity: 'Latency + jitter (MOS)',
-    policy: 'Replicated in a risk window once loss exceeds its budget or failure is < 1 s away',
+    policy: 'Replicated in the burst only once loss exceeds its 2 % budget or failure is < 1 s away',
   },
   BULK: {
     id: 'BULK',
@@ -46,7 +49,7 @@ export const TRAFFIC_CLASSES = {
     color: '#94A3B8',
     examples: 'Video upload · file transfer',
     sensitivity: 'Throughput',
-    policy: 'Never replicated: striped across links and drained off a failing one',
+    policy: 'Never replicated: moved to the new path with delay-compensated pacing (ΔRTT offset)',
   },
 };
 
@@ -158,6 +161,9 @@ function summarize(a, window, dt) {
 export class TrafficManager {
   constructor({ rng, flows = FLOW_DEFS } = {}) {
     this.rng = rng;
+    this.seqRng = rng.fork('seq');
+    this.holRng = rng.fork('hol');
+    this.pacingRng = rng.fork('pacing');
     this.flows = flows;
     this.hasClass = Object.fromEntries(Object.keys(TRAFFIC_CLASSES).map((c) => [c, flows.some((f) => f.cls === c)]));
     this.reset();
@@ -166,12 +172,24 @@ export class TrafficManager {
   reset() {
     this.window = {};
     this.latencyStats = {};
+    this.seq = {};
+    this.reorder = {};
+    this.tcp = {};
+    this.pacing = {};
     for (const f of this.flows) {
       this.window[f.id] = new WindowRatio(10); // 1 s loss window
       this.latencyStats[f.id] = new RunningStats();
+      if (f.mode === 'packet') {
+        this.seq[f.id] = Math.floor(this.seqRng.next() * 4294967296) >>> 0; // random 32-bit initial sequence number
+        this.reorder[f.id] = new SequenceReorderBuffer();
+      } else {
+        this.tcp[f.id] = {};
+        this.pacing[f.id] = { ticks: 0, pacedSumMs: 0, unpacedSumMs: 0, maxOffsetMs: 0 };
+      }
     }
     this.classWindow = { CRITICAL: new WindowRatio(10), REALTIME: new WindowRatio(10) };
     this.packetWindow = new WindowRatio(10);
+    this.timeMs = 0;
     this.totals = {
       packetSent: 0,
       packetDelivered: 0,
@@ -183,7 +201,7 @@ export class TrafficManager {
       realtimeSent: 0,
       realtimeDelivered: 0,
       realtimeLost: 0,
-      duplicatesDiscarded: 0,
+      duplicatesDiscarded: 0, // late copies discarded by the receiver's sequence buffer
       duplicateBytes: 0, // extra copies actually transmitted on a second path
       duplicateBytesByClass: { CRITICAL: 0, REALTIME: 0 },
       bulkMbit: 0,
@@ -193,13 +211,20 @@ export class TrafficManager {
     };
   }
 
+  _tcpModel(flowId, linkId) {
+    const map = this.tcp[flowId];
+    map[linkId] ??= new TcpHolModel(this.holRng.fork(`${flowId}:${linkId}`));
+    return map[linkId];
+  }
+
   /**
    * Execute one 100 ms tick of traffic under a routing decision.
    * @param {object} decision controller output
    * @param {Record<string, object>} links true link states
    * @param {number} dt tick length (s)
+   * @param {number} [t] simulation time at the start of the tick (s)
    */
-  step(decision, links, dt) {
+  step(decision, links, dt, t = 0) {
     const r = this.rng;
     const blackoutFrac = clamp((decision.blackoutMs || 0) / (dt * 1000), 0, 1);
     const paths = decision.criticalPaths || [];
@@ -209,24 +234,31 @@ export class TrafficManager {
     const flowResults = [];
     const agg = { packet: tickAgg(), CRITICAL: tickAgg(), REALTIME: tickAgg() };
     let voice = null;
+    let inOrderTickMax = 0;
+    let reorderedTick = 0;
+    this.timeMs += dt * 1000;
 
-    // ── Packet flows (CRITICAL, REAL-TIME): per-packet fate ────────────────
+    // ── Packet flows (CRITICAL, REAL-TIME): per-packet fate, sequence-numbered ─────
     for (const f of this.flows) {
       if (f.mode !== 'packet') continue;
       const n = Math.round(f.pps * dt);
       const size = f.payloadBytes + HEADER_BYTES;
       const mirror = paths.length > 1 && (replicate ? !!replicate[f.cls] : true);
       const fPaths = mirror ? paths : paths.slice(0, 1);
+      const buf = this.reorder[f.id];
       let delivered = 0;
-      let dups = 0;
       let fLat = 0;
       let fLatSq = 0;
       let dupBytes = 0;
+      const arrivals = [];
+      const firsts = [];
       const blackoutPkts = Math.ceil(blackoutFrac * n);
       for (let i = 0; i < n; i++) {
+        const seq = this.seq[f.id];
+        this.seq[f.id] = seqAdd(seq, 1);
         if (decision.stalled || !fPaths.length || i < blackoutPkts) continue;
+        const sendAt = t + ((i + 0.5) / n) * dt;
         let first = Infinity;
-        let copies = 0;
         for (let p = 0; p < fPaths.length; p++) {
           const L = links[fPaths[p]];
           if (!L || !L.up) continue;
@@ -236,19 +268,32 @@ export class TrafficManager {
             dupBytes += size;
           }
           if (r.next() >= L.lossRate) {
-            copies++;
             const lat = L.rttMs / 2 + Math.abs(r.gaussian(0, L.jitterMs));
+            arrivals.push({ seq, at: sendAt + lat / 1000 });
             if (lat < first) first = lat;
           }
         }
-        if (copies > 0) {
+        if (first < Infinity) {
           delivered++;
           fLat += first;
           fLatSq += first * first;
           this.latencyStats[f.id].push(first);
-          if (copies > 1) dups += copies - 1;
+          firsts.push(sendAt + first / 1000);
         }
       }
+      // Receiver: copies in arrival order through the 32-bit sequence buffer — first copy delivered at
+      // once, the late duplicate discarded. Nothing is held back, so the HoL wait is zero.
+      arrivals.sort((a, b) => a.at - b.at);
+      const dupBefore = buf.duplicates;
+      const reBefore = buf.reordered;
+      for (const a of arrivals) buf.arrive(a.seq);
+      const dups = buf.duplicates - dupBefore;
+      reorderedTick += buf.reordered - reBefore;
+      // Counterfactual: what strict in-order delivery of the same arrivals would have added.
+      let inOrderMax = 0;
+      for (const at of firsts) inOrderMax = Math.max(inOrderMax, buf.inOrderSample(at));
+      inOrderTickMax = Math.max(inOrderTickMax, inOrderMax);
+
       const lost = n - delivered;
       this.window[f.id].push(lost, n);
       const meanLat = delivered ? fLat / delivered : NaN;
@@ -280,6 +325,9 @@ export class TrafficManager {
         paths: decision.stalled ? [] : [...fPaths],
         replicated: mirror && !decision.stalled && fPaths.length > 1,
         dupBytes,
+        holStallMs: buf.holMaxMs,
+        inOrderWaitMs: inOrderMax,
+        seqNext: this.seq[f.id],
       });
       if (f.voice) {
         voice = {
@@ -302,7 +350,7 @@ export class TrafficManager {
       this.totals.packetBytes += n * size;
     }
 
-    // ── BULK flows: fluid water-filling over score-weighted shares ─────────
+    // ── BULK flows: fluid goodput on the active radio(s), TCP-like in-order delivery ──
     const shares = decision.stalled ? {} : decision.bulkShares || {};
     const caps = {};
     for (const id of Object.keys(shares)) {
@@ -313,6 +361,10 @@ export class TrafficManager {
     const backup = decision.backup ?? null;
     const backupCap = backup ? decision.scores?.[backup]?.metrics?.throughputMbps ?? links[backup]?.throughputMbps ?? 0 : 0;
     let bulkMbps = 0;
+    let bulkBlocked = 0;
+    let bulkStall = 0;
+    let bulkRto = false;
+    let pacingNow = null;
     for (const f of this.flows) {
       if (f.mode !== 'fluid') continue;
       const alloc = waterFill(f.demandMbps, shares, caps);
@@ -328,6 +380,41 @@ export class TrafficManager {
       got *= 1 - blackoutFrac; // in-flight data lost while an abrupt failure is detected
       bulkMbps += got;
       this.totals.perFlow[f.id].mbit += got * dt;
+
+      // Head-of-line blocking: loss recovery on each path the flow uses.
+      let blocked = 0;
+      let stall = 0;
+      let rto = false;
+      const used = new Set(flowPaths);
+      for (const id of new Set([...flowPaths, ...Object.keys(this.tcp[f.id])])) {
+        const L = links[id];
+        const res = this._tcpModel(f.id, id).step(
+          dt * 1000,
+          used.has(id) && L?.up ? { rttMs: L.rttMs, jitterMs: L.jitterMs, lossRate: L.lossRate, mbps: alloc[id] * (1 - blackoutFrac) } : null,
+        );
+        blocked = Math.max(blocked, res.blockedMs);
+        stall = Math.max(stall, res.stallMs);
+        rto ||= res.rto;
+      }
+      // Multipath (only during a burst): delay-compensated pacing removes the reordering stall.
+      let pacing = null;
+      if (flowPaths.length > 1 && decision.pacing) {
+        pacing = delayCompensatedPacing(
+          flowPaths.map((id) => ({ id, rttMs: links[id].rttMs, jitterMs: links[id].jitterMs, mbps: alloc[id] })),
+          this.pacingRng,
+        );
+        if (pacing) {
+          const ps = this.pacing[f.id];
+          ps.ticks++;
+          ps.pacedSumMs += pacing.pacedHolMs * dt * 1000;
+          ps.unpacedSumMs += pacing.unpacedHolMs * dt * 1000;
+          ps.maxOffsetMs = Math.max(ps.maxOffsetMs, pacing.offsetMs);
+          pacingNow ??= pacing;
+        }
+      }
+      bulkBlocked = Math.max(bulkBlocked, blocked);
+      bulkStall = Math.max(bulkStall, stall);
+      bulkRto ||= rto;
       flowResults.push({
         id: f.id,
         cls: f.cls,
@@ -343,6 +430,10 @@ export class TrafficManager {
         alloc,
         replicated: false,
         replicaCostPct: backup && backupCap > 0 ? (got / backupCap) * 100 : null,
+        holBlockedMs: blocked,
+        holStallMs: stall,
+        rto,
+        pacing,
       });
     }
     const totalShare = Object.values(shares).reduce((a, b) => a + b, 0) || 1;
@@ -383,6 +474,15 @@ export class TrafficManager {
       flows: flowResults,
       duplicateBytes: packet.dupBytes,
       replicatedClasses: PACKET_CLASSES.filter((c) => flowResults.some((fr) => fr.cls === c && fr.replicated)),
+      hol: {
+        packetStallMs: 0, // first-copy delivery: nothing waits behind a missing packet
+        inOrderWaitMs: inOrderTickMax,
+        reordered: reorderedTick,
+        bulkBlockedMs: bulkBlocked,
+        bulkStallMs: bulkStall,
+        bulkRto,
+        pacing: pacingNow,
+      },
     };
   }
 
@@ -404,6 +504,59 @@ export class TrafficManager {
           return [c, orig ? (T.duplicateBytesByClass[c] / orig) * 100 : 0];
         }),
       ),
+    };
+  }
+
+  /** Receiver ordering / head-of-line statistics so far. */
+  holStats() {
+    const packetFlows = this.flows.filter((f) => f.mode === 'packet');
+    const bulkFlows = this.flows.filter((f) => f.mode === 'fluid');
+    let inOrderSum = 0;
+    let inOrderCount = 0;
+    let inOrderMax = 0;
+    let reordered = 0;
+    let holMax = 0;
+    for (const f of packetFlows) {
+      const b = this.reorder[f.id];
+      inOrderSum += b.inOrderSumMs;
+      inOrderCount += b.inOrderCount;
+      inOrderMax = Math.max(inOrderMax, b.inOrderMaxMs);
+      reordered += b.reordered;
+      holMax = Math.max(holMax, b.holMaxMs);
+    }
+    let bulkMean = 0;
+    let bulkPeak = 0;
+    let rtoEvents = 0;
+    let fastRetx = 0;
+    let unpacedMean = 0;
+    let maxOffset = 0;
+    const T = Math.max(1, this.timeMs);
+    for (const f of bulkFlows) {
+      let sumSq = 0;
+      for (const m of Object.values(this.tcp[f.id])) {
+        sumSq += m.sumSqMs2;
+        bulkPeak = Math.max(bulkPeak, m.peakMs);
+        rtoEvents += m.rtoEvents;
+        fastRetx += m.fastRetx;
+      }
+      const ps = this.pacing[f.id];
+      bulkMean += sumSq / (2 * T) + ps.pacedSumMs / T;
+      unpacedMean += sumSq / (2 * T) + ps.unpacedSumMs / T;
+      maxOffset = Math.max(maxOffset, ps.maxOffsetMs);
+    }
+    const nb = bulkFlows.length || 1;
+    return {
+      packetHolMaxMs: holMax,
+      inOrderWaitMeanMs: inOrderCount ? inOrderSum / inOrderCount : 0,
+      inOrderWaitMaxMs: inOrderMax,
+      reordered,
+      duplicatesDiscarded: this.totals.duplicatesDiscarded,
+      bulkHolMeanMs: bulkFlows.length ? bulkMean / nb : null,
+      bulkHolUnpacedMeanMs: bulkFlows.length ? unpacedMean / nb : null,
+      bulkHolPeakMs: bulkFlows.length ? bulkPeak : null,
+      bulkRtoEvents: rtoEvents,
+      bulkFastRetransmits: fastRetx,
+      pacingMaxOffsetMs: maxOffset,
     };
   }
 }

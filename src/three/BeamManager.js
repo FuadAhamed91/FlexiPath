@@ -220,21 +220,30 @@ export class BeamManager {
           target = 1;
         }
       } else if (L.up) {
+        const radio = d?.radio?.[lid];
+        const sc = d?.scores?.[lid];
         if (lid === d?.primary) {
           role = 'primary';
           target = 1;
         } else if (lid === d?.replica) {
-          role = 'replica';
+          role = 'replica'; // BURST TX: both radios transmit during the handoff window
           target = d.replicationActive ? 0.95 : 0.6;
         } else if (lid === d?.prepared) {
-          role = 'prepared'; // selected and validated next path, not yet carrying traffic
+          role = 'prepared'; // warm-validated next path: heartbeats, no traffic yet
           target = 0.45;
         } else if (share > 0.001) {
           role = 'share';
           target = 0.35 + 0.5 * share;
-        } else {
-          role = 'probe';
-          target = 0.1;
+        } else if (radio === 'WARM') {
+          role = 'prepared'; // warm probe, still being validated by its heartbeats
+          target = 0.3;
+        } else if (radio === 'WAKING') {
+          role = 'waking';
+          target = 0.18;
+        } else if (radio === 'DRX') {
+          // Asleep: no probes. A faint blink on the tick the modem wakes for its DRX signal sample.
+          role = 'paging';
+          target = sc?.estimated && sc.ageS < 0.05 ? 0.16 : 0;
         }
       }
       out[lid] = { role, target, share, rttMs: L.up ? L.rttMs : Infinity, loss: L.lossRate };
@@ -288,7 +297,7 @@ export class BeamManager {
         u.uTime.value = time;
         u.uIntensity.value = beam.intensity;
         u.uFlow.value = Math.min(2.4, Math.max(0.12, 9 / Math.max(3, beam.rttMs)));
-        u.uDash.value = r.role === 'probe' || r.role === 'attaching' || r.role === 'prepared' ? 1 : 0;
+        u.uDash.value = r.role === 'probe' || r.role === 'attaching' || r.role === 'prepared' || r.role === 'waking' || r.role === 'paging' ? 1 : 0;
         const pulse = repl && (r.role === 'primary' || r.role === 'replica') ? 1 : 0;
         u.uPulse.value += (pulse - u.uPulse.value) * k;
         if (r.role === 'failing' || r.role === 'attaching') {
