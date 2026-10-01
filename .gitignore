@@ -19,3 +19,6 @@ Thumbs.db
 
 # Claude Code desktop preview config
 .claude/
+
+# /brag launch-video output (renders, frames)
+brag-output*/
