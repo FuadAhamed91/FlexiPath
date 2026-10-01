@@ -1,0 +1,135 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project
+
+FlexiPath is a **simulation prototype** of a predictive, traffic-aware multipath connectivity engine. A deterministic
+10 Hz simulation drives two vehicles over the same seeded route, RF field and faults: **FlexiPath** (detect → predict →
+prepare → replicate → switch → continue) and a **legacy break-before-make OS stack** as the baseline. A Three.js digital
+twin and an explainable HUD render it live; a headless runner produces paired experiments. Plain ES modules, no
+framework, no TypeScript. `README.md` documents the model rules, parameters and published results in detail.
+
+## Commands
+
+```bash
+npm run dev          # Vite dev server, http://localhost:5173
+npm run build        # production bundle → dist/ (base './', sourcemaps on)
+npm run preview      # serve dist/ on :4173
+npm run benchmark    # headless paired experiments in Node → results/benchmark_<stamp>.{json,csv} + benchmark_comparison_<stamp>.csv
+npm run models       # regenerate public/models/*.glb (needs `blender` on PATH)
+```
+
+There is no test suite, linter or type checker. Verify changes with `npm run build` and the benchmark:
+
+- Narrow runs: `npm run benchmark -- --quick` (3 seeds, 60 km/h), or e.g. `-- --seeds 1 --speeds 60 --scenarios A,D`;
+  also `--no-failsafe` and `--out <dir>`. The default is scenarios A–F × 5 seeds × 30/60/90/120 km/h = 120 paired runs.
+- Runs are deterministic per seed. For a change that must not alter behaviour, benchmark into two `--out` dirs (before
+  and after) and compare: both CSVs must be byte-identical; the JSON differs only in `meta` (timestamps, wall time).
+- The README's "Measured results" tables come from the default `npm run benchmark`; when model behaviour changes,
+  re-run it and update them.
+
+In the browser, URL parameters give reproducible states: `?scenario=A&seed=2026&speed=90&mode=advanced&focus=legacy
+&camera=overview&intro=0&paused=1` (`paused` only applies with `intro=0`); `demo=1` starts the guided demo and
+`models=procedural` forces the primitive models. `window.flexipath` exposes `{ engine, dashboard, sceneManager,
+vehicles, nodes, beams, particles }` in the console.
+
+## Architecture
+
+### Simulation (`src/simulation`, pure JS)
+
+- It never imports `three`, `src/ui`, `src/charts` or the DOM: the same engine drives the 60 fps twin and runs headless
+  in Node through `ExperimentRunner` / `scripts/benchmark.js`. Keep it that way (the one browser-only helper is
+  `downloadText` in `src/utils/Export.js`).
+- `SimulationEngine` is the hub. `advance(realDt)` accumulates wall time × `simRate` and runs whole fixed ticks
+  (`DT = 0.1 s`, at most 40 per call), returning an interpolation `alpha`; `getRenderState()` interpolates vehicle arc
+  length and satellites between `prevSnapshot` and `snapshot` for rendering.
+- One `step()`: scenario faults fire once the FlexiPath vehicle's X passes their `atX` → `env.update(t)` → for each
+  agent (`flexipath`, then `legacy`): fail-safe check → `MobilityModel.update` → `LinkModel.sample(env.signal(…))` for
+  `eth0, wlan0, wwan0, sat0` → `controller.update({ t, links, ctx })` → `TrafficManager.step(decision, links)` →
+  `QoEModel` → stats → `PowerTracker.update(decision.radio)` → `RelayTunnelModel.update` → `DecisionTrace.update` →
+  decision records; then the snapshot, the history row and the events.
+- Both agents share one `NetworkEnvironment` (identical large-scale channel, evaluated on the road centre-line); each
+  has its own fast-fading, probe-noise, traffic and tunnel streams.
+- Controllers act on measured values (`links[id].meas`) and the `up` flag; the true link state decides packet fate in
+  `TrafficManager`. The `decision` object a controller returns (primary, replica, prepared, per-class `replicate`,
+  `bulkShares`, `pacing`, `stalled`, `blackoutMs`, `radio`, `events`, `records`, …) is the contract read by traffic,
+  power, tunnel, trace and the engine's stats.
+- Engine events: `on('tick' | 'event' | 'decision' | 'reset' | 'complete', fn)`. Snapshot shape:
+  `{ t, tick, completed, scenario, env, agents: { flexipath, legacy } }`. `reset()` primes tick 0 silently.
+- `_summarizeAgent` defines the per-run metric keys. `SUMMARY_METRICS` / `COMPARISON_METRICS` in `ExperimentRunner`,
+  the CSV exports, the Experiments panel (which reads some keys without null checks) and the README tables use them by
+  name, so rename everywhere or not at all.
+- Scenarios (`mission`, `A`–`F`, the hidden `demo`, and the original matrix `baseline` / `wifi-fade` / `cell-outage`)
+  are defined once in `Scenarios.js` and shared by the live twin and the runner. Route X runs 0 → 240 scene units
+  (1 unit = 5 m) across four zones; X must stay strictly increasing along the route (`sAtX`, X-triggered faults,
+  `zoneAt` and the finish test rely on it).
+
+### Controllers
+
+- `FlexiPathController.update()` is order-sensitive: measure → score → attach / abrupt-loss handling → `_predict`
+  (once per tick; it advances the time-to-failure confirmation counter, so any extra call must pass `peek: true`) →
+  `_watch` (before `_radioPlan`, so a predicted degradation wakes a modem on the onset tick) → `_radioPlan` → burst /
+  upgrade logic → `_radioStates` (writes the radio states, so it runs after any switch).
+- Time comparisons subtract `1e-9` because `t = tick × 0.1` is inexact; do the same for new timers.
+- `decision.replicate` must be an explicit per-class map: `TrafficManager` mirrors every packet flow when it is
+  undefined.
+- Event codes and record kinds are an API. The engine's stats (`REPL_ON`, `HOT_SWAP`, `FAILOVER`, `RECONNECTED`,
+  `TCP_RST`), the `DecisionTrace` episodes and the `GuidedDemo` captions all match on them by name.
+- The UI shows the exported default parameters (`FLEXIPATH_PARAMS`, `LEGACY_PARAMS`, `POWER_PARAMS`), not a controller
+  instance's merged `p`, and `params` merges shallowly (overriding `floors` replaces the whole object).
+
+### Determinism
+
+- All randomness comes from `Random` (Mulberry32) seeded by `config.seed` (`'2026'` and `2026` are the same seed).
+  Subsystems get independent streams from `rng.fork(label)`: `environment` → `shadow:<if>`; `agent:<id>` →
+  `link:<if>`, `traffic` (→ `seq`, `hol` → `<flow>:<link>`, `pacing`) and `tunnel`. A fork depends only on seed + label.
+- Within a stream the draw order is part of the result (flows iterate in `FLOW_DEFS` order; `gaussian()` caches a
+  spare value; a link draws more when it is up). Adding or removing a draw, or changing a threshold that gates draws,
+  shifts every later value in that stream. Give a new random consumer its own `fork('<label>')`, and never use
+  `Math.random()` or the clock in `src/simulation` (`Math.random` is fine for visual-only effects in `src/three`).
+- Several values assume `TICK_HZ = 10`: 1 s `WindowRatio(10)` windows, per-tick EWMA alphas, `round(pps · dt)`
+  packets per tick.
+
+### Parameters and claims
+
+- Tunables live in exported UPPER_CASE objects per module (`FLEXIPATH_PARAMS`, `LEGACY_PARAMS`, `TRACE_PARAMS`,
+  `POWER_PARAMS`, `HOL_PARAMS`, `RELAY_PARAMS`, `INTERFACE_SPECS`, `RF`, `FAULTS`, `ZONES`, `NODE_LAYOUT`,
+  `FLOW_DEFS`, …); `exportData()` writes them into the run JSON, so new tunables belong there. A few values are
+  duplicated by hand and must change together: `RF.wifi.noiseFloor` / `wlan0.noiseFloor`, `RF.cell.sinrOffset` /
+  `wwan0.sinrOffset`, `SWITCH_LOSS` / `FLEXIPATH_PARAMS.switchLoss`, the scenarios' `endX: 240` / `ROUTE_END_X`.
+- Provenance (README "Data provenance and claims"): every number is a MODEL PARAMETER or MEASURED · SIM; nothing is a
+  real-world measurement. The HUD labels interruptions as simulated, shows a `SIMULATION` badge and reports
+  differences without a score or "winner". Use `tag('param' | 'measured' | 'sim')` from `src/ui/format.js` for
+  provenance chips, and keep README and UI copy within these claims.
+
+### Front end (`src/main.js`, `src/ui`, `src/charts`, `src/three`)
+
+- `main.js` creates the engine paused → `Dashboard` → `SceneManager` and the environment / node / vehicle managers →
+  awaits the GLB loads → beams and particles. Each animation frame: `engine.advance(dt)` → each manager's
+  `update(render, snapshot, …)` → camera → render → `dashboard.frame(now)`. Visual animation runs on wall-clock time
+  (it keeps moving while paused); HUD values come from the latest 10 Hz snapshot.
+- The HUD and the twin hold no simulation state. Anything derived belongs in the engine and its snapshot, not in UI
+  code.
+- `Dashboard.js` builds the DOM from template strings and collects `[data-ref]` into `this.refs` before the child
+  panels render, so each panel scopes its own lookups. Panels refresh at most every 90 ms when dirty; charts every
+  180 ms and only in the Advanced view. `makeSetter` (`format.js`) skips unchanged DOM writes; pass dynamic text
+  through `esc()`.
+- Views: `data-mode="mission|advanced"` on `.fp-shell`, elements tagged `data-view`; theatre mode (`data-theatre`)
+  hides `.fp-deck`, `.fp-bottom` and `.fp-toolbar`. These rules sit at the end of `styles.css`, outside `@layer`,
+  with `!important`.
+- Lucide: an `<i data-lucide="name">` renders only if the icon is imported and added to `ICONS` in `Dashboard.js`,
+  and `renderIcons(subtree)` runs after the HTML is injected.
+- Chart.js is tree-shaken: `BaseTimeSeriesChart.js` registers only the components it uses; register any new
+  controller, scale or plugin there.
+- Tailwind v4 via `@tailwindcss/vite`: theme tokens (`void`, `fp`, `legacy`, `repl`, fonts) are in the `@theme` block
+  of `src/styles.css`, HUD component classes in `@layer components`. Utility classes must appear as complete literal
+  strings; composed names such as `lvl-${level}` or `cls-${cls}` must be component classes in `styles.css`.
+
+### 3D assets
+
+- `public/models/*.glb` are generated by `blender/generate_all_models.py` (`npm run models`; `-- --out <dir>`,
+  `-- --showcase`). The Three.js code relies on the conventions recorded in `manifest.json`: +Y up, vehicles face +X,
+  `AntennaAnchor` on vehicles, `BeamAnchor` on nodes, `Wheel_FL/FR/RL/RR` pivots.
+- Every asset has a procedural Three.js fallback (`build*` in `NetworkNodeManager.js` / `VehicleManager.js`), used when
+  a GLB fails to load or with `?models=procedural`. Keep its anchor names and positions in step with the Blender script.
