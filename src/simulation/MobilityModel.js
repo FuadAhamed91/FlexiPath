@@ -11,7 +11,6 @@
 import { clamp } from '../utils/Metrics.js';
 
 export const METERS_PER_UNIT = 5;
-export const ROUTE_START_X = 0;
 export const ROUTE_END_X = 240;
 export const ANTENNA_HEIGHT = 2.2; // roof antenna height used for RF geometry (units)
 

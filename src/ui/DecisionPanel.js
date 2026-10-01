@@ -77,29 +77,37 @@ export class DecisionPanel {
         <span class="decision-kind" data-ref="kind" hidden></span>
       </div>
       <div class="px-3 pb-3">
-        <div class="decision-headline mt-1.5" data-ref="headline">—</div>
+        <div class="decision-headline dp-clamp2 mt-1.5" data-ref="headline">—</div>
         <dl class="kv mt-2.5">
-          <dt>Current path</dt><dd data-ref="cur">—</dd>
-          <dt>Status</dt><dd data-ref="status">—</dd>
-          <dt data-ref="altLabel">Alternate</dt><dd data-ref="alt">—</dd>
-          <dt>Traffic</dt><dd data-ref="traffic">—</dd>
-          <dt title="Radio subsystem draw in the tier this decision puts the system in (model parameter)">Radio</dt><dd data-ref="radio">—</dd>
+          <dt class="dp-more">Current path</dt><dd class="dp-more" data-ref="cur">—</dd>
+          <dt class="dp-more">Status</dt><dd class="dp-more" data-ref="status">—</dd>
+          <dt class="dp-more" data-ref="altLabel">Alternate</dt><dd class="dp-more" data-ref="alt">—</dd>
+          <dt class="dp-more">Traffic</dt><dd class="dp-more" data-ref="traffic">—</dd>
+          <dt class="dp-more" title="Radio subsystem draw in the tier this decision puts the system in (model parameter)">Radio</dt><dd class="dp-more" data-ref="radio">—</dd>
           <dt>Action</dt><dd data-ref="action" class="font-semibold">—</dd>
-          <dt>Reason</dt><dd data-ref="reason">—</dd>
+          <dt>Reason</dt><dd class="dp-clamp" data-ref="reason">—</dd>
         </dl>
-        <div class="mt-2.5 flex flex-wrap items-center gap-1.5 text-[9.5px] text-slate-500">
+        <div class="dp-more mt-2.5 flex flex-wrap items-center gap-1.5 text-[9.5px] text-slate-500">
           ${tag('measured')}<span>values at decision time</span>${tag('param')}<span>thresholds</span>
         </div>
-        <div class="legacy-rule mt-2.5" data-ref="legacy" title="What the legacy OS stack is doing at the same moment">Legacy OS · —</div>
-        <div class="mt-3 flex items-center justify-between">
+        <div class="legacy-rule dp-line1 mt-2.5" data-ref="legacy">Legacy OS · —</div>
+        <div class="dp-more mt-3 flex items-center justify-between">
           <span class="hud-label">Decision history</span>
           <button type="button" class="btn h-[22px]! px-2! text-[10px]!" data-ref="follow" hidden>Follow latest</button>
         </div>
-        <div class="decision-history mt-1 flex flex-col gap-0.5" data-ref="history"></div>
+        <div class="dp-more decision-history mt-1 flex flex-col gap-0.5" data-ref="history"></div>
+        <button type="button" class="dp-toggle btn mt-2.5 h-[22px]! w-full justify-center px-2! text-[10px]!" data-ref="more" aria-expanded="false">Show details</button>
       </div>`;
+    root.classList.add('decision-panel');
     this.refs = {};
     root.querySelectorAll('[data-ref]').forEach((n) => (this.refs[n.dataset.ref] = n));
     this.refs.follow.addEventListener('click', () => this.select(null));
+    this.refs.more.addEventListener('click', () => {
+      this.expanded = !this.expanded;
+      this._applyCompact();
+    });
+    this.compactMode = false;
+    this.expanded = false;
     this.refs.history.addEventListener('click', (e) => {
       const b = e.target.closest('[data-idx]');
       if (b) this.select(Number(b.dataset.idx));
@@ -108,6 +116,23 @@ export class DecisionPanel {
     this.records = [];
     this.pinned = null;
     this._dirty = true;
+  }
+
+  /**
+   * Mission view shows the card compact (headline, action, reason, the legacy rule) with a toggle for
+   * the rest; the Advanced view always shows everything.
+   */
+  setCompact(on) {
+    this.compactMode = !!on;
+    this._applyCompact();
+  }
+
+  _applyCompact() {
+    const compact = this.compactMode && !this.expanded;
+    this.root.classList.toggle('can-compact', this.compactMode);
+    this.root.classList.toggle('is-compact', compact);
+    this.refs.more.textContent = compact ? 'Show details' : 'Hide details';
+    this.refs.more.setAttribute('aria-expanded', String(!compact));
   }
 
   /** Replace the record list (engine reset). */
@@ -135,8 +160,9 @@ export class DecisionPanel {
   }
 
   update(snapshot) {
-    const lgRule = snapshot.agents.legacy.decision?.rule ?? '—';
-    this.set.text(this.refs.legacy, 'legacy', `Legacy OS · ${lgRule}`);
+    const lgText = `Legacy OS · ${snapshot.agents.legacy.decision?.rule ?? '—'}`;
+    this.set.text(this.refs.legacy, 'legacy', lgText);
+    this.set.attr(this.refs.legacy, 'legacy', 'title', `${lgText} (what the legacy OS stack does at the same moment)`);
     if (!this._dirty) return;
     this._dirty = false;
     const r = this.current;

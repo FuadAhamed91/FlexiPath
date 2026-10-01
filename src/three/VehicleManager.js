@@ -271,6 +271,15 @@ export class VehicleManager {
     return target.copy(this.vehicles[id].holder.position);
   }
 
+  /** " · 59 m behind" once the legacy vehicle has lost ground to interruptions and fail-safe stops. */
+  _gapText(snapshot) {
+    const fp = snapshot.agents.flexipath?.vehicle;
+    const lg = snapshot.agents.legacy?.vehicle;
+    if (!fp || !lg) return '';
+    const m = (fp.s - lg.s) * METERS_PER_UNIT;
+    return Math.abs(m) < 2 ? '' : ` · ${Math.abs(m).toFixed(0)} m ${m > 0 ? 'behind' : 'ahead'}`;
+  }
+
   _setLabel(v, cls, state, sub, progress) {
     const key = `${cls}|${state}|${sub}`;
     if (key !== v.label.last) {
@@ -364,7 +373,7 @@ export class VehicleManager {
               ? 'link failed · still attached'
               : st === 'DEGRADING'
                 ? 'link degrading · no prediction'
-                : 'break-before-make';
+                : `break-before-make${this._gapText(snapshot)}`;
           this._setLabel(v, '', `${d?.primary ?? '—'} · ${speed}`, sub, 0);
         }
       } else if (repl) {

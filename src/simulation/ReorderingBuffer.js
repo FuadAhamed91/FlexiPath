@@ -104,10 +104,6 @@ export class SequenceReorderBuffer {
     this.inOrderCount++;
     return wait;
   }
-
-  get inOrderMeanMs() {
-    return this.inOrderCount ? this.inOrderSumMs / this.inOrderCount : 0;
-  }
 }
 
 /** In-order (TCP-like) delivery of one bulk flow on one path: loss-recovery stalls. */
@@ -123,12 +119,10 @@ export class TcpHolModel {
     this.stallLenMs = 0;
     this.srtt = null;
     this.rttvar = null;
-    this.events = 0;
     this.rtoEvents = 0;
     this.fastRetx = 0;
     this.sumSqMs2 = 0;
     this.peakMs = 0;
-    this.timeMs = 0;
   }
 
   _rtoMs() {
@@ -136,7 +130,6 @@ export class TcpHolModel {
   }
 
   _event(len) {
-    this.events++;
     this.sumSqMs2 += len * len;
     this.peakMs = Math.max(this.peakMs, len);
   }
@@ -148,7 +141,6 @@ export class TcpHolModel {
    * @returns {{blockedMs:number, stallMs:number, rto:boolean}}
    */
   step(dtMs, path) {
-    this.timeMs += dtMs;
     if (!path || !(path.mbps > 0) || !Number.isFinite(path.rttMs)) {
       // Nothing flowing is an interruption, not head-of-line blocking.
       this.stallLeftMs = 0;
@@ -211,11 +203,6 @@ export class TcpHolModel {
       }
     }
     return { blockedMs: Math.min(blocked, dtMs), stallMs, rto };
-  }
-
-  /** Mean extra in-order delivery delay of a byte (ms): Σ stall² / (2 · time). */
-  get meanDelayMs() {
-    return this.timeMs > 0 ? this.sumSqMs2 / (2 * this.timeMs) : 0;
   }
 }
 

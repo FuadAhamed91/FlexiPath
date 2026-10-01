@@ -5,8 +5,6 @@
  */
 
 export const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
-export const lerp = (a, b, t) => a + (b - a) * t;
-export const invLerp = (a, b, v) => (b === a ? 0 : (v - a) / (b - a));
 export const smoothstep = (e0, e1, x) => {
   const t = clamp((x - e0) / (e1 - e0), 0, 1);
   return t * t * (3 - 2 * t);
@@ -76,11 +74,6 @@ export class RingBuffer {
     this.length = 0;
   }
 
-  toArray() {
-    const out = new Array(this.length);
-    for (let i = 0; i < this.length; i++) out[i] = this.get(i);
-    return out;
-  }
 }
 
 /** Least-squares slope of evenly spaced samples (units per second). */
@@ -184,16 +177,6 @@ export class RunningStats {
       max: this.count ? round(this.max, 4) : null,
     };
   }
-}
-
-/** Percentile (0..100) of an array using linear interpolation. */
-export function percentile(values, p) {
-  if (!values.length) return NaN;
-  const sorted = [...values].sort((a, b) => a - b);
-  const idx = clamp((p / 100) * (sorted.length - 1), 0, sorted.length - 1);
-  const lo = Math.floor(idx);
-  const hi = Math.ceil(idx);
-  return lerp(sorted[lo], sorted[hi], idx - lo);
 }
 
 export function mean(values) {

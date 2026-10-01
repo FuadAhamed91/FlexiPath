@@ -117,7 +117,7 @@ export function infoHTML() {
       <div class="grid gap-2.5 md:grid-cols-3">
         ${OBJECTIONS.map(([q, a, d]) => `<div class="why-card"><div class="n">${esc(q.toUpperCase())}</div><h3>${esc(a)}</h3><p>${esc(d)}</p></div>`).join('')}
       </div>
-      <p class="mt-2 text-[11px] leading-relaxed text-slate-500">Measured per run in the Battery · ordering · session panel, the Radio Power and Bulk HoL graphs and the experiment table (energy in J, duplicates discarded, HoL stalls, remote-visible IP changes).</p>
+      <p class="mt-2 text-[11px] leading-relaxed text-slate-500">Measured per run: summarised in the Mission view's At a glance card, in full in the Advanced view (Battery · ordering · session panel, Radio Power and Bulk HoL graphs) and in the experiment table (energy in J, duplicates discarded, HoL stalls, remote-visible IP changes).</p>
     </div>
 
     <div class="mt-5 rounded-lg border border-slate-800 bg-slate-950/50 p-3">

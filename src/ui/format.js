@@ -23,14 +23,12 @@ export function classBadge(cls, priority) {
 }
 
 export const fmtT = (t) => (Number.isFinite(t) ? `T+${t.toFixed(1)}` : '—');
-export const fmtS = (v, d = 1) => (Number.isFinite(v) ? `${v < 1 && d < 2 ? v.toFixed(2) : v.toFixed(d)} s` : '—');
 export const fmtRel = (dt) => {
   if (!Number.isFinite(dt)) return '';
   if (Math.abs(dt) < 0.05) return '±0.0 s';
   return `${dt > 0 ? '+' : '−'}${Math.abs(dt).toFixed(1)} s`;
 };
 export const fmtPct = (v, d = 1) => (Number.isFinite(v) ? `${(v * 100).toFixed(d)}%` : '—');
-export const fmtNum = (v, d = 1) => (Number.isFinite(v) ? v.toFixed(d) : '—');
 export const fmtInt = (v) => (Number.isFinite(v) ? Math.round(v).toLocaleString('en-US') : '—');
 
 /** Signal value with unit, or a carrier label for the wired link. */

@@ -14,7 +14,6 @@ import { POWER_PARAMS } from './PowerModel.js';
 import { EWMA } from '../utils/Metrics.js';
 
 export const LOOP_STAGES = ['DETECT', 'PREDICT', 'PREPARE', 'REPLICATE', 'SWITCH', 'CONTINUE'];
-export const LEGACY_STAGES = ['CONNECTED', 'DEGRADING', 'FAILED', 'INTERRUPTED', 'STOPPING', 'RECOVERED'];
 
 export const TRACE_PARAMS = {
   switchHoldS: 1.0, // SWITCH stays the active stage for 1 s after the switch tick

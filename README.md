@@ -20,27 +20,27 @@ Each is modelled in the simulation, measured per run and shown in the HUD.
 
 ## What the demo shows
 
-Open the app and you get the **Mission view**:
+Open the app and you get the **Mission view**, kept to the story — the 3D twin with one short column beside it:
 
 | Area | What it answers |
 | --- | --- |
 | **Decision loop** — DETECT → PREDICT → PREPARE → REPLICATE → SWITCH → CONTINUE | Which stage the controller is in right now, when it reached each stage, which stages were skipped (e.g. an abrupt outage cannot be predicted), and the radio state each stage runs at (DRX standby, warm probe, burst). |
-| **Prediction · live** | Is the current path degrading? Current link, 3 s signal trend, projected time to the failure level, next path with its radio state (a sleeping modem only has a signal-based estimate), action — plus a sparkline of the measured signal with the trend extrapolated to the 15 %-loss level. |
-| **Why did FlexiPath do that?** | Every decision as a record: current path, status, alternate, traffic, **radio power tier**, action, reason — built from the values measured when the decision was taken. Shown next to the static rule the legacy stack follows. |
-| **Traffic-aware protection** | Which traffic needs protection: class, priority, path, backup path, replication state and its reason (incl. the 400 ms burst and the bulk pacing offset), QoE sensitivity, and the measured replication overhead. |
-| **Battery · ordering · session** | Radio power of both stacks with each interface's radio badge (`DRX SLEEP` · `WARM PROBE` · `BURST TX`) and journey energy; head-of-line blocking (critical stall and late duplicates discarded, bulk HoL for both stacks with TCP timeout stalls); the relay tunnel (client physical IP → anchor relay → what remote services see) next to the legacy stack's changing source IP. |
-| **Legacy vs FlexiPath** | Both vehicles' latest transition step by step, timed relative to the moment the path *actually* failed, with the simulated interruption, critical packets lost, failures acted on before they happened, mean radio power and the distance gap. |
-| **3D twin** | Two vehicles on the same route; the camera keeps both in frame and an edge marker points to the other vehicle if it falls out of view. Sleeping modems draw no probe beams (a faint blink marks each DRX signal sample); a warm modem shows dashed heartbeat beams; both beams pulse purple during the burst. |
+| **3D twin** | Two vehicles on the same route; the camera keeps both in frame and an edge marker points to the other vehicle if it falls out of view. The legacy car's label shows the distance it has lost. Sleeping modems draw no probe beams (a faint blink marks each DRX signal sample); a warm modem shows dashed heartbeat beams; both beams pulse purple during the burst. |
+| **Why did FlexiPath do that?** | The latest decision as a short card — headline, action and reason, beside the rule the legacy stack follows. **Show details** opens the full record (current path, status, alternate, traffic, **radio power tier**) and the decision history. |
+| **At a glance** | Which traffic is protected right now (critical, voice, bulk), and FlexiPath vs Legacy on radio power, the longest data stall and client IP changes seen by remote services. **Details** opens the Advanced view. |
+| **Legacy vs FlexiPath** | Both vehicles' latest transition step by step, timed relative to the moment the path *actually* failed, with the simulated interruption, critical packets lost and failures acted on before they happened. |
 
-The header carries the static **anchor relay** address, the current client IP and the FlexiPath radio power chip (both on
-wide screens).
+The header carries the status, the `SIMULATION` badge, the static **anchor relay** address and the clock.
 
-The **Advanced view** (`M`) keeps the full engineering HUD: interface health (radio power and a radio badge per modem;
-a modem asleep in DRX shows signal only), prediction internals (every trigger with its live value and threshold,
-including the radio wake triggers), flow inspector (sequence numbers, per-flow HoL, pacing offset), relay tunnel
-(session ID, outer addresses, leases, rebinds), controls, event log and six 60 s charts (throughput, latency, loss,
-MOS, **radio power**, **bulk HoL stall**). **Guided demo** (`D`) replays scenario A and captions each real decision as it
-happens; **Experiments** (`X`) runs paired trials.
+The **Advanced view** (`M`) holds every panel: prediction · live (trend, time to failure, next path with its radio
+state, signal sparkline), the full decision record, traffic-aware protection (per flow: class, path, backup, burst or
+pacing state, overhead), battery · ordering · session (radio badges, journey energy, HoL stalls, relay tunnel vs the
+legacy IP changes), interface health (radio power and a radio badge per modem; a modem asleep in DRX shows signal only),
+prediction internals (every trigger with its live value and threshold, including the radio wake triggers), flow
+inspector (sequence numbers, per-flow HoL, pacing offset), relay tunnel (session ID, outer addresses, leases, rebinds),
+controls, event log and six 60 s charts (throughput, latency, loss, MOS, **radio power**, **bulk HoL stall**), plus the
+client IP and radio power chips in the header. **Guided demo** (`D`) replays scenario A and captions each real decision
+as it happens; **Experiments** (`X`) runs paired trials.
 
 ## Measured results (simulation)
 

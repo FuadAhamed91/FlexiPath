@@ -6,22 +6,14 @@
   --font-display: 'Orbitron', 'Inter', ui-sans-serif, sans-serif;
 
   --color-void: #030712;
-  --color-panel: #0a1222;
   --color-fp: #00f0ff;
   --color-legacy: #f43f5e;
-  --color-eth: #64748b;
-  --color-wifi: #00f0ff;
-  --color-cell: #10b981;
-  --color-sat: #f59e0b;
   --color-repl: #a855f7;
-  --color-fail: #ef4444;
-  --color-ok: #22c55e;
 }
 
 :root {
   color-scheme: dark;
   --hud-border: rgba(34, 211, 238, 0.14);
-  --hud-border-strong: rgba(34, 211, 238, 0.32);
 }
 
 html,
@@ -696,17 +688,6 @@ body {
   border: 1px solid rgba(34, 211, 238, 0.18);
   border-radius: 10px;
   backdrop-filter: blur(6px);
-}
-.zone-track {
-  position: relative;
-  height: 8px;
-  border-radius: 4px;
-  overflow: visible;
-  display: flex;
-}
-.zone-track .seg-z {
-  height: 100%;
-  opacity: 0.55;
 }
 .zone-marker {
   position: absolute;
@@ -1647,6 +1628,29 @@ body {
   box-shadow: 0 0 16px -6px rgba(244, 63, 94, 0.6);
   color: #fff1f2;
 }
+/* ── Mission view: at a glance ─────────────────────────────────────────── */
+.glance-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px 72px;
+  gap: 8px 10px;
+  align-items: baseline;
+}
+.glance-head {
+  font: 700 8.5px/1 var(--font-mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  text-align: right;
+}
+.glance-label {
+  font: 500 11.5px/1.3 var(--font-sans);
+  color: #cbd5e1;
+  cursor: help;
+}
+.glance-v {
+  font: 700 13px/1 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
 } /* end @layer components */
 
 /* View switching (unlayered on purpose: these structural rules must beat the layout utilities). */
@@ -1660,9 +1664,32 @@ body {
 .fp-shell[data-demo='1'] .fp-camctl {
   display: none;
 }
+/* Mission view: the 3D twin and one short column beside it; the left deck only holds Advanced panels. */
+.fp-shell[data-mode='mission'] [data-ref='leftDeck'] {
+  display: none !important;
+}
+.decision-panel.is-compact .dp-more,
+.decision-panel:not(.can-compact) .dp-toggle {
+  display: none !important;
+}
+.decision-panel.is-compact .dp-clamp,
+.decision-panel.is-compact .dp-clamp2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.decision-panel.is-compact .dp-clamp2 {
+  -webkit-line-clamp: 2;
+}
+.decision-panel.is-compact .dp-line1 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 @media (min-width: 1280px) {
   .fp-shell[data-mode='mission'] .fp-main {
-    grid-template-columns: 320px minmax(0, 1fr) 344px;
+    grid-template-columns: minmax(0, 1fr) 344px;
   }
   .fp-shell[data-mode='advanced'] .fp-main {
     grid-template-columns: 292px minmax(0, 1fr) 328px;

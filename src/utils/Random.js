@@ -50,10 +50,6 @@ export class Random {
     return Math.floor(this.range(min, maxInclusive + 1));
   }
 
-  chance(p) {
-    return this.next() < p;
-  }
-
   pick(items) {
     return items[Math.floor(this.next() * items.length)];
   }
@@ -72,35 +68,6 @@ export class Random {
     const mag = Math.sqrt(-2 * Math.log(u));
     this._spareGaussian = mag * Math.sin(2 * Math.PI * v);
     return mean + std * mag * Math.cos(2 * Math.PI * v);
-  }
-
-  /** Binomial(n, p): exact Bernoulli sum for small n, normal approximation otherwise. */
-  binomial(n, p) {
-    if (n <= 0 || p <= 0) return 0;
-    if (p >= 1) return n;
-    if (n <= 64) {
-      let k = 0;
-      for (let i = 0; i < n; i++) if (this.next() < p) k++;
-      return k;
-    }
-    const k = Math.round(this.gaussian(n * p, Math.sqrt(n * p * (1 - p))));
-    return Math.min(n, Math.max(0, k));
-  }
-
-  /** Poisson(lambda): Knuth for small lambda, normal approximation for large. */
-  poisson(lambda) {
-    if (lambda <= 0) return 0;
-    if (lambda < 30) {
-      const limit = Math.exp(-lambda);
-      let k = 0;
-      let prod = this.next();
-      while (prod > limit) {
-        k++;
-        prod *= this.next();
-      }
-      return k;
-    }
-    return Math.max(0, Math.round(this.gaussian(lambda, Math.sqrt(lambda))));
   }
 
   /** Derive an independent, reproducible sub-stream. */

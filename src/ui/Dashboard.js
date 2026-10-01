@@ -35,7 +35,6 @@ import {
   Crosshair,
   Video,
   Map as MapIcon,
-  Keyboard,
   X,
   Download,
   Repeat,
@@ -60,6 +59,7 @@ import { TrafficPanel } from './TrafficPanel.js';
 import { ComparisonLanes } from './ComparisonLanes.js';
 import { EngineeringPanel } from './EngineeringPanel.js';
 import { TunnelPanel } from './TunnelPanel.js';
+import { GlancePanel } from './GlancePanel.js';
 import { PredictionInternals } from './PredictionInternals.js';
 import { GuidedDemo } from './GuidedDemo.js';
 import { openExperiments } from './ExperimentPanel.js';
@@ -105,7 +105,6 @@ const ICONS = {
   Crosshair,
   Video,
   Map: MapIcon,
-  Keyboard,
   X,
   Download,
   Repeat,
@@ -167,6 +166,7 @@ export class Dashboard {
     this.traffic = new TrafficPanel(this.refs.traffic);
     this.lanes = new ComparisonLanes(this.refs.lanes);
     this.engineering = new EngineeringPanel(this.refs.engineering);
+    this.glance = new GlancePanel(this.refs.glance, { onDetails: () => this.setMode('advanced') });
     this.tunnelPanel = new TunnelPanel(this.refs.tunnel);
     this.internals = new PredictionInternals(this.refs.internals);
     this.telemetry = new TelemetryPanel(this.refs.telemetry);
@@ -225,7 +225,7 @@ export class Dashboard {
       const w = ((z.x1 - z.x0) / ROUTE_END_X) * 100;
       return `<div class="relative" style="width:${w}%">
         <div class="mb-1 truncate pr-1 font-mono text-[8.5px] font-bold tracking-[0.12em]" style="color:${z.color}">Z${z.id} · ${z.name.toUpperCase()}</div>
-        <div class="seg-z rounded-sm" style="height:6px;background:${z.color}"></div>
+        <div class="rounded-sm" style="height:6px;background:${z.color}"></div>
       </div>`;
     }).join('');
     const scenarioOptions = LIVE_SCENARIOS.map((id) => `<option value="${id}">${esc(id === 'mission' ? SCENARIOS[id].label : `${id} · ${SCENARIOS[id].label}`)}</option>`).join('');
@@ -252,9 +252,9 @@ export class Dashboard {
           <span class="chip border-fp/30!" title="Static anchor relay: FlexiPath tunnels every flow (userspace UDP) to this address, so remote services only ever see it and no socket is reset by a path change">
             <i data-lucide="lock" class="text-fp"></i>ANCHOR RELAY <b class="text-slate-100">${ANCHOR_IP}</b>
           </span>
-          <span class="chip hidden min-[1700px]:inline-flex" data-ref="clientIp" title="FlexiPath's current physical (outer) address — changes with the network; remote services never see it">CLIENT IP —</span>
-          <span class="chip hidden min-[1440px]:inline-flex" data-ref="radioChip" title="FlexiPath radio power (three-tier sleep model)">RADIO 1.2 W</span>
-          <span class="chip hidden 2xl:inline-flex"><i data-lucide="map-pin"></i><span data-ref="zone">ZONE 1</span></span>
+          <span class="chip hidden min-[1700px]:inline-flex" data-ref="clientIp" data-view="advanced" title="FlexiPath's current physical (outer) address — changes with the network; remote services never see it">CLIENT IP —</span>
+          <span class="chip hidden min-[1440px]:inline-flex" data-ref="radioChip" data-view="advanced" title="FlexiPath radio power (three-tier sleep model)">RADIO 1.2 W</span>
+          <span class="chip hidden 2xl:inline-flex" data-view="advanced"><i data-lucide="map-pin"></i><span data-ref="zone">ZONE 1</span></span>
           <span class="chip"><i data-lucide="timer"></i><span class="text-slate-100" data-ref="clock">T+00:00.0</span></span>
         </div>
       </header>
@@ -268,7 +268,7 @@ export class Dashboard {
           <span class="hud-label hidden sm:inline">Scenario</span>
           <select class="toolbar-select" data-ref="scenario" aria-label="Scenario">${scenarioOptions}</select>
         </label>
-        <span class="chip hidden lg:inline-flex" data-ref="trafficChip" title="Traffic mix of this scenario"></span>
+        <span class="chip hidden lg:inline-flex" data-ref="trafficChip" data-view="advanced" title="Traffic mix of this scenario"></span>
         <div class="ml-auto flex flex-wrap items-center gap-2">
           <button type="button" class="btn btn-fault-sm" data-fault="wifi-fade" data-view="mission" title="Inject a rapid Wi-Fi fade (F)"><i data-lucide="wifi-off"></i>Wi-Fi fade</button>
           <button type="button" class="btn btn-fault-sm" data-fault="cell-outage" data-view="mission" title="Inject an abrupt 5G cell outage (G)"><i data-lucide="tower-control"></i>5G outage</button>
@@ -283,8 +283,7 @@ export class Dashboard {
 
       <div class="fp-main grid shrink-0 grid-cols-1 gap-2 p-2 xl:min-h-[500px] xl:flex-1" data-ref="mainGrid">
         <aside class="fp-deck hud-scroll flex min-h-0 flex-col gap-2 xl:overflow-y-auto" aria-label="Left deck" data-ref="leftDeck">
-          <section class="hud-panel shrink-0" data-ref="prediction" data-view="mission"></section>
-          <section class="hud-panel shrink-0" data-ref="decision" data-view="mission"></section>
+          <section class="hud-panel shrink-0" data-ref="prediction" data-view="advanced"></section>
           <section class="hud-panel" data-ref="telemetry" data-view="advanced"></section>
           <section class="hud-panel" data-ref="internals" data-view="advanced"></section>
           <section class="hud-panel" data-ref="flows" data-view="advanced"></section>
@@ -374,14 +373,16 @@ export class Dashboard {
             <span class="num hidden px-1 text-[11px] text-slate-400 sm:inline" data-ref="simInfo">10 Hz</span>
           </div>
 
-          <div class="pointer-events-none absolute right-3 bottom-3 hidden flex-col items-end gap-1.5 sm:flex">
+          <div class="pointer-events-none absolute right-3 bottom-3 hidden flex-col items-end gap-1.5 sm:flex" data-view="advanced">
             <span class="chip" data-ref="assets"><i data-lucide="box"></i>MODELS · LOADING</span>
           </div>
         </main>
 
         <aside class="fp-deck hud-scroll flex min-h-0 flex-col gap-2 xl:overflow-y-auto" aria-label="Right deck" data-ref="rightDeck">
-          <section class="hud-panel shrink-0" data-ref="traffic" data-view="mission"></section>
-          <section class="hud-panel shrink-0" data-ref="engineering" data-view="mission"></section>
+          <section class="hud-panel shrink-0" data-ref="decision"></section>
+          <section class="hud-panel shrink-0" data-ref="glance" data-view="mission"></section>
+          <section class="hud-panel shrink-0" data-ref="traffic" data-view="advanced"></section>
+          <section class="hud-panel shrink-0" data-ref="engineering" data-view="advanced"></section>
           <section class="hud-panel shrink-0" data-ref="controls" data-view="advanced"></section>
           <section class="hud-panel flex min-h-[230px] flex-1 flex-col" data-ref="log" data-view="advanced"></section>
         </aside>
@@ -587,13 +588,14 @@ export class Dashboard {
     const agent = snap.agents[focus];
     this.loop.update(snap);
     this._updateHeader(snap);
+    this.decision.update(snap);
     if (this.view.mode === 'mission') {
-      this.prediction.update(snap);
-      this.decision.update(snap);
-      this.traffic.update(snap);
+      this.glance.update(snap);
       this.lanes.update(snap);
-      this.engineering.update(snap);
     } else {
+      this.prediction.update(snap);
+      this.traffic.update(snap);
+      this.engineering.update(snap);
       this.telemetry.update(agent, focus);
       this.internals.update(snap);
       this.flows.update(agent, focus);
@@ -725,9 +727,10 @@ export class Dashboard {
     this.view.mode = mode === 'advanced' ? 'advanced' : 'mission';
     this.refs.shell.dataset.mode = this.view.mode;
     for (const b of this.modeButtons) b.setAttribute('aria-pressed', String(b.dataset.mode === this.view.mode));
+    this.decision.setCompact(this.view.mode === 'mission');
     this.dirty = true;
     this._chartDirty = true;
-    if (!quiet) this.toast(this.view.mode === 'mission' ? 'Mission view · the decision story' : 'Advanced view · telemetry, internals, charts, log');
+    if (!quiet) this.toast(this.view.mode === 'mission' ? 'Mission view · the decision story' : 'Advanced view · every panel, charts and log');
   }
 
   setFocus(id, { quiet = false } = {}) {
@@ -993,19 +996,9 @@ export class Dashboard {
     this.openModal(`${this._modalHeader('Why FlexiPath?', 'What makes it different · how the loop decides · what the numbers are')}${infoHTML()}`);
   }
 
-  /** Kept for the keyboard map and older bindings. */
-  openHelp() {
-    this.openInfo();
-  }
-
   openExperiments(opts = {}) {
     const sc = this.engine.scenario.id;
     const scenario = opts.scenario ?? (SCENARIOS[sc]?.hidden ? 'A' : sc);
     openExperiments(this, { ...opts, scenario });
-  }
-
-  /** Kept for older bindings. */
-  openBenchmark() {
-    this.openExperiments({ scenario: '__all__' });
   }
 }

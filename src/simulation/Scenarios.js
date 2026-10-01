@@ -8,7 +8,6 @@
  * Route X: 0 → 240 scene units (1 unit = 5 m). Zones: 1 depot/Wi-Fi 0–40 · 2 corridor 40–90 ·
  * 3 5G core 90–160 · 4 rural/LEO 160–240.
  */
-import { TRAFFIC_PROFILES } from './TrafficManager.js';
 
 const CORRIDOR = { startX: 40, endX: 135, rolling: true };
 
@@ -142,8 +141,4 @@ export const LIVE_SCENARIOS = ['mission', ...EXPERIMENT_SCENARIOS];
 
 export function resolveScenario(id) {
   return SCENARIOS[id] ?? SCENARIOS.mission;
-}
-
-export function scenarioTrafficLabel(id) {
-  return TRAFFIC_PROFILES[resolveScenario(id).traffic]?.label ?? '';
 }

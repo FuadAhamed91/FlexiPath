@@ -163,10 +163,6 @@ export class NetworkEnvironment {
     return this.faults[type];
   }
 
-  clearFaults() {
-    this.faults = { 'wifi-fade': null, 'cell-outage': null };
-  }
-
   /** Extra attenuation (dB) applied to Wi-Fi by an injected fade. */
   wifiFadeDb(t = this.t) {
     const f = this.faults['wifi-fade'];

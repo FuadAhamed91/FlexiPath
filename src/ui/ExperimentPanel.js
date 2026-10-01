@@ -5,7 +5,7 @@
  * SimulationEngine). The table reports measured means, standard deviations and the mean paired
  * difference (FlexiPath − Legacy) with a 95 % confidence interval. No score, no winner label.
  */
-import { ExperimentRunner, COMPARISON_METRICS, EXPERIMENT_SCENARIOS, SCENARIOS, seedsFor } from '../simulation/ExperimentRunner.js';
+import { ExperimentRunner, EXPERIMENT_SCENARIOS, SCENARIOS, seedsFor } from '../simulation/ExperimentRunner.js';
 import { LEGACY_WIRELESS_STALL_S } from '../simulation/LegacyController.js';
 import { FLEXIPATH_PARAMS } from '../simulation/FlexiPathController.js';
 import { TRAFFIC_PROFILES } from '../simulation/TrafficManager.js';
