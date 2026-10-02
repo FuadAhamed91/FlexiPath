@@ -6,14 +6,19 @@
  * matched pair. Results are reported as measured differences (FlexiPath − Legacy) with a 95 % confidence
  * interval over the paired trials — no score, no "winner".
  *
+ * By default each run also drives the baselines modelled on existing mechanisms (reactive multipath:
+ * MPTCP backup subflow / ATSSS active-standby; always duplicate: MPTCP redundant scheduler / PDCP
+ * duplication) in the same engine, so the "mechanisms" table compares all four on identical conditions.
+ * They never change the FlexiPath / Legacy results: each agent has its own random streams.
+ *
  * Works in the browser (chunked, with progress) and in Node (scripts/benchmark.js).
  */
-import { SimulationEngine, VERSION, ANCHOR_IP } from './SimulationEngine.js';
+import { SimulationEngine, VERSION, ANCHOR_IP, ENGINES, BASELINE_ENGINES } from './SimulationEngine.js';
 import { RunningStats, round } from '../utils/Metrics.js';
 import { toCSV } from '../utils/Export.js';
 import { SCENARIOS, EXPERIMENT_SCENARIOS } from './Scenarios.js';
 
-export { SCENARIOS, EXPERIMENT_SCENARIOS };
+export { SCENARIOS, EXPERIMENT_SCENARIOS, BASELINE_ENGINES };
 
 /** Metrics shown in the paired comparison (Metric | Legacy | FlexiPath | Difference). */
 export const COMPARISON_METRICS = [
@@ -44,6 +49,27 @@ export const COMPARISON_METRICS = [
   { key: 'remoteIpChanges', label: 'Client IP changes seen by remote services', unit: '', digits: 1 },
   { key: 'physicalIpChanges', label: 'Physical IP changes (radio side)', unit: '', digits: 1 },
 ];
+
+/** Metrics compared across mechanisms: Legacy | Reactive multipath | Always duplicate | FlexiPath. */
+export const MECHANISM_METRICS = [
+  { key: 'interruptionS', label: 'Simulated interruption (total)', unit: 's', digits: 2 },
+  { key: 'longestInterruptionS', label: 'Longest single interruption', unit: 's', digits: 2 },
+  { key: 'criticalDeliveryPct', label: 'Critical packet delivery', unit: '%', digits: 2 },
+  { key: 'meanMos', label: 'Voice QoE · mean MOS (G.107)', unit: '', digits: 2 },
+  { key: 'timeBelowMos36S', label: 'Time below MOS 3.6', unit: 's', digits: 1 },
+  { key: 'replicationOverheadPct', label: 'Duplicate bytes · protected flows', unit: '%', digits: 1 },
+  { key: 'replicationOverheadTotalPct', label: 'Duplicate bytes · all traffic', unit: '%', digits: 3 },
+  { key: 'meanPowerW', label: 'Mean radio power', unit: 'W', digits: 2, note: 'Model tiers: DRX 1.2 W · warm probe 1.8 W · two radios transmitting 3.4 W' },
+  { key: 'energyJ', label: 'Radio energy per journey', unit: 'J', digits: 1 },
+  { key: 'tcpResets', label: 'TCP connection resets', unit: '', digits: 1 },
+  { key: 'remoteIpChanges', label: 'Client IP changes seen by remote services', unit: '', digits: 1 },
+  { key: 'bulkHolPeakMs', label: 'HoL stall · bulk (peak)', unit: 'ms', digits: 0 },
+  { key: 'actionVsFailureS', label: 'Action time vs. path failure', unit: 's', digits: 2, note: 'Negative = acted before the path failed' },
+  { key: 'journeyTimeS', label: 'Journey time', unit: 's', digits: 1 },
+];
+
+/** Engines present in a run summary, in display order (FlexiPath, Legacy, then any baselines). */
+const enginesOf = (run) => Object.keys(ENGINES).filter((id) => run[id]);
 
 export const SUMMARY_METRICS = [
   'interruptionS',
@@ -110,19 +136,21 @@ export const tCritical95 = (df) => (df < 1 ? NaN : df <= 30 ? T95[df - 1] : 1.96
 export const seedsFor = (n, base = 1000) => Array.from({ length: n }, (_, i) => base + i * 7919);
 
 /** Run one scenario to completion and return its summary. */
-export function runSingle({ seed, speedKmh = 60, scenario = 'mission', failSafe = true, maxSimSeconds = 900 }) {
-  const engine = new SimulationEngine({ seed, speedKmh, failSafe, scenario, recordHistory: false, maxSimSeconds });
+export function runSingle({ seed, speedKmh = 60, scenario = 'mission', failSafe = true, maxSimSeconds = 900, baselines = [] }) {
+  const agents = ['flexipath', 'legacy', ...baselines];
+  const engine = new SimulationEngine({ seed, speedKmh, failSafe, scenario, recordHistory: false, maxSimSeconds, agents });
   while (!engine.completed) engine.step();
   const summary = engine.getSummary();
   return { seed: engine.config.seed, speedKmh, scenario, failSafe, simTimeS: round(engine.t, 1), ...summary };
 }
 
 export class ExperimentRunner {
-  constructor({ seeds = [1, 2, 3, 4, 5], speeds = [30, 60, 90, 120], scenarios = EXPERIMENT_SCENARIOS, failSafe = true } = {}) {
+  constructor({ seeds = [1, 2, 3, 4, 5], speeds = [30, 60, 90, 120], scenarios = EXPERIMENT_SCENARIOS, failSafe = true, baselines = BASELINE_ENGINES } = {}) {
     this.seeds = seeds;
     this.speeds = speeds;
     this.scenarios = scenarios;
     this.failSafe = failSafe;
+    this.baselines = baselines.filter((id) => BASELINE_ENGINES.includes(id));
   }
 
   get plan() {
@@ -141,7 +169,7 @@ export class ExperimentRunner {
     const started = Date.now();
     for (let i = 0; i < jobs.length; i++) {
       if (signal?.aborted) break;
-      const run = runSingle({ ...jobs[i], failSafe: this.failSafe });
+      const run = runSingle({ ...jobs[i], failSafe: this.failSafe, baselines: this.baselines });
       runs.push(run);
       onProgress?.(i + 1, jobs.length, run);
       if ((i + 1) % yieldEvery === 0) await new Promise((r) => setTimeout(r, 0));
@@ -159,10 +187,14 @@ export class ExperimentRunner {
         speeds: this.speeds,
         scenarios: this.scenarios.map((s) => SCENARIOS[s]),
         failSafe: this.failSafe,
+        baselines: this.baselines.map((id) => ({ id, label: ENGINES[id].label, mechanism: ENGINES[id].mechanism })),
         aborted: !!signal?.aborted,
       },
       aggregate: ExperimentRunner.aggregate(runs),
       comparison: Object.fromEntries(this.scenarios.map((s) => [s, ExperimentRunner.paired(runs.filter((r) => r.scenario === s))])),
+      mechanisms: this.baselines.length
+        ? Object.fromEntries(this.scenarios.map((s) => [s, ExperimentRunner.mechanisms(runs.filter((r) => r.scenario === s), this.baselines)]))
+        : null,
       runs,
     };
   }
@@ -171,7 +203,7 @@ export class ExperimentRunner {
   static aggregate(runs) {
     const groups = {};
     for (const run of runs) {
-      for (const engine of ['flexipath', 'legacy']) {
+      for (const engine of enginesOf(run)) {
         const key = `${run.scenario}|${engine}`;
         groups[key] ??= { scenario: run.scenario, engine, runs: 0, metrics: {} };
         const g = groups[key];
@@ -218,16 +250,66 @@ export class ExperimentRunner {
     });
   }
 
-  /** One CSV row per run with both engines side by side. */
+  /**
+   * Mechanism comparison over matched runs: per metric, every engine's mean ± sd and the mean paired
+   * difference FlexiPath − engine with its 95 % confidence interval.
+   */
+  static mechanisms(runs, baselines = BASELINE_ENGINES, metrics = MECHANISM_METRICS) {
+    const engines = ['legacy', ...baselines, 'flexipath'];
+    const num = (v) => typeof v === 'number' && Number.isFinite(v);
+    return metrics.map((m) => {
+      const stats = Object.fromEntries(engines.map((id) => [id, new RunningStats()]));
+      const diffs = Object.fromEntries(engines.filter((id) => id !== 'flexipath').map((id) => [id, new RunningStats()]));
+      for (const r of runs) {
+        const fp = r.flexipath?.[m.key];
+        for (const id of engines) {
+          const v = r[id]?.[m.key];
+          if (num(v)) stats[id].push(v);
+          if (diffs[id] && num(v) && num(fp)) diffs[id].push(fp - v);
+        }
+      }
+      const engineStats = Object.fromEntries(
+        engines.map((id) => [id, stats[id].count ? { mean: stats[id].mean, sd: stats[id].std, n: stats[id].count } : null]),
+      );
+      const diff = Object.fromEntries(
+        Object.entries(diffs).map(([id, d]) => {
+          const n = d.count;
+          return [id, n ? { mean: d.mean, sd: d.std, n, ci95: n > 1 ? tCritical95(n - 1) * (d.std / Math.sqrt(n)) : null } : null];
+        }),
+      );
+      return { ...m, engines: engineStats, diff };
+    });
+  }
+
+  /** One CSV row per run with every engine side by side (fp_, lg_, then mp_ / rd_ for the baselines). */
   static toCSV(results) {
     const rows = results.runs.map((r) => {
       const row = { scenario: r.scenario, seed: r.seed, speed_kmh: r.speedKmh, fail_safe: r.failSafe, sim_time_s: r.simTimeS };
-      for (const m of SUMMARY_METRICS) {
-        row[`fp_${m}`] = r.flexipath[m];
-        row[`lg_${m}`] = r.legacy[m];
-      }
+      const prefixes = enginesOf(r).map((id) => [id, ENGINES[id].short.toLowerCase()]);
+      for (const m of SUMMARY_METRICS) for (const [id, px] of prefixes) row[`${px}_${m}`] = r[id][m];
       return row;
     });
+    return toCSV(rows);
+  }
+
+  /** Mechanism comparison as flat CSV rows (one per scenario × metric). */
+  static mechanismsCSV(results) {
+    const rows = [];
+    for (const [scenario, table] of Object.entries(results.mechanisms ?? {})) {
+      for (const m of table) {
+        const row = { scenario, metric: m.key, label: m.label, unit: m.unit };
+        for (const [id, st] of Object.entries(m.engines)) {
+          row[`${id}_mean`] = st?.mean ?? null;
+          row[`${id}_sd`] = st?.sd ?? null;
+        }
+        for (const [id, d] of Object.entries(m.diff)) {
+          row[`fp_minus_${id}`] = d?.mean ?? null;
+          row[`fp_minus_${id}_ci95`] = d?.ci95 ?? null;
+        }
+        row.pairs = m.engines.flexipath?.n ?? 0;
+        rows.push(row);
+      }
+    }
     return toCSV(rows);
   }
 

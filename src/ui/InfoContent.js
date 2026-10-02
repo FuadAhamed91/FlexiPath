@@ -41,6 +41,36 @@ const OBJECTIONS = [
   ],
 ];
 
+// Existing mechanisms the experiments compare against (docs/existing-mechanisms.md).
+const EXISTING = [
+  [
+    'Reactive multipath',
+    'MPTCP backup subflow (RFC 8684) · 3GPP ATSSS active-standby',
+    'Sessions survive a path change, because they are anchored at a proxy or in the 5G core. But traffic moves only after the active path has failed (a retransmission timeout or a loss threshold), and then the standby radio has to wake. No prediction, no per-class protection.',
+  ],
+  [
+    'Always duplicate',
+    'MPTCP redundant scheduler · 3GPP PDCP duplication',
+    'Every protected packet travels on two paths all the time. There is no gap when one path fails, but both radios transmit continuously and protected bytes are doubled.',
+  ],
+  [
+    'FlexiPath (adapted)',
+    'Anchored session + predicted, time-boxed, class-selective duplication',
+    `Keeps the anchored session. The standby radio sleeps and wakes only when failure is predicted. Critical traffic is duplicated only for a ~${BURST_MS} ms burst; voice joins when it needs to, and bulk never does.`,
+  ],
+];
+
+const GUIDELINES = [
+  'Anchor the session, not the interface.',
+  'Act on the trend, not on the failure.',
+  'Prepare the next path just in time; spare radios sleep.',
+  'Duplicate only what needs it, only around the handover.',
+  'Deliver the first copy; real-time traffic never waits in order.',
+  'Detect a dead path faster than the application can tolerate.',
+  'Hold still unless moving clearly pays.',
+  'Measure what users feel, on matched pairs.',
+];
+
 const WHY = [
   ['01', 'Predictive', 'Acts before the current path becomes unusable: a measured signal trend projects when the path will reach its failure level.'],
   ['02', 'Traffic-aware', 'Different traffic receives different protection: critical, real-time and bulk flows are handled by their own rules.'],
@@ -69,7 +99,7 @@ export function infoHTML() {
       <div class="font-display text-[18px] font-extrabold tracking-[0.1em] text-slate-100">WHY FLEXIPATH?</div>
       <p class="mx-auto mt-2 max-w-[560px] text-[13px] leading-relaxed text-slate-300">
         FlexiPath is a predictive, traffic-aware connectivity engine for heterogeneous networks (wired, Wi-Fi, 5G, LEO satellite).
-        These four mechanisms exist in the networking field; <b class="text-slate-100">FlexiPath combines them into one simulation and decision framework.</b>
+        These four mechanisms exist in the networking field; <b class="text-slate-100">FlexiPath combines them into one simulation and decision framework</b>, and compares itself with existing multipath designs below.
       </p>
     </div>
     <div class="mt-4 grid gap-2.5 sm:grid-cols-2">
@@ -118,6 +148,18 @@ export function infoHTML() {
         ${OBJECTIONS.map(([q, a, d]) => `<div class="why-card"><div class="n">${esc(q.toUpperCase())}</div><h3>${esc(a)}</h3><p>${esc(d)}</p></div>`).join('')}
       </div>
       <p class="mt-2 text-[11px] leading-relaxed text-slate-500">Measured per run: summarised in the Mission view's At a glance card, in full in the Advanced view (Battery · ordering · session panel, Radio Power and Bulk HoL graphs) and in the experiment table (energy in J, duplicates discarded, HoL stalls, remote-visible IP changes).</p>
+    </div>
+
+    <div class="mt-5">
+      <div class="hud-label mb-2">Existing mechanisms, and what FlexiPath adapts</div>
+      <div class="grid gap-2.5 md:grid-cols-3">
+        ${EXISTING.map(([q, a, d]) => `<div class="why-card"><div class="n">${esc(q.toUpperCase())}</div><h3>${esc(a)}</h3><p>${esc(d)}</p></div>`).join('')}
+      </div>
+      <p class="mt-2 text-[11px] leading-relaxed text-slate-500">The Experiments panel (X) runs all four stacks on the same seeds: legacy, reactive multipath, always duplicate and FlexiPath. FlexiPath gets close to always-duplicate reliability at close to reactive-multipath radio power.</p>
+      <div class="hud-label mt-4 mb-2">Guidelines for QoS / QoE</div>
+      <ol class="grid list-decimal gap-x-6 gap-y-1 pl-5 text-[12px] leading-relaxed text-slate-300 md:grid-cols-2">
+        ${GUIDELINES.map((g) => `<li>${esc(g)}</li>`).join('')}
+      </ol>
     </div>
 
     <div class="mt-5 rounded-lg border border-slate-800 bg-slate-950/50 p-3">

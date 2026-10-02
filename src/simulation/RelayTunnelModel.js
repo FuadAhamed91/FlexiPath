@@ -32,7 +32,7 @@ export const FIRST_LEASE = {
   legacy: { eth0: '10.42.0.18', wlan0: '192.168.1.117', wwan0: '100.84.31.77', sat0: '100.112.9.201' },
 };
 
-const ACTIVE_RADIO = new Set(['ACTIVE', 'BURST', 'WARM']);
+const ACTIVE_RADIO = new Set(['ACTIVE', 'BURST', 'WARM', 'DUAL']);
 
 export class RelayTunnelModel {
   /**

@@ -7,7 +7,8 @@
  *   Tier 1  WARM PROBING  1.8 W  one secondary modem is awake and sends 64-byte heartbeats every
  *                                100 ms, so its RTT / loss are measured before it is trusted.
  *   Tier 2  BURST TX      3.4 W  both radios transmit (replication) — only during the ~400 ms
- *                                handoff window.
+ *                                handoff window. (The redundant baseline's DUAL TX state is the same
+ *                                tier, held for as long as two radios carry duplicates.)
  *
  * Wake rules (FlexiPathController): a secondary sleeps while the primary's health score is > 75 and
  * wakes when the primary's loss rises > 2 % in 1 s, its health drops to ≤ 75, or degradation is
@@ -34,6 +35,7 @@ export const RADIO_STATES = {
   WAKING: { id: 'WAKING', badge: 'WAKING', color: '#93c5fd', desc: 'leaving DRX (RRC resume) — heartbeats start next' },
   WARM: { id: 'WARM', badge: 'WARM PROBE', color: '#60a5fa', desc: 'awake, 64-byte heartbeats every 100 ms' },
   BURST: { id: 'BURST', badge: 'BURST TX', color: '#c084fc', desc: 'dual-radio replication during the handoff window' },
+  DUAL: { id: 'DUAL', badge: 'DUAL TX', color: '#a3e635', desc: 'redundant baseline: sends a copy of every protected packet, all the time' },
   IDLE: { id: 'IDLE', badge: 'WIRED IDLE', color: '#64748b', desc: 'wired port up, not carrying traffic (no radio)' },
   SCAN: { id: 'SCAN', badge: 'SCAN · ATTACH', color: '#fbbf24', desc: 'legacy stack scanning and attaching after a failure' },
   OFF: { id: 'OFF', badge: 'NO SIGNAL', color: '#475569', desc: 'not available here' },
@@ -49,7 +51,7 @@ export const POWER_TIERS = [
 export function tierFor(radio) {
   let tier = 0;
   for (const s of Object.values(radio ?? {})) {
-    if (s === 'BURST') return 2;
+    if (s === 'BURST' || s === 'DUAL') return 2;
     if (s === 'WARM' || s === 'WAKING' || s === 'SCAN') tier = 1;
   }
   return tier;
