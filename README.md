@@ -16,6 +16,15 @@ three-tier radio sleep model), **packet reordering** (sequence-numbered replicat
 delay-compensated pacing) and **carrier middleboxes / IP changes** (a userspace UDP tunnel to a static anchor relay).
 Each is modelled in the simulation, measured per run and shown in the HUD.
 
+**Existing mechanisms.** FlexiPath is also compared with two existing seamless-connectivity designs:
+
+- **Reactive multipath**: MPTCP with a backup subflow (RFC 8684), or 3GPP ATSSS active-standby.
+- **Always duplicate**: the MPTCP redundant scheduler, or 3GPP PDCP duplication.
+
+Both are modelled as baselines and run on the same seeds as FlexiPath and Legacy. The analysis of the references is in
+[docs/existing-mechanisms.md](docs/existing-mechanisms.md), and the evidence-based guidelines in
+[docs/qos-qoe-guidelines.md](docs/qos-qoe-guidelines.md).
+
 ---
 
 ## What the demo shows
@@ -40,13 +49,14 @@ prediction internals (every trigger with its live value and threshold, including
 inspector (sequence numbers, per-flow HoL, pacing offset), relay tunnel (session ID, outer addresses, leases, rebinds),
 controls, event log and six 60 s charts (throughput, latency, loss, MOS, **radio power**, **bulk HoL stall**), plus the
 client IP and radio power chips in the header. **Guided demo** (`D`) replays scenario A and captions each real decision
-as it happens; **Experiments** (`X`) runs paired trials.
+as it happens; **Experiments** (`X`) runs paired trials and shows the existing-mechanisms comparison on the same runs.
 
 ## Measured results (simulation)
 
-`npm run benchmark` — scenarios A–F, 5 seeds × 4 speeds (30/60/90/120 km/h), 20 paired runs per scenario. In each run
-FlexiPath and Legacy drive together on the same seed, route, RF field and fault timing. Values are means over the 20
-pairs.
+`npm run benchmark` runs scenarios A–F, 5 seeds × 4 speeds (30/60/90/120 km/h): 20 paired runs per scenario. In each run
+FlexiPath and Legacy drive together on the same seed, route, RF field and fault timing, and by default the two
+existing-mechanism baselines drive alongside them. Values are means over the 20 pairs. The baselines have their own random
+streams, so the FlexiPath and Legacy values below are identical with or without them (`--baselines none`).
 
 **Continuity**
 
@@ -92,6 +102,49 @@ How to read it:
 - **IP changes**: remote services only ever see FlexiPath's anchor relay; the legacy stack's source address changes at
   every reattach, and each change resets its TCP sessions (4 sockets per break).
 - The CSV export adds per-metric standard deviations and the 95 % confidence interval of each paired difference.
+
+### Comparison with existing mechanisms
+
+Same benchmark and runs. The analysis and the full tables, with 95 % confidence intervals, are in
+[docs/existing-mechanisms.md](docs/existing-mechanisms.md).
+
+Each cell reads **Legacy · Reactive multipath · Always duplicate · FlexiPath**:
+- **Reactive multipath**: MPTCP backup subflow / ATSSS active-standby.
+- **Always duplicate**: redundant scheduler / PDCP duplication.
+
+| Scenario | Interruption (s) | Critical delivered (%) | Voice MOS | Duplicate bytes, protected flows (%) | Mean radio power (W) |
+| --- | --- | --- | --- | --- | --- |
+| A · Wi-Fi → 5G | 3.80 · 0.00 · 0.00 · 0.00 | 84.9 · 98.3 · 100.0 · 99.0 | 3.71 · 4.23 · 4.38 · 4.30 | 0 · 0 · 99.7 · 1.1 | 1.22 · 1.20 · 3.39 · 1.31 |
+| B · Wi-Fi → 5G → LEO | 7.52 · 0.00 · 0.00 · 0.00 | 84.1 · 97.8 · 99.5 · 98.6 | 3.66 · 4.16 · 4.33 · 4.25 | 0 · 0 · 73.4 · 1.2 | 1.22 · 1.20 · 3.13 · 1.31 |
+| C · 5G degradation → LEO | 3.73 · 0.00 · 0.00 · 0.00 | 82.8 · 97.5 · 99.3 · 98.2 | 3.59 · 4.12 · 4.30 · 4.22 | 0 · 0 · 64.5 · 1.4 | 1.22 · 1.20 · 2.85 · 1.32 |
+| D · Multiple degradation | 16.37 · 0.68 · 0.00 · 0.16 | 77.3 · 97.0 · 99.0 · 98.2 | 3.38 · 4.10 · 4.27 · 4.19 | 0 · 0 · 49.0 · 0.9 | 1.22 · 1.20 · 2.65 · 1.25 |
+| E · Critical traffic only | 3.80 · 0.00 · 0.00 · 0.00 | 84.9 · 98.3 · 100.0 · 99.0 | 3.71 · 4.23 · 4.38 · 4.30 | 0 · 0 · 99.7 · 1.1 | 1.22 · 1.20 · 3.39 · 1.31 |
+| F · Bulk traffic only | 3.80 · 0.00 · 0.00 · 0.00 | — | — | 0 · 0 · 0 · 0 | 1.22 · 1.20 · 1.20 · 1.31 |
+
+- **Anchoring removes the interruption.** Every anchored stack removes the legacy interruption, all TCP resets and all
+  remote-visible IP changes in the predictable handovers.
+- **Prediction plus the burst add the remaining reliability.** Against reactive multipath, FlexiPath:
+  - loses 25–40 % fewer critical packets (+0.6 to +1.2 pp delivery; 95 % CIs exclude zero);
+  - raises MOS by 0.07–0.10;
+  - halves the unpredictable outage's gap in D (0.16 vs 0.35 s, inside the 300 ms fail-safe budget);
+  - acts 1.3–4.6 s before the failure instead of 0.3–0.5 s after.
+
+  The cost is about 0.1 W (≈ 9 %) more radio power.
+- **Permanent duplication is the most reliable but the most expensive.** It delivers 99–100 % of critical packets, but
+  draws 2.65–3.39 W (2.1–2.6× FlexiPath) and duplicates 49–100 % of protected bytes, against FlexiPath's ~1 %.
+
+### Guidelines for QoS / QoE
+
+The full guidelines, each with its evidence, are in [docs/qos-qoe-guidelines.md](docs/qos-qoe-guidelines.md):
+
+1. Anchor the session, not the interface.
+2. Act on the trend, not on the failure.
+3. Prepare the next path just in time, and only then (spare radios in DRX).
+4. Duplicate only what needs it, only around the handover.
+5. Deliver the first copy; never make real-time traffic wait in order.
+6. Detect a dead path faster than the application can tolerate (detection + wake < deadline).
+7. Hold still unless moving clearly pays (hysteresis and dwell).
+8. Measure what users feel, on matched pairs.
 
 ---
 
@@ -228,7 +281,7 @@ npm run dev          # http://localhost:5173
 | --- | --- |
 | `npm run dev` | Vite dev server with the full HUD |
 | `npm run build` / `npm run preview` | Production bundle in `dist/` |
-| `npm run benchmark` | Paired experiments → `results/benchmark_*.json`, per-run `.csv` and `_comparison.csv` (`--quick`, `--seeds 10`, `--speeds 60`, `--scenarios A,D`, `--no-failsafe`) |
+| `npm run benchmark` | Paired experiments → `results/benchmark_*.json`, per-run `.csv`, `_comparison.csv` and `_mechanisms.csv` (`--quick`, `--seeds 10`, `--speeds 60`, `--scenarios A,D`, `--no-failsafe`, `--baselines mptcp,redundant` or `none`) |
 | `npm run models` | Regenerate the six GLB assets with headless Blender (`blender` on `PATH`) |
 
 URL parameters: `?scenario=A&seed=2026&speed=90&mode=advanced&focus=legacy&camera=overview&paused=1`, `intro=0` skips
@@ -331,12 +384,14 @@ healthy `#22C55E`.
 FlexiPath/
 ├── index.html · package.json · vite.config.js
 ├── blender/generate_all_models.py      procedural asset generator (headless or MCP)
+├── docs/                               existing mechanisms (references + comparison) · QoS / QoE guidelines
 ├── public/models/                      generated GLBs + manifest.json
 ├── scripts/benchmark.js                Node CLI for paired experiments
 └── src/
     ├── main.js · styles.css            entry point, Tailwind v4 theme + HUD components
     ├── simulation/                     SimulationEngine, Scenarios, NetworkEnvironment, LinkModel, MobilityModel,
-    │                                   TrafficManager, FlexiPathController, LegacyController, DecisionTrace,
+    │                                   TrafficManager, FlexiPathController, LegacyController, MultipathController
+    │                                   (existing-mechanism baselines), DecisionTrace,
     │                                   PowerModel, ReorderingBuffer, RelayTunnelModel, QoEModel, ExperimentRunner
     ├── three/                          SceneManager, VehicleManager, NetworkNodeManager, BeamManager,
     │                                   PacketParticleManager, EnvironmentManager

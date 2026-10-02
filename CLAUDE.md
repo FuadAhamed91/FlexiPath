@@ -7,8 +7,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 FlexiPath is a **simulation prototype** of a predictive, traffic-aware multipath connectivity engine. A deterministic
 10 Hz simulation drives two vehicles over the same seeded route, RF field and faults: **FlexiPath** (detect → predict →
 prepare → replicate → switch → continue) and a **legacy break-before-make OS stack** as the baseline. A Three.js digital
-twin and an explainable HUD render it live; a headless runner produces paired experiments. Plain ES modules, no
-framework, no TypeScript. `README.md` documents the model rules, parameters and published results in detail.
+twin and an explainable HUD render it live; a headless runner produces paired experiments, by default also against two
+baselines modelled on existing mechanisms (reactive multipath = MPTCP backup subflow / ATSSS active-standby; always
+duplicate = MPTCP redundant scheduler / PDCP duplication). Plain ES modules, no framework, no TypeScript. `README.md`
+documents the model rules, parameters and published results; `docs/existing-mechanisms.md` and
+`docs/qos-qoe-guidelines.md` hold the references analysis, the four-stack comparison and the guidelines.
 
 ## Commands
 
@@ -16,16 +19,19 @@ framework, no TypeScript. `README.md` documents the model rules, parameters and 
 npm run dev          # Vite dev server, http://localhost:5173
 npm run build        # production bundle → dist/ (base './', sourcemaps on)
 npm run preview      # serve dist/ on :4173
-npm run benchmark    # headless paired experiments in Node → results/benchmark_<stamp>.{json,csv} + benchmark_comparison_<stamp>.csv
+npm run benchmark    # headless paired experiments in Node → results/benchmark_<stamp>.{json,csv} + _comparison / _mechanisms CSVs
 npm run models       # regenerate public/models/*.glb (needs `blender` on PATH)
 ```
 
 There is no test suite, linter or type checker. Verify changes with `npm run build` and the benchmark:
 
 - Narrow runs: `npm run benchmark -- --quick` (3 seeds, 60 km/h), or e.g. `-- --seeds 1 --speeds 60 --scenarios A,D`;
-  also `--no-failsafe` and `--out <dir>`. The default is scenarios A–F × 5 seeds × 30/60/90/120 km/h = 120 paired runs.
+  also `--no-failsafe`, `--out <dir>` and `--baselines mptcp,redundant` (default) or `--baselines none`. The default is
+  scenarios A–F × 5 seeds × 30/60/90/120 km/h = 120 paired runs.
 - Runs are deterministic per seed. For a change that must not alter behaviour, benchmark into two `--out` dirs (before
   and after) and compare: both CSVs must be byte-identical; the JSON differs only in `meta` (timestamps, wall time).
+  The baselines never change FlexiPath / Legacy values (own random streams): a `--baselines none` run reproduces the
+  FP/LG-only CSVs exactly, and the `fp_` / `lg_` columns of a full run match them.
 - The README's "Measured results" tables come from the default `npm run benchmark`; when model behaviour changes,
   re-run it and update them.
 
@@ -44,8 +50,11 @@ vehicles, nodes, beams, particles }` in the console.
 - `SimulationEngine` is the hub. `advance(realDt)` accumulates wall time × `simRate` and runs whole fixed ticks
   (`DT = 0.1 s`, at most 40 per call), returning an interpolation `alpha`; `getRenderState()` interpolates vehicle arc
   length and satellites between `prevSnapshot` and `snapshot` for rendering.
+- Agents: `flexipath` and `legacy` always; `config.agents` may add `mptcp` / `redundant` (`BASELINE_ENGINES`), which
+  `ExperimentRunner` does by default. The live twin and HUD use only the first two; `_capture`, `getSummary` and the
+  exports cover every agent present, and `getRenderState` iterates the snapshot's agents.
 - One `step()`: scenario faults fire once the FlexiPath vehicle's X passes their `atX` → `env.update(t)` → for each
-  agent (`flexipath`, then `legacy`): fail-safe check → `MobilityModel.update` → `LinkModel.sample(env.signal(…))` for
+  agent (`flexipath`, `legacy`, then any baselines): fail-safe check → `MobilityModel.update` → `LinkModel.sample(env.signal(…))` for
   `eth0, wlan0, wwan0, sat0` → `controller.update({ t, links, ctx })` → `TrafficManager.step(decision, links)` →
   `QoEModel` → stats → `PowerTracker.update(decision.radio)` → `RelayTunnelModel.update` → `DecisionTrace.update` →
   decision records; then the snapshot, the history row and the events.
@@ -74,6 +83,11 @@ vehicles, nodes, beams, particles }` in the console.
 - Time comparisons subtract `1e-9` because `t = tick × 0.1` is inexact; do the same for new timers.
 - `decision.replicate` must be an explicit per-class map: `TrafficManager` mirrors every packet flow when it is
   undefined.
+- `MultipathController.js`: `ReactiveMultipathController` (anchored session, standby radio in DRX, moves after loss >
+  15 % for one 250 ms RTO or a drop, + 100 ms wake) and `RedundantMultipathController` (critical + real-time on two
+  joinable paths, radio state `DUAL` = tier 2; with no protected classes it delegates to a reactive instance). Both
+  share the legacy priority and join thresholds (`MULTIPATH_PARAMS`) and use `MultipathTrace`; they emit `HOT_SWAP` /
+  `FAILOVER` (with `upgrade` on switch-backs), never `TCP_RST`.
 - Event codes and record kinds are an API. The engine's stats (`REPL_ON`, `HOT_SWAP`, `FAILOVER`, `RECONNECTED`,
   `TCP_RST`), the `DecisionTrace` episodes and the `GuidedDemo` captions all match on them by name.
 - The UI shows the exported default parameters (`FLEXIPATH_PARAMS`, `LEGACY_PARAMS`, `POWER_PARAMS`), not a controller

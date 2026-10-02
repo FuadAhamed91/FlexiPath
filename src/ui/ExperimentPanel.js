@@ -1,13 +1,16 @@
 /**
- * ExperimentPanel.js — "EXPERIMENTAL PROOF": controlled, paired Legacy vs FlexiPath experiments.
+ * ExperimentPanel.js — "EXPERIMENTAL PROOF": controlled, paired Legacy vs FlexiPath experiments, plus the
+ * baselines modelled on existing mechanisms (reactive multipath, always duplicate) on the same runs.
  *
  * Each trial runs both engines together on the same seed, route, RF field and fault timing (one
  * SimulationEngine). The table reports measured means, standard deviations and the mean paired
  * difference (FlexiPath − Legacy) with a 95 % confidence interval. No score, no winner label.
  */
 import { ExperimentRunner, EXPERIMENT_SCENARIOS, SCENARIOS, seedsFor } from '../simulation/ExperimentRunner.js';
+import { ENGINES } from '../simulation/SimulationEngine.js';
 import { LEGACY_WIRELESS_STALL_S } from '../simulation/LegacyController.js';
 import { FLEXIPATH_PARAMS } from '../simulation/FlexiPathController.js';
+import { MULTIPATH_PARAMS } from '../simulation/MultipathController.js';
 import { TRAFFIC_PROFILES } from '../simulation/TrafficManager.js';
 import { downloadText, timestampedName, toJSON } from '../utils/Export.js';
 import { esc, tag } from './format.js';
@@ -50,6 +53,42 @@ export function comparisonTable(table) {
       </table>
     </div>
     ${notes.length ? `<p class="mt-2 font-mono text-[10px] leading-relaxed text-slate-500">${esc(notes.join(' '))}</p>` : ''}`;
+}
+
+const MECHANISM_ROWS = ['interruptionS', 'longestInterruptionS', 'criticalDeliveryPct', 'meanMos', 'replicationOverheadPct', 'meanPowerW', 'energyJ', 'tcpResets', 'remoteIpChanges', 'actionVsFailureS'];
+
+/** Legacy | existing multipath mechanisms | FlexiPath, means over the same paired runs. */
+export function mechanismsTable(table, baselines) {
+  const cols = ['legacy', ...baselines.map((b) => b.id), 'flexipath'];
+  const head = cols
+    .map((id) => {
+      const e = ENGINES[id];
+      const cls = id === 'flexipath' ? 'text-fp!' : id === 'legacy' ? 'text-legacy!' : '';
+      const sub = e.mechanism ? `<div class="mt-0.5 font-mono text-[9px] font-normal tracking-normal text-slate-500 normal-case">${esc(e.mechanism)}</div>` : '';
+      return `<th class="${cls}">${esc(e.label)}${sub}</th>`;
+    })
+    .join('');
+  const rows = table
+    .filter((m) => MECHANISM_ROWS.includes(m.key) && Object.values(m.engines).some(Boolean))
+    .map((m) => `<tr><td>${esc(m.label)}</td>${cols.map((id) => `<td>${m.engines[id] ? `${fmtV(m.engines[id].mean, m.digits)}${esc(unitOf(m))}` : '—'}</td>`).join('')}</tr>`)
+    .join('');
+  return `
+    <div class="hud-scroll overflow-x-auto">
+      <table class="exp-table">
+        <thead><tr><th>Metric · mean</th>${head}</tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+function mechanismsNote() {
+  const q = MULTIPATH_PARAMS;
+  return `
+    <p class="mt-2 text-[11px] leading-relaxed text-slate-400">
+      ${tag('param')} Baselines modelled on existing mechanisms, with the legacy stack's path preference and thresholds and detection in their favour:
+      reactive multipath moves traffic once the active path has lost &gt; ${(q.failLoss * 100).toFixed(0)} % for one ${Math.round(q.rtoS * 1000)} ms retransmission timeout (or dropped), after a ${Math.round(q.wakeLatencyS * 1000)} ms standby-radio wake;
+      always-duplicate sends every critical and real-time packet on two paths with both radios transmitting. Sessions stay anchored for both (no socket resets). See docs/existing-mechanisms.md.
+    </p>`;
 }
 
 function provenance(meta) {
@@ -165,10 +204,21 @@ export function openExperiments(dash, { scenario = 'A', trials = 10, speed = nul
         <span class="font-mono text-[10px] text-slate-500">${res.meta.seeds.length} paired trials · ${res.meta.speeds.join(', ')} km/h · ${(res.meta.wallTimeMs / 1000).toFixed(1)} s compute</span>
       </div>
       ${comparisonTable(res.comparison[show])}
+      ${
+        res.mechanisms?.[show]
+          ? `<div class="mt-5 mb-2 flex flex-wrap items-baseline justify-between gap-2">
+              <h3 class="font-display text-[11px] font-bold tracking-[0.18em] text-slate-200">EXISTING MECHANISMS · SAME SEEDS</h3>
+              <span class="font-mono text-[10px] text-slate-500">legacy · ${esc(res.meta.baselines.map((b) => b.label.toLowerCase()).join(' · '))} · FlexiPath</span>
+            </div>
+            ${mechanismsTable(res.mechanisms[show], res.meta.baselines)}
+            ${mechanismsNote()}`
+          : ''
+      }
       ${provenance(res.meta)}
       <div class="mt-4 flex flex-wrap justify-end gap-2">
         <button type="button" class="btn" data-act="json"><i data-lucide="download"></i>JSON</button>
         <button type="button" class="btn" data-act="csv"><i data-lucide="download"></i>Per-run CSV</button>
+        ${res.mechanisms ? '<button type="button" class="btn" data-act="mcsv"><i data-lucide="download"></i>Mechanisms CSV</button>' : ''}
         <button type="button" class="btn btn-primary" data-act="ccsv"><i data-lucide="download"></i>Comparison CSV</button>
       </div>`;
     dash.renderIcons(out);
@@ -177,6 +227,9 @@ export function openExperiments(dash, { scenario = 'A', trials = 10, speed = nul
     out.querySelector('[data-act="csv"]').addEventListener('click', () => downloadText(timestampedName('flexipath_experiment_runs', 'csv'), ExperimentRunner.toCSV(res), 'text/csv'));
     out.querySelector('[data-act="ccsv"]').addEventListener('click', () =>
       downloadText(timestampedName('flexipath_experiment_comparison', 'csv'), ExperimentRunner.comparisonCSV(res), 'text/csv'),
+    );
+    out.querySelector('[data-act="mcsv"]')?.addEventListener('click', () =>
+      downloadText(timestampedName('flexipath_experiment_mechanisms', 'csv'), ExperimentRunner.mechanismsCSV(res), 'text/csv'),
     );
   };
 

@@ -408,3 +408,106 @@ export class LegacyTrace {
     };
   }
 }
+
+// ── Existing multipath mechanisms (comparison baselines) ───────────────────
+/**
+ * Reactive / redundant multipath baselines: CONNECTED → DEGRADING → FAILED → SWITCHED. One episode per
+ * path change. "Action vs failure" compares the switch with the true failure of the path it left, exactly
+ * as for the other engines; a path left before it failed is watched for a while, so its later failure
+ * still counts.
+ */
+export class MultipathTrace {
+  constructor() {
+    this.truth = new TrueLinkState();
+    this.serving = null;
+    this.degradingT = null;
+    this.failedT = null;
+    this.history = [];
+    this.pending = [];
+    this.last = null;
+    this.count = 0;
+  }
+
+  update({ t, decision: d, events, links }) {
+    this.truth.update(links);
+    const ev = byCode(events);
+    for (let i = this.pending.length - 1; i >= 0; i--) {
+      const pe = this.pending[i];
+      if (this.truth.failed(pe.from)) {
+        pe.failureT = t;
+        this.pending.splice(i, 1);
+      } else if (t - pe.switchT > TRACE_PARAMS.failureWatchS) this.pending.splice(i, 1);
+    }
+
+    const prev = { serving: this.serving, failedT: this.failedT };
+    if (d.primary !== this.serving) {
+      this.serving = d.primary;
+      this.degradingT = null;
+      this.failedT = null;
+    }
+    if (this.serving) {
+      if (this.degradingT === null && this.truth.degrading(this.serving)) this.degradingT = t;
+      if (this.failedT === null && this.truth.failed(this.serving)) this.failedT = t;
+      if (this.failedT === null && this.truth.loss(this.serving) < TRACE_PARAMS.degradeLoss / 2) this.degradingT = null;
+    }
+
+    const sw = ev.HOT_SWAP ?? ev.FAILOVER;
+    if (!sw) return;
+    this.count++;
+    const upgrade = !!sw.upgrade;
+    const from = sw.from ?? prev.serving;
+    let failureT = null;
+    if (!upgrade) failureT = (prev.serving === from ? prev.failedT : null) ?? (this.truth.failed(from) ? t : null);
+    const ep = {
+      id: this.count,
+      kind: ev.FAILOVER ? 'failover' : upgrade ? 'upgrade' : 'switch',
+      from,
+      to: sw.to ?? d.primary,
+      switchT: t,
+      actionT: t,
+      failureT,
+      blackoutMs: d.blackoutTotalMs || 0,
+      status: 'complete',
+    };
+    this.history.push(ep);
+    if (this.history.length > 60) this.history.shift();
+    this.last = ep;
+    if (failureT === null && !upgrade) this.pending.push(ep);
+  }
+
+  stage(t) {
+    if (this.last && t - this.last.switchT < TRACE_PARAMS.switchHoldS - 1e-9) return 'SWITCHED';
+    if (this.serving && this.failedT !== null) return 'FAILED';
+    if (this.serving && this.degradingT !== null) return 'DEGRADING';
+    return 'CONNECTED';
+  }
+
+  view(t) {
+    return {
+      stage: this.stage(t),
+      serving: this.serving,
+      degradingT: this.degradingT,
+      failedT: this.failedT,
+      episode: null,
+      last: this.last ? { ...this.last } : null,
+      count: this.count,
+      counts: this.counts(),
+    };
+  }
+
+  /** Measured switch time relative to the true failure of the path being left (negative = before). */
+  actionVsFailure() {
+    return this.history.filter((e) => e.failureT !== null).map((e) => e.actionT - e.failureT);
+  }
+
+  counts() {
+    const failed = this.history.filter((e) => e.failureT !== null);
+    return {
+      episodes: this.history.length,
+      pathFailures: failed.length,
+      predictedFailures: failed.filter((e) => e.actionT < e.failureT).length,
+      abruptFailures: this.history.filter((e) => e.kind === 'failover').length,
+      falseAlarms: 0,
+    };
+  }
+}

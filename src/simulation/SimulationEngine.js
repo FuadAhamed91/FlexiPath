@@ -4,6 +4,9 @@
  * Runs two agents over the same seeded RF environment:
  *   • flexipath — FlexiPathController (predict → prepare → replicate → switch)
  *   • legacy    — LegacyController   (hard-threshold break-before-make)
+ * Headless experiments can add baselines modelled on existing mechanisms (config.agents):
+ *   • mptcp     — ReactiveMultipathController  (MPTCP backup subflow / ATSSS active-standby)
+ *   • redundant — RedundantMultipathController (MPTCP redundant scheduler / PDCP duplication)
  *
  * The engine is renderer-agnostic: the 3D layer and HUD subscribe to events
  * ('tick', 'event', 'decision', 'reset', 'complete') and read interpolated render state.
@@ -19,8 +22,9 @@ import { LinkModel, INTERFACE_IDS, INTERFACE_SPECS } from './LinkModel.js';
 import { TrafficManager, FLOW_DEFS, TRAFFIC_CLASSES, TRAFFIC_PROFILES, flowsForProfile } from './TrafficManager.js';
 import { FlexiPathController, FLEXIPATH_PARAMS } from './FlexiPathController.js';
 import { LegacyController, LEGACY_PARAMS } from './LegacyController.js';
+import { ReactiveMultipathController, RedundantMultipathController, MULTIPATH_PARAMS } from './MultipathController.js';
 import { QoEModel } from './QoEModel.js';
-import { FlexiPathTrace, LegacyTrace, TRACE_PARAMS } from './DecisionTrace.js';
+import { FlexiPathTrace, LegacyTrace, MultipathTrace, TRACE_PARAMS } from './DecisionTrace.js';
 import { resolveScenario } from './Scenarios.js';
 import { PowerTracker, POWER_PARAMS } from './PowerModel.js';
 import { RelayTunnelModel, RELAY_PARAMS } from './RelayTunnelModel.js';
@@ -36,7 +40,13 @@ export const MOS_THRESHOLD = 3.6;
 export const ENGINES = {
   flexipath: { id: 'flexipath', label: 'FlexiPath', short: 'FP', laneOffset: 3.2, color: '#00F0FF' },
   legacy: { id: 'legacy', label: 'Legacy OS', short: 'LG', laneOffset: -3.2, color: '#F43F5E' },
+  // Comparison baselines (existing mechanisms). Headless only: the twin renders FlexiPath and Legacy.
+  mptcp: { id: 'mptcp', label: 'Reactive multipath', short: 'MP', laneOffset: 0, color: '#F59E0B', mechanism: 'MPTCP backup subflow / 3GPP ATSSS active-standby' },
+  redundant: { id: 'redundant', label: 'Always duplicate', short: 'RD', laneOffset: 0, color: '#A3E635', mechanism: 'MPTCP redundant scheduler / PDCP duplication' },
 };
+
+/** Baselines modelled on existing seamless-connectivity mechanisms (docs/existing-mechanisms.md). */
+export const BASELINE_ENGINES = ['mptcp', 'redundant'];
 
 export const DEFAULT_CONFIG = {
   seed: 2026,
@@ -44,6 +54,7 @@ export const DEFAULT_CONFIG = {
   failSafe: true,
   simRate: 1,
   scenario: 'mission',
+  agents: ['flexipath', 'legacy'], // + any of BASELINE_ENGINES (headless experiments)
   recordHistory: true,
   maxHistory: 36000,
   maxEvents: 5000,
@@ -106,7 +117,9 @@ export class SimulationEngine {
     this.faultLog = [];
     this.pendingFaults = this.scenario.faults.map((f) => ({ ...f }));
     this.agents = {};
-    for (const id of Object.keys(ENGINES)) this.agents[id] = this._createAgent(id, root);
+    // FlexiPath and Legacy always run (the twin, the HUD and the X-triggered faults rely on them).
+    const extra = (this.config.agents ?? []).filter((id) => id !== 'flexipath' && id !== 'legacy' && ENGINES[id]);
+    for (const id of ['flexipath', 'legacy', ...extra]) this.agents[id] = this._createAgent(id, root);
     this.snapshot = this._capture();
 
     // Prime tick 0 silently so every consumer starts from a fully populated snapshot.
@@ -145,7 +158,14 @@ export class SimulationEngine {
     for (const lid of INTERFACE_IDS) links[lid] = new LinkModel(INTERFACE_SPECS[lid], rng.fork(`link:${lid}`));
     const flows = flowsForProfile(sc.traffic);
     const classes = Object.fromEntries(Object.keys(TRAFFIC_CLASSES).map((c) => [c, flows.some((f) => f.cls === c)]));
-    const controller = id === 'flexipath' ? new FlexiPathController({ dt: DT, classes }) : new LegacyController({ dt: DT });
+    const controller =
+      id === 'flexipath'
+        ? new FlexiPathController({ dt: DT, classes })
+        : id === 'mptcp'
+          ? new ReactiveMultipathController({ dt: DT })
+          : id === 'redundant'
+            ? new RedundantMultipathController({ dt: DT, classes })
+            : new LegacyController({ dt: DT });
     const hasVoice = flows.some((f) => f.voice);
     return {
       id,
@@ -159,9 +179,11 @@ export class SimulationEngine {
       hasPacket: flows.some((f) => f.mode === 'packet'),
       traffic: new TrafficManager({ rng: rng.fork('traffic'), flows }),
       qoe: new QoEModel(),
-      trace: id === 'flexipath' ? new FlexiPathTrace() : new LegacyTrace(),
+      trace: id === 'flexipath' ? new FlexiPathTrace() : id === 'legacy' ? new LegacyTrace() : new MultipathTrace(),
       power: new PowerTracker(),
-      tunnel: new RelayTunnelModel({ engineId: id, rng: rng.fork('tunnel'), tunnel: id === 'flexipath' }),
+      // Sessions are anchored for FlexiPath (relay tunnel) and the multipath baselines (MPTCP proxy / ATSSS
+      // anchor); only the legacy stack binds sockets to its physical address.
+      tunnel: new RelayTunnelModel({ engineId: id, rng: rng.fork('tunnel'), tunnel: id !== 'legacy' }),
       holRecent: [],
       linkStates: null,
       decision: null,
@@ -483,10 +505,7 @@ export class SimulationEngine {
       completed: this.completed,
       scenario: this.scenario,
       env: this.env.state,
-      agents: {
-        flexipath: this._captureAgent(this.agents.flexipath),
-        legacy: this._captureAgent(this.agents.legacy),
-      },
+      agents: Object.fromEntries(Object.entries(this.agents).map(([id, a]) => [id, this._captureAgent(a)])),
     };
   }
 
@@ -546,8 +565,8 @@ export class SimulationEngine {
     const cur = this.snapshot;
     const prev = this.prevSnapshot ?? cur;
     const vehicles = {};
-    for (const id of Object.keys(ENGINES)) {
-      const a = prev.agents[id].vehicle;
+    for (const id of Object.keys(cur.agents)) {
+      const a = (prev.agents[id] ?? cur.agents[id]).vehicle;
       const b = cur.agents[id].vehicle;
       const s = a.s + (b.s - a.s) * alpha;
       const frame = this.path.frameAt(s, ENGINES[id].laneOffset);
@@ -653,12 +672,10 @@ export class SimulationEngine {
   }
 
   getSummary() {
-    return {
-      meta: this.meta(),
-      flexipath: this._summarizeAgent(this.agents.flexipath),
-      legacy: this._summarizeAgent(this.agents.legacy),
-      faults: [...this.faultLog],
-    };
+    const out = { meta: this.meta() };
+    for (const [id, agent] of Object.entries(this.agents)) out[id] = this._summarizeAgent(agent);
+    out.faults = [...this.faultLog];
+    return out;
   }
 
   meta() {
@@ -696,6 +713,7 @@ export class SimulationEngine {
         faults: FAULTS,
         flexipathParams: FLEXIPATH_PARAMS,
         legacyParams: LEGACY_PARAMS,
+        multipathParams: MULTIPATH_PARAMS,
         traceParams: TRACE_PARAMS,
         powerParams: POWER_PARAMS,
         holParams: HOL_PARAMS,
@@ -703,10 +721,7 @@ export class SimulationEngine {
       },
       summary: this.getSummary(),
       decisions: this.decisions.map((d) => ({ ...d, t: round(d.t, 2) })),
-      episodes: {
-        flexipath: this.agents.flexipath.trace.history,
-        legacy: this.agents.legacy.trace.history,
-      },
+      episodes: Object.fromEntries(Object.entries(this.agents).map(([id, a]) => [id, a.trace.history])),
       events: this.events.map((e) => ({ t: round(e.t, 2), engine: e.engine, level: e.level, code: e.code, message: e.message })),
       timeseries: this.history,
     };
