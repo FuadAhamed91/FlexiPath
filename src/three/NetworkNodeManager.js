@@ -18,6 +18,15 @@ import { INTERFACE_SPECS } from '../simulation/LinkModel.js';
 const loader = new GLTFLoader();
 const MODEL_BASE = `${import.meta.env?.BASE_URL ?? './'}models/`;
 const OUTAGE_TINT = new THREE.Color('#ff2d55');
+const REAL_EMISSIVE = 0.45; // realistic look: node glow cut to status-light level
+
+const _hsl = {};
+/** Realistic-look colour: dark neon hardware becomes galvanised or painted steel; gold foil, PV cells and white radomes stay. */
+function realisticColor(color) {
+  color.getHSL(_hsl, THREE.SRGBColorSpace);
+  if (_hsl.s > 0.5 || _hsl.l > 0.75) return color.clone();
+  return new THREE.Color().setHSL(0.58, 0.05, 0.32 + 0.6 * _hsl.l, THREE.SRGBColorSpace);
+}
 
 /** `?models=procedural` forces the primitive fallbacks (handy for comparison or broken assets). */
 const FORCE_PROCEDURAL =
@@ -368,9 +377,38 @@ export class NetworkNodeManager {
     return this.nodes[id].anchor.getWorldPosition(target);
   }
 
+  /**
+   * `real`: steel instead of the dark neon hardware and glow at status-light level; `twin`: the original materials.
+   * Each material keeps both colours, so switching back restores the twin look exactly.
+   */
+  setLook(look) {
+    const real = look === 'real';
+    this.emissiveScale = real ? REAL_EMISSIVE : 1;
+    if (!this._lookMats) {
+      const mats = new Set();
+      const roots = [...Object.values(this.nodes).map((n) => n.root), ...this.satellites.map((s) => s.root)];
+      for (const root of roots) {
+        root.traverse((o) => {
+          if (!o.isMesh) return;
+          for (const m of Array.isArray(o.material) ? o.material : [o.material]) if (m.isMeshStandardMaterial) mats.add(m);
+        });
+      }
+      this._lookMats = [...mats];
+      for (const m of this._lookMats) {
+        m.userData.twinColor = m.color.clone();
+        m.userData.realColor = realisticColor(m.color);
+      }
+    }
+    for (const m of this._lookMats) m.color.copy(real ? m.userData.realColor : m.userData.twinColor);
+    // The Wi-Fi and 5G glow is rewritten every frame by update(); the dock and the satellites only change here.
+    this._setEmissive(this.nodes.eth0.emissives, 1, null);
+    for (const sat of this.satellites) this._setEmissive(sat.emissives, 1, null);
+  }
+
   _setEmissive(list, factor, tint) {
+    const scale = this.emissiveScale ?? 1;
     for (const m of list) {
-      m.emissiveIntensity = m.userData.baseEmissive * factor;
+      m.emissiveIntensity = m.userData.baseEmissive * factor * scale;
       if (tint) m.emissive.copy(tint);
       else m.emissive.copy(m.userData.baseEmissiveColor);
     }

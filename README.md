@@ -41,7 +41,7 @@ Open the app and you get the **Mission view**, kept to the story — the 3D twin
 | Area | What it answers |
 | --- | --- |
 | **Decision loop** — DETECT → PREDICT → PREPARE → REPLICATE → SWITCH → CONTINUE | Which stage the controller is in right now, when it reached each stage, which stages were skipped (e.g. an abrupt outage cannot be predicted), and the radio state each stage runs at (DRX standby, warm probe, burst). |
-| **3D twin** | Two drones on the same corridor; the camera keeps both in frame and an edge marker points to the other drone if it falls out of view. The legacy drone's label shows the distance it has lost. Sleeping modems draw no probe beams (a faint blink marks each DRX signal sample); a warm modem shows dashed heartbeat beams; both beams pulse purple during the burst. |
+| **3D twin** | A moonlit night over a real city and desert (press `L` for the original neon digital twin). Two drones on the same corridor; the camera keeps both in frame and an edge marker points to the other drone if it falls out of view. The legacy drone's label shows the distance it has lost. Sleeping modems draw no probe beams (a faint blink marks each DRX signal sample); a warm modem shows dashed heartbeat beams; both beams pulse purple during the burst. |
 | **Why did FlexiPath do that?** | The latest decision as a short card — headline, action and reason, beside the rule the legacy stack follows. **Show details** opens the full record (current path, status, alternate, traffic, **radio power tier**) and the decision history. |
 | **At a glance** | Which traffic is protected right now (critical, voice, bulk), and FlexiPath vs Legacy on radio power, the longest data stall and client IP changes seen by remote services. **Details** opens the Advanced view. |
 | **Legacy vs FlexiPath** | Both drones' latest transition step by step, timed relative to the moment the path *actually* failed, with the simulated interruption, critical packets lost and failures acted on before they happened. |
@@ -292,10 +292,10 @@ npm run dev          # http://localhost:5173
 | `npm run models` | Regenerate the six GLB assets with headless Blender (`blender` on `PATH`) |
 
 URL parameters: `?scenario=A&seed=2026&speed=90&mode=advanced&focus=legacy&camera=overview&paused=1`, `intro=0` skips
-the intro screen, `demo=1` starts the guided demo, `models=procedural` forces the built-in primitive models.
+the intro screen, `demo=1` starts the guided demo, `models=procedural` forces the built-in primitive models, `look=twin` starts in the neon digital-twin look.
 
 Keys: `Space` pause · `M` mission / advanced · `D` guided demo · `X` experiments · `I` why FlexiPath? · `F` Wi-Fi fade ·
-`G` 5G outage · `R` reset · `1`/`2` focus · `C` camera · `V` ghost drone · `T` theatre · `E` export JSON.
+`G` 5G outage · `R` reset · `1`/`2` focus · `C` camera · `V` ghost drone · `T` theatre · `L` real / twin look · `E` export JSON.
 
 ### Exports
 
@@ -387,6 +387,19 @@ In the twin, the drones wait on their dock pads, climb out on departure and fly 
 carries its state colour (cyan, purple during the burst, red during an interruption) and a faint line joins it to the
 drone.
 
+**Two looks** (`L`, the **Real / Twin** button, or `?look=twin`). Both show the same network layer: drones, beams,
+packets, coverage rings and labels. The world around it changes.
+- **Real** (default) is a moonlit night (`RealWorld.js`):
+  - solid buildings with lit windows on the same plots as the twin's city;
+  - a tarmac road with lane markings, pavements and street lights through zones 1–3;
+  - ground that turns to desert sand in zone 4, with dunes, the ridge that shadows 5G, date palms and rocks;
+  - road-sign gantries at the zone borders, and a concrete dock apron with painted landing pads.
+
+  The network gear is drawn in steel, with its glow cut to status-light level.
+- **Twin** is the original neon digital twin: grid floor, wireframe city and neon zone gates.
+
+Everything in both looks is built procedurally in code, with no image files.
+
 Colours: Wi-Fi `#00F0FF` · 5G `#10B981` · LEO `#F59E0B` · wired `#64748B` · replication `#A855F7` · failure `#EF4444` ·
 healthy `#22C55E`.
 
@@ -406,7 +419,7 @@ FlexiPath/
     │                                   (existing-mechanism baselines), DecisionTrace,
     │                                   PowerModel, ReorderingBuffer, RelayTunnelModel, QoEModel, ExperimentRunner
     ├── three/                          SceneManager, VehicleManager, NetworkNodeManager, BeamManager,
-    │                                   PacketParticleManager, EnvironmentManager
+    │                                   PacketParticleManager, EnvironmentManager, RealWorld (realistic look)
     ├── ui/                             Dashboard, SystemLoop, PredictionPanel, DecisionPanel, TrafficPanel,
     │                                   EngineeringPanel, ComparisonLanes, PredictionInternals, TunnelPanel,
     │                                   ExperimentPanel, GuidedDemo, InfoContent, TelemetryPanel, FlowInspector,

@@ -30,6 +30,7 @@ function readParams() {
     mode: q.get('mode') === 'advanced' ? 'advanced' : 'mission',
     focus: q.get('focus') === 'legacy' ? 'legacy' : 'flexipath',
     camera: ['chase', 'cinematic', 'overview'].includes(q.get('camera')) ? q.get('camera') : 'chase',
+    look: q.get('look') === 'twin' ? 'twin' : 'real',
     paused: q.get('paused') === '1',
     intro: q.get('intro') !== '0',
     demo: q.get('demo') === '1',
@@ -71,6 +72,12 @@ async function boot() {
 
   dashboard.setAssetSource({ vehicles: vehicles.usedGLB, nodes: nodes.usedGLB });
   dashboard.hooks.onCamera = (mode) => sceneManager.setCameraMode(mode);
+  dashboard.hooks.onLook = (look) => {
+    sceneManager.setLook(look);
+    environment.setLook(look);
+    nodes.setLook(look);
+  };
+  dashboard.setLook(params.look, { quiet: true });
   dashboard.hooks.onBeforeReset = () => particles.clear();
   dashboard.setCamera(params.camera);
 
