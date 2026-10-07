@@ -372,7 +372,7 @@ export class FlexiPathController {
     if (!pred) return out;
     const tr = pred.triggers;
     if (tr.context) {
-      out.push(`dock release: vehicle departing, wired carrier ends ${Number.isFinite(pred.dockDistM) ? `${pred.dockDistM.toFixed(0)} m ahead` : 'imminently'}`);
+      out.push(`dock release: drone departing, wired carrier ends ${Number.isFinite(pred.dockDistM) ? `${pred.dockDistM.toFixed(0)} m ahead` : 'imminently'}`);
     }
     if (tr.rapidFade) out.push(`signal collapsing ${pred.signalSlope.toFixed(0)} dB/s (steeper than −${p.rapidFadeSlope} dB/s)`);
     if (tr.ttf && !tr.context && Number.isFinite(pred.ttf)) {

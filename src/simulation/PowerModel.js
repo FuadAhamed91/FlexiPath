@@ -81,7 +81,7 @@ export class PowerTracker {
   /**
    * @param {Record<string,string>} radio per-interface radio state for this tick
    * @param {number} dt seconds
-   * @param {{active?: boolean}} [opts] active = the vehicle is still on its route (energy is per journey)
+   * @param {{active?: boolean}} [opts] active = the drone is still on its route (energy is per journey)
    */
   update(radio, dt, { active = true } = {}) {
     const tier = tierFor(radio);

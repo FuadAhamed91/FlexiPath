@@ -35,7 +35,7 @@ const LEGACY_LABEL = {
   DEGRADING: ['link degrading · no prediction', '#facc15'],
   FAILED: ['link failed · still attached', '#f87171'],
   INTERRUPTED: ['SIMULATED INTERRUPTION', '#ef4444'],
-  STOPPING: ['SIMULATED INTERRUPTION · fail-safe stop', '#ef4444'],
+  STOPPING: ['SIMULATED INTERRUPTION · fail-safe hover', '#ef4444'],
   RECOVERED: ['recovered', '#e2e8f0'],
 };
 

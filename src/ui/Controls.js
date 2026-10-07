@@ -3,7 +3,7 @@
  *
  *   • cumulative handover stall-time counter (FlexiPath vs Legacy)
  *   • engine toggle (FlexiPath Mode / Legacy OS Mode), ghost + fail-safe toggles
- *   • vehicle speed slider (0–120 km/h), reproducible seed input
+ *   • drone speed slider (0–120 km/h), reproducible seed input
  *   • fault injection: rapid Wi-Fi fade, 5G cell outage, reset scenario
  *   • data export (JSON / CSV) and batch benchmark
  */
@@ -47,19 +47,19 @@ export class Controls {
         </div>
         <div class="mt-2 flex flex-col gap-1.5">
           <label class="flex cursor-pointer items-center justify-between gap-2 text-[11px] text-slate-300">
-            <span class="flex items-center gap-1.5"><i data-lucide="ghost" class="size-3.5 text-slate-500"></i>Side-by-side ghost vehicle</span>
-            <button type="button" class="toggle" role="switch" aria-checked="true" data-ref="ghost" aria-label="Show comparison vehicle"></button>
+            <span class="flex items-center gap-1.5"><i data-lucide="ghost" class="size-3.5 text-slate-500"></i>Side-by-side ghost drone</span>
+            <button type="button" class="toggle" role="switch" aria-checked="true" data-ref="ghost" aria-label="Show comparison drone"></button>
           </label>
           <label class="flex cursor-pointer items-center justify-between gap-2 text-[11px] text-slate-300">
-            <span class="flex items-center gap-1.5"><i data-lucide="siren" class="size-3.5 text-slate-500"></i>Fail-safe braking on link loss</span>
-            <button type="button" class="toggle" role="switch" aria-checked="true" data-ref="failsafe" aria-label="Fail-safe braking"></button>
+            <span class="flex items-center gap-1.5"><i data-lucide="siren" class="size-3.5 text-slate-500"></i>Fail-safe hover on C2-link loss</span>
+            <button type="button" class="toggle" role="switch" aria-checked="true" data-ref="failsafe" aria-label="Fail-safe hover"></button>
           </label>
         </div>
       </section>
 
-      <section class="mt-3 px-3" aria-label="Vehicle speed">
+      <section class="mt-3 px-3" aria-label="Drone speed">
         <div class="flex items-baseline justify-between">
-          <label class="hud-label" for="speed-range">Vehicle speed</label>
+          <label class="hud-label" for="speed-range">Drone speed</label>
           <span class="num text-[15px] font-bold text-slate-100"><span data-ref="speedVal">60</span><span class="text-[10px] text-slate-500"> km/h</span></span>
         </div>
         <input id="speed-range" class="speed-range mt-1" type="range" min="0" max="120" step="1" value="60" data-ref="speed" />

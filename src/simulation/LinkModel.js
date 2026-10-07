@@ -1,7 +1,7 @@
 /**
- * LinkModel.js — real-time link metrics for one interface of one vehicle.
+ * LinkModel.js — real-time link metrics for one interface of one drone.
  *
- * Maps the large-scale signal from NetworkEnvironment (+ per-vehicle fast
+ * Maps the large-scale signal from NetworkEnvironment (+ per-drone fast
  * fading) to the metrics a transport proxy can observe every 100 ms:
  *
  *   loss      = base + (1 − base) · 1 / (1 + e^{(SNR − SNR₅₀)/k})   (link-edge logistic)

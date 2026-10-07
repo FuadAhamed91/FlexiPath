@@ -114,7 +114,7 @@ The relay should learn the outer address from the authenticated tunnel packets t
 
 **Evidence:** in scenario D's unpredictable 5G outage:
 - FlexiPath's gap is **160 ms** (3 missed 20 ms probes = 60 ms, plus a 100 ms DRX wake). That is inside the 300 ms telemetry fail-safe budget.
-- A retransmission-timeout detector (250 ms + 100 ms = **350 ms**) exceeds the budget, and the reactive stack brakes.
+- A retransmission-timeout detector (250 ms + 100 ms = **350 ms**) exceeds the budget, and the reactive drone hovers.
 - The legacy stack is offline for 3.8 s.
 
 **How:**

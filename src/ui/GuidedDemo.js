@@ -50,7 +50,7 @@ export class GuidedDemo {
     this._beat({
       step: 'GUIDED DEMO · SCENARIO A · Wi-Fi → 5G',
       title: 'Connectivity shouldn’t wait for failure.',
-      body: 'Two identical vehicles drive the same route with the same seed and the same radio conditions. Cyan = FlexiPath: it predicts, prepares and protects. Crimson = Legacy OS: it reacts only after the link has failed. Everything shown is simulated.',
+      body: 'Two identical drones fly the same corridor with the same seed and the same radio conditions. Cyan = FlexiPath: it predicts, prepares and protects. Crimson = Legacy OS: it reacts only after the link has failed. Everything shown is simulated.',
       hold: HOLD.intro,
     });
   }
@@ -134,7 +134,7 @@ export class GuidedDemo {
         this._beat({
           step: '2 / 6 · REPLICATE · DECISION ENGINE',
           title: r?.headline ?? 'Critical flow protection enabled',
-          body: `Action: ${sentence(r?.action)} Reason: ${sentence(r?.reason)} Purple packets carry critical traffic on both paths for this window only; the receiver keeps the first copy of each sequence number and discards the late duplicate, so delivery never waits (HoL 0 ms). Video and file sync are not duplicated: bulk moves with delay-compensated pacing.`,
+          body: `Action: ${sentence(r?.action)} Reason: ${sentence(r?.reason)} Purple packets carry critical traffic on both paths for this window only; the receiver keeps the first copy of each sequence number and discards the late duplicate, so delivery never waits (HoL 0 ms). Video and data sync are not duplicated: bulk moves with delay-compensated pacing.`,
         });
         this.dash.setRate(0.5); // slow motion while both paths carry critical traffic
       } else if (ev.code === 'REPL_RT' && this.seen.has('repl') && once('rt')) {
@@ -158,7 +158,7 @@ export class GuidedDemo {
         this._beat({
           step: '3 / 6 · FAILURE → SWITCH → CONTINUE',
           title: r?.headline ?? `Switched to ${linkName(ev.to)}`,
-          body: `${sentence(r?.reason)}${failure} FlexiPath so far: ${fp.stats.stallTime.toFixed(2)} s of simulated interruption, ${fp.stats.criticalLost} critical packets lost. The old radio is back in DRX; the vehicle continues.`,
+          body: `${sentence(r?.reason)}${failure} FlexiPath so far: ${fp.stats.stallTime.toFixed(2)} s of simulated interruption, ${fp.stats.criticalLost} critical packets lost. The old radio is back in DRX; the drone continues.`,
         });
       }
     } else if (ev.engine === 'legacy') {
@@ -173,8 +173,8 @@ export class GuidedDemo {
       } else if (ev.code === 'FAILSAFE' && this.seen.has('lost') && once('failsafe')) {
         this._beat({
           step: '4 / 6 · LEGACY OS',
-          title: 'Fail-safe stop',
-          body: `Critical telemetry has been silent for more than ${FAILSAFE_OUTAGE_S * 1000} ms, so the legacy vehicle brakes to a minimal-risk stop (simulated teleoperation policy).`,
+          title: 'Fail-safe hover',
+          body: `C2 telemetry has been silent for more than ${FAILSAFE_OUTAGE_S * 1000} ms, so the legacy drone stops and hovers in place (simulated lost-link policy).`,
           pause: false,
         });
       } else if (ev.code === 'RECONNECTED' && this.seen.has('lost') && once('recovered')) {
@@ -184,7 +184,7 @@ export class GuidedDemo {
         const lgT = A.legacy.tunnel.state;
         this._beat({
           step: '5 / 6 · RESULT OF THIS RUN',
-          title: 'Legacy recovered — same road, same radio conditions',
+          title: 'Legacy recovered — same corridor, same radio conditions',
           body: `${sentence(ev.message)} Simulated interruption so far: FlexiPath ${s.flexipath.stats.stallTime.toFixed(2)} s · Legacy ${s.legacy.stats.stallTime.toFixed(2)} s. Remote services saw Legacy's source address change ${lgT.remoteIpChanges}× (sessions reset); FlexiPath's stayed ${ANCHOR_IP} (${fpT.remoteIpChanges} changes). Mean radio power FlexiPath ${A.flexipath.power.state.meanWatts.toFixed(2)} W · Legacy ${A.legacy.power.state.meanWatts.toFixed(2)} W (both radios always on: ${POWER_PARAMS.tierWatts[2]} W, model parameter). Replication cost ${s.flexipath.stats.overheadPct.toFixed(1)} % of protected-flow bytes.`,
           hold: HOLD.beat,
         });
