@@ -1,35 +1,56 @@
 /**
- * VehicleManager.js — FlexiPath vehicle (A) and the Legacy ghost vehicle (B).
+ * VehicleManager.js — FlexiPath drone (A) and the Legacy ghost drone (B).
  *
- * Models come from public/models/{flexipath,legacy}_vehicle.glb when present,
- * otherwise an identical low-poly cyber-vehicle is built from primitives.
- * Each vehicle exposes an `AntennaAnchor` (roof antenna tip) where beams start.
+ * Models come from public/models/{flexipath,legacy}_drone.glb when present,
+ * otherwise an identical low-poly quadcopter is built from primitives.
+ * Each drone exposes an `AntennaAnchor` (multi-link antenna tip) where beams start
+ * and four `Rotor_*` pivots that spin about the vertical axis.
+ *
+ * The drones fly a low-altitude corridor above the route: they sit on their dock pads,
+ * climb out on departure and hold the corridor height. Altitude is visual only (the radio
+ * model is evaluated on the route centre-line at ground level).
  *
  * Visual state (all driven by the simulation snapshot):
  *   FlexiPath  — cyan halo; label shows PREDICT / WARM PROBE / BURST TX / SWITCHED with the
  *                radio power; purple pulsing halo while critical traffic is replicated
- *   Legacy     — crimson ghost; on an interruption it flashes red, shakes (stutters),
- *                brakes (fail-safe) and shows "SIMULATED INTERRUPTION · 3.8 s" with a countdown
+ *   Legacy     — crimson ghost; on an interruption it flashes red, wobbles (stutters),
+ *                stops and hovers (fail-safe) and shows "SIMULATED INTERRUPTION · 3.8 s" with a countdown
  */
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { loadGLB, collectEmissives } from './NetworkNodeManager.js';
-import { METERS_PER_UNIT } from '../simulation/MobilityModel.js';
+import { METERS_PER_UNIT, MOBILITY_DEFAULTS } from '../simulation/MobilityModel.js';
 import { POWER_PARAMS } from '../simulation/PowerModel.js';
 import { RELAY_PARAMS } from '../simulation/RelayTunnelModel.js';
 
 const W = POWER_PARAMS.tierWatts;
 
 const PALETTE = {
-  flexipath: { body: '#0b0f16', accent: '#00F0FF', cabin: '#00F0FF', trim: '#1f2937' },
-  legacy: { body: '#3b0a16', accent: '#E11D48', cabin: '#FB7185', trim: '#4c0519' },
+  flexipath: { body: '#0b0f16', accent: '#00F0FF', canopy: '#00F0FF', trim: '#1f2937' },
+  legacy: { body: '#3b0a16', accent: '#E11D48', canopy: '#FB7185', trim: '#4c0519' },
 };
-const WHEEL_RADIUS = 0.36;
-const VEHICLE_SCALE = 1.3; // stylised: vehicles read clearly against 1.2 km of route
+const VEHICLE_SCALE = 1.3; // stylised: drones read clearly against 1.2 km of route
+const CRUISE_ALT = 5; // world units (≈ 25 m) above the route; visual only
+const CLIMB_S = 9; // route units over which a drone climbs away from its dock pad
+const ROTOR_IDLE = 9; // rad/s while waiting on the pad
+const ROTOR_FLIGHT = 34; // rad/s once moving or airborne
 const STALL_RED = new THREE.Color('#EF4444');
 const REPL_PURPLE = new THREE.Color('#a855f7');
 
-export function buildVehicle(kind = 'flexipath') {
+// Airframe, in the Blender script's frame (X forward, Y left, Z up). Keep in step with build_drone().
+const HULL_OUTLINE = [[0.62, 0], [0.4, 0.34], [-0.42, 0.36], [-0.62, 0.18], [-0.62, -0.18], [-0.42, -0.36], [0.4, -0.34]];
+const CANOPY_OUTLINE = [[0.44, 0], [0.27, 0.2], [-0.3, 0.2], [-0.4, 0], [-0.3, -0.2], [0.27, -0.2]];
+const ARM_REACH = 1.12;
+const ROTOR_Z = 0.82;
+const GUARD_R = 0.7;
+const BLADE_LEN = 1.24;
+const MOTORS = [['FL', 1, 1], ['FR', 1, -1], ['RL', -1, 1], ['RR', -1, -1]];
+
+/** Blender (x, y, z) → three.js (x, z, −y), the glTF exporter's axis conversion. */
+const B = (x, y, z) => new THREE.Vector3(x, z, -y);
+const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+
+export function buildDrone(kind = 'flexipath') {
   const c = PALETTE[kind];
   const root = new THREE.Group();
   const carbon = new THREE.MeshStandardMaterial({ color: c.body, metalness: 0.75, roughness: 0.32 });
@@ -38,107 +59,93 @@ export function buildVehicle(kind = 'flexipath') {
     color: '#02060d',
     metalness: 0.3,
     roughness: 0.15,
-    emissive: new THREE.Color(c.cabin),
+    emissive: new THREE.Color(c.canopy),
     emissiveIntensity: 1.1,
   });
   const accent = new THREE.MeshStandardMaterial({ color: '#05080f', emissive: new THREE.Color(c.accent), emissiveIntensity: 2.6 });
+  const head = new THREE.MeshStandardMaterial({ color: '#05080f', emissive: new THREE.Color('#E0FDFF'), emissiveIntensity: 4 });
   const tail = new THREE.MeshStandardMaterial({ color: '#05080f', emissive: new THREE.Color('#ff2848'), emissiveIntensity: 2.2 });
   tail.name = 'TailLight';
+  const blade = new THREE.MeshStandardMaterial({ color: '#05070b', metalness: 0.2, roughness: 0.6 });
 
-  const extrude = (pts, width, mat) => {
-    const shape = new THREE.Shape(pts.map(([x, y]) => new THREE.Vector2(x, y)));
-    const geo = new THREE.ExtrudeGeometry(shape, {
-      depth: width - 0.12,
-      bevelEnabled: true,
-      bevelThickness: 0.06,
-      bevelSize: 0.05,
-      bevelSegments: 2,
-    });
-    geo.translate(0, 0, -(width - 0.12) / 2);
-    return new THREE.Mesh(geo, mat);
+  const add = (parent, geo, mat, pos) => {
+    const m = new THREE.Mesh(geo, mat);
+    if (pos) m.position.copy(pos);
+    parent.add(m);
+    return m;
+  };
+  // Top-view outline extruded upwards from z0 to z1 (rotateX maps the shape's Y to −Z, depth to +Y).
+  const slab = (outline, z0, z1, mat) => {
+    const bevel = 0.02;
+    const shape = new THREE.Shape(outline.map(([x, y]) => new THREE.Vector2(x, y)));
+    const geo = new THREE.ExtrudeGeometry(shape, { depth: z1 - z0 - 2 * bevel, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 1 });
+    geo.rotateX(-Math.PI / 2);
+    geo.translate(0, z0 + bevel, 0);
+    return add(root, geo, mat);
+  };
+  const strut = (p0, p1, r, mat, parent = root) => {
+    const dir = new THREE.Vector3().subVectors(p1, p0);
+    const m = add(parent, new THREE.CylinderGeometry(r, r, dir.length(), 8), mat, p0.clone().lerp(p1, 0.5));
+    m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+    return m;
   };
 
-  // Wedge chassis (side profile, forward = +X).
-  root.add(
-    extrude(
-      [
-        [-1.8, 0.3],
-        [1.72, 0.3],
-        [1.88, 0.5],
-        [1.7, 0.7],
-        [0.72, 0.86],
-        [-1.25, 0.9],
-        [-1.78, 0.8],
-        [-1.88, 0.5],
-      ],
-      1.64,
-      carbon,
-    ),
-  );
-  // Glowing cabin canopy.
-  root.add(
-    extrude(
-      [
-        [0.8, 0.84],
-        [0.18, 1.3],
-        [-0.92, 1.34],
-        [-1.36, 0.9],
-      ],
-      1.3,
-      glass,
-    ),
-  );
-  // Side skirts, light bars.
+  slab(HULL_OUTLINE, 0.41, 0.71, carbon);
+  slab(CANOPY_OUTLINE, 0.71, 0.81, glass);
+  for (const side of [-1, 1]) add(root, new THREE.BoxGeometry(0.8, 0.05, 0.04), accent, B(0, side * 0.355, 0.5));
+  add(root, new THREE.BoxGeometry(0.04, 0.06, 0.3), head, B(0.63, 0, 0.56));
+  add(root, new THREE.BoxGeometry(0.04, 0.06, 0.3), tail, B(-0.63, 0, 0.56));
+
+  // Arms, motor cans, prop guards and their struts.
+  for (const [, sx, sy] of MOTORS) {
+    const mx = sx * ARM_REACH;
+    const my = sy * ARM_REACH;
+    strut(B(sx * 0.34, sy * 0.26, 0.6), B(mx, my, 0.64), 0.065, trim);
+    add(root, new THREE.CylinderGeometry(0.13, 0.13, 0.2, 16), trim, B(mx, my, 0.66));
+    for (let k = 0; k < 3; k++) {
+      const a = Math.atan2(sy, sx) + ((k - 1) * Math.PI * 2) / 3;
+      strut(B(mx + 0.12 * Math.cos(a), my + 0.12 * Math.sin(a), 0.74), B(mx + GUARD_R * Math.cos(a), my + GUARD_R * Math.sin(a), ROTOR_Z - 0.02), 0.02, trim);
+    }
+    const guard = add(root, new THREE.TorusGeometry(GUARD_R, 0.035, 8, 40), accent, B(mx, my, ROTOR_Z - 0.02));
+    guard.rotation.x = Math.PI / 2;
+  }
+
+  // Landing skids.
   for (const side of [-1, 1]) {
-    const skirt = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.08, 0.04), accent);
-    skirt.position.set(0, 0.42, side * 0.84);
-    root.add(skirt);
-  }
-  const front = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.07, 1.34), accent);
-  front.position.set(1.86, 0.6, 0);
-  root.add(front);
-  const rear = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.08, 1.4), tail);
-  rear.position.set(-1.88, 0.62, 0);
-  root.add(rear);
-
-  // Wheels (axis along Z so rotation.z spins them).
-  const tyre = new THREE.MeshStandardMaterial({ color: '#05070b', roughness: 0.9, metalness: 0.1 });
-  const rimGlow = new THREE.MeshStandardMaterial({ color: '#05080f', emissive: new THREE.Color(c.accent), emissiveIntensity: 2.2 });
-  for (const [name, x, z] of [
-    ['Wheel_FL', 1.12, 0.83],
-    ['Wheel_FR', 1.12, -0.83],
-    ['Wheel_RL', -1.14, 0.83],
-    ['Wheel_RR', -1.14, -0.83],
-  ]) {
-    const wheel = new THREE.Group();
-    wheel.name = name;
-    const t = new THREE.Mesh(new THREE.CylinderGeometry(WHEEL_RADIUS, WHEEL_RADIUS, 0.28, 24), tyre);
-    t.rotation.x = Math.PI / 2;
-    wheel.add(t);
-    const rim = new THREE.Mesh(new THREE.TorusGeometry(0.21, 0.03, 8, 24), rimGlow);
-    rim.position.z = Math.sign(z) * 0.145;
-    wheel.add(rim);
-    const spoke = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.05, 0.02), trim);
-    spoke.position.z = Math.sign(z) * 0.145;
-    wheel.add(spoke);
-    wheel.position.set(x, WHEEL_RADIUS, z);
-    root.add(wheel);
+    const rail = add(root, new THREE.CylinderGeometry(0.04, 0.04, 1.3, 10), trim, B(0, side * 0.42, 0.05));
+    rail.rotation.z = Math.PI / 2;
+    for (const x of [-0.32, 0.32]) strut(B(x, side * 0.42, 0.05), B(x * 0.8, side * 0.3, 0.42), 0.03, trim);
   }
 
-  // Roof-mounted multi-link antenna + AntennaAnchor.
-  const puck = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.2, 0.08, 20), trim);
-  puck.position.set(-0.5, 1.38, 0);
-  root.add(puck);
-  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.03, 0.62, 8), trim);
-  mast.position.set(-0.5, 1.72, 0);
-  root.add(mast);
-  const tip = new THREE.Mesh(new THREE.SphereGeometry(0.07, 14, 10), accent);
-  tip.position.set(-0.5, 2.04, 0);
-  root.add(tip);
+  // ISR camera gimbal under the nose.
+  add(root, new THREE.CylinderGeometry(0.05, 0.05, 0.12, 10), trim, B(0.42, 0, 0.36));
+  add(root, new THREE.SphereGeometry(0.16, 16, 10), trim, B(0.42, 0, 0.27));
+  const lens = add(root, new THREE.CylinderGeometry(0.07, 0.07, 0.04, 16), head, B(0.575, 0, 0.27));
+  lens.rotation.z = Math.PI / 2;
+
+  // Multi-link antenna (Wi-Fi · 5G · LEO) + AntennaAnchor.
+  add(root, new THREE.CylinderGeometry(0.12, 0.14, 0.06, 20), trim, B(-0.2, 0, 0.84));
+  add(root, new THREE.CylinderGeometry(0.016, 0.022, 0.5, 8), trim, B(-0.2, 0, 1.1));
+  add(root, new THREE.SphereGeometry(0.06, 14, 10), accent, B(-0.2, 0, 1.36));
   const anchorObj = new THREE.Object3D();
   anchorObj.name = 'AntennaAnchor';
-  anchorObj.position.set(-0.5, 2.06, 0);
+  anchorObj.position.copy(B(-0.2, 0, 1.38));
   root.add(anchorObj);
+
+  // Rotor pivots (spin about +Y), blades with glowing tips.
+  for (const [name, sx, sy] of MOTORS) {
+    const pivot = new THREE.Group();
+    pivot.name = `Rotor_${name}`;
+    pivot.position.copy(B(sx * ARM_REACH, sy * ARM_REACH, ROTOR_Z));
+    root.add(pivot);
+    const alongX = sx * sy > 0;
+    add(pivot, alongX ? new THREE.BoxGeometry(BLADE_LEN, 0.022, 0.1) : new THREE.BoxGeometry(0.1, 0.022, BLADE_LEN), blade);
+    for (const s of [-1, 1]) {
+      const d = s * (BLADE_LEN / 2 - 0.05);
+      add(pivot, new THREE.BoxGeometry(0.1, 0.024, 0.1), accent, alongX ? new THREE.Vector3(d, 0, 0) : new THREE.Vector3(0, 0, d));
+    }
+    add(pivot, new THREE.CylinderGeometry(0.03, 0.06, 0.06, 12), trim, new THREE.Vector3(0, 0.03, 0));
+  }
   return root;
 }
 
@@ -147,7 +154,7 @@ function makeLabel(kind) {
   el.className = `veh-label ${kind === 'legacy' ? 'lg' : 'fp'}`;
   el.innerHTML = `<div class="name">${kind === 'legacy' ? 'LEGACY OS' : 'FLEXIPATH'}</div><div class="state"></div><div class="sub"></div><div class="bar"><span></span></div>`;
   const obj = new CSS2DObject(el);
-  obj.position.set(0, 3.3, 0);
+  obj.position.set(0, 2.4, 0);
   return { obj, el, state: el.querySelector('.state'), sub: el.querySelector('.sub'), bar: el.querySelector('.bar span'), last: '' };
 }
 
@@ -173,6 +180,14 @@ function makeHalo() {
   return { halo, glow };
 }
 
+/** Faint vertical line from the ground halo up to the drone, so its height reads at a glance. */
+function makeAltitudeLine() {
+  const geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 1, 0)]);
+  const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ color: new THREE.Color('#00F0FF'), transparent: true, opacity: 0.3, depthWrite: false, toneMapped: false }));
+  line.position.y = 0.06;
+  return line;
+}
+
 export class VehicleManager {
   constructor(sceneManager, world) {
     this.sm = sceneManager;
@@ -182,10 +197,11 @@ export class VehicleManager {
     this.sm.scene.add(this.group);
     this.vehicles = {};
     this.usedGLB = {};
+    this.sDock = world.path.sAtX(MOBILITY_DEFAULTS.startX); // route position of the dock pads
   }
 
   async load() {
-    const [fpGLB, lgGLB] = await Promise.all([loadGLB('flexipath_vehicle.glb'), loadGLB('legacy_vehicle.glb')]);
+    const [fpGLB, lgGLB] = await Promise.all([loadGLB('flexipath_drone.glb'), loadGLB('legacy_drone.glb')]);
     this._register('flexipath', fpGLB);
     this._register('legacy', lgGLB);
     return this;
@@ -193,39 +209,42 @@ export class VehicleManager {
 
   _register(id, glb) {
     this.usedGLB[id] = !!glb;
-    const model = glb ?? buildVehicle(id);
-    const holder = new THREE.Group();
-    const body = new THREE.Group(); // shaken / pitched independently of the holder
+    const model = glb ?? buildDrone(id);
+    const holder = new THREE.Group(); // ground point under the drone: halo and altitude line
+    const air = new THREE.Group(); // flight altitude
+    const body = new THREE.Group(); // attitude: pitch, bank, hover bob, stall wobble
     body.add(model);
-    holder.add(body);
+    air.add(body);
+    holder.add(air);
     const { halo, glow } = makeHalo();
-    holder.add(halo, glow);
+    const altLine = makeAltitudeLine();
+    holder.add(halo, glow, altLine);
     const label = makeLabel(id);
-    holder.add(label.obj);
+    air.add(label.obj);
     holder.scale.setScalar(VEHICLE_SCALE);
     this.group.add(holder);
 
-    // Outermost Wheel_* nodes only (a nested match would double-spin).
-    const wheels = [];
+    // Outermost Rotor_* nodes only (a nested match would double-spin); neighbours counter-rotate.
+    const rotors = [];
     model.traverse((o) => {
-      if (!/^Wheel_/i.test(o.name)) return;
+      if (!/^Rotor_/i.test(o.name)) return;
       let p = o.parent;
-      while (p && !/^Wheel_/i.test(p.name)) p = p.parent;
-      if (!p) wheels.push(o);
+      while (p && !/^Rotor_/i.test(p.name)) p = p.parent;
+      if (!p) rotors.push({ obj: o, dir: /FL|RR/i.test(o.name) ? 1 : -1 });
     });
     let anchorObj = model.getObjectByName('AntennaAnchor');
     if (!anchorObj) model.traverse((o) => (anchorObj ??= o.name.startsWith('AntennaAnchor') ? o : undefined));
     if (!anchorObj) {
       anchorObj = new THREE.Object3D();
       anchorObj.name = 'AntennaAnchor';
-      anchorObj.position.set(-0.5, 2.06, 0);
+      anchorObj.position.copy(B(-0.2, 0, 1.38));
       model.add(anchorObj);
     }
     const emissives = collectEmissives(model, 1.0, 0.3); // no boost: body detail must stay readable under bloom
     const tailLights = emissives.filter((m) => m.name === 'TailLight' || /tail|brake/i.test(m.name));
 
     if (id === 'legacy') {
-      // Ghost treatment: slightly translucent so the FlexiPath car reads as the hero.
+      // Ghost treatment: slightly translucent so the FlexiPath drone reads as the hero.
       model.traverse((o) => {
         if (!o.isMesh) return;
         const mats = Array.isArray(o.material) ? o.material : [o.material];
@@ -236,19 +255,40 @@ export class VehicleManager {
       });
     }
 
+    // Motion-blur discs over the spinning blades (added after the ghost pass, which would make them opaque).
+    const discMat = new THREE.MeshBasicMaterial({
+      color: new THREE.Color(PALETTE[id].accent),
+      transparent: true,
+      opacity: 0.05,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      toneMapped: false,
+      side: THREE.DoubleSide,
+    });
+    const discGeo = new THREE.CircleGeometry(GUARD_R - 0.06, 40);
+    discGeo.rotateX(-Math.PI / 2);
+    for (const r of rotors) r.obj.add(new THREE.Mesh(discGeo, discMat));
+
     this.vehicles[id] = {
       id,
       holder,
+      air,
       body,
       model,
-      wheels,
+      rotors,
+      discMat,
+      altLine,
       anchor: anchorObj,
       emissives,
       tailLights,
       halo,
       glow,
       label,
-      wheelAngle: 0,
+      rotorAngle: 0,
+      rotorSpeed: ROTOR_IDLE,
+      pitch: 0,
+      bank: 0,
+      heading: null,
       visible: true,
       baseHalo: new THREE.Color(id === 'legacy' ? '#E11D48' : '#00F0FF'),
     };
@@ -267,11 +307,12 @@ export class VehicleManager {
     return this.vehicles[id].anchor.getWorldPosition(target);
   }
 
+  /** The drone itself (at flight altitude), which the cameras follow. */
   getPosition(id, target) {
-    return target.copy(this.vehicles[id].holder.position);
+    return this.vehicles[id].air.getWorldPosition(target);
   }
 
-  /** " · 59 m behind" once the legacy vehicle has lost ground to interruptions and fail-safe stops. */
+  /** " · 59 m behind" once the legacy drone has lost ground to interruptions and fail-safe stops. */
   _gapText(snapshot) {
     const fp = snapshot.agents.flexipath?.vehicle;
     const lg = snapshot.agents.legacy?.vehicle;
@@ -303,23 +344,38 @@ export class VehicleManager {
       v.holder.position.set(r.x, 0, r.z);
       v.holder.rotation.y = r.heading;
 
-      // Wheels roll with speed.
-      const unitsPerSec = kmh / 3.6 / METERS_PER_UNIT;
-      v.wheelAngle -= (unitsPerSec / (WHEEL_RADIUS * VEHICLE_SCALE)) * dt;
-      for (const w of v.wheels) w.rotation.z = v.wheelAngle;
+      // Altitude: on the dock pad until departure, a climb-out over the first metres of route, then
+      // the corridor height (a scenario that starts further along begins airborne).
+      const alt = CRUISE_ALT * THREE.MathUtils.smoothstep(r.s - this.sDock, 0.2, CLIMB_S);
+      v.air.position.y = alt / VEHICLE_SCALE;
+      const airborne = alt > 0.05;
+
+      // Rotors idle on the pad and spin up for flight.
+      const spin = airborne || kmh > 0.5 ? ROTOR_FLIGHT : ROTOR_IDLE;
+      v.rotorSpeed += (spin - v.rotorSpeed) * Math.min(1, dt * 2.5);
+      v.rotorAngle += v.rotorSpeed * dt;
+      for (const rt of v.rotors) rt.obj.rotation.y = rt.dir * v.rotorAngle;
 
       const stalled = !!d?.stalled;
       const repl = !!d?.replicationActive;
-      const braking = agent.vehicle.failSafe;
+      const failSafe = agent.vehicle.failSafe; // lost-link policy: stop and hover
 
-      // Body motion: gentle suspension, stutter while stalled, nose-dive when braking.
-      const bob = Math.sin(time * 9 + (id === 'legacy' ? 1.3 : 0)) * 0.012 * Math.min(1, kmh / 40);
+      // Attitude: nose down with forward speed, nose up while braking to the fail-safe hover,
+      // banked into turns, a slow hover bob; the stalled legacy drone wobbles.
+      const turn = v.heading === null || dt <= 0 ? 0 : wrapAngle(r.heading - v.heading) / dt;
+      v.heading = r.heading;
+      const k = Math.min(1, dt * 3);
+      const bankTarget = airborne ? THREE.MathUtils.clamp(-turn * 0.5, -0.3, 0.3) : 0;
+      const pitchTarget = !airborne ? 0 : failSafe && kmh > 1 ? 0.2 : -0.13 * Math.min(1, kmh / 90);
+      v.bank += (bankTarget - v.bank) * k;
+      v.pitch += (pitchTarget - v.pitch) * k;
+      const bob = airborne ? Math.sin(time * 2.1 + (id === 'legacy' ? 1.3 : 0)) * 0.06 : 0;
       if (stalled) {
-        v.body.position.set((Math.random() - 0.5) * 0.09, bob + Math.random() * 0.03, (Math.random() - 0.5) * 0.05);
-        v.body.rotation.set((Math.random() - 0.5) * 0.02, 0, (Math.random() - 0.5) * 0.03);
+        v.body.position.set((Math.random() - 0.5) * 0.12, bob + (Math.random() - 0.5) * 0.08, (Math.random() - 0.5) * 0.08);
+        v.body.rotation.set(v.bank + (Math.random() - 0.5) * 0.06, 0, v.pitch + (Math.random() - 0.5) * 0.05);
       } else {
         v.body.position.set(0, bob, 0);
-        v.body.rotation.set(0, 0, braking ? -0.035 : 0);
+        v.body.rotation.set(v.bank, 0, v.pitch);
       }
 
       // Emissive state: stall flash for legacy.
@@ -333,9 +389,12 @@ export class VehicleManager {
           m.emissiveIntensity = m.userData.baseEmissive;
         }
       }
-      for (const m of v.tailLights) if (braking && !flashOn) m.emissiveIntensity = m.userData.baseEmissive * 2.6;
+      // Fail-safe hover: the rear light strobes.
+      for (const m of v.tailLights) if (failSafe && !flashOn) m.emissiveIntensity = m.userData.baseEmissive * (Math.sin(time * 10) > 0 ? 3 : 0.6);
+      v.discMat.opacity = 0.02 + 0.07 * (v.rotorSpeed / ROTOR_FLIGHT);
+      v.discMat.color.copy(stalled && flashOn ? STALL_RED : v.baseHalo);
 
-      // Halo ring under the vehicle.
+      // Halo ring on the ground under the drone, joined to it by the altitude line.
       const hm = v.halo.material;
       const gm = v.glow.material;
       if (stalled) {
@@ -357,6 +416,9 @@ export class VehicleManager {
         gm.opacity = 0.02;
         v.halo.scale.setScalar(1);
       }
+      v.altLine.visible = alt > 0.6;
+      v.altLine.scale.y = Math.max(0.01, v.air.position.y - 0.06);
+      v.altLine.material.color.copy(hm.color);
 
       // Floating label.
       const speed = `${Math.round(kmh)} km/h`;
@@ -367,8 +429,8 @@ export class VehicleManager {
           this._setLabel(v, 'is-stalled', `SIMULATED INTERRUPTION · ${s.total.toFixed(1)} s`, sub, s.elapsed / s.total);
         } else {
           const st = agent.trace?.stage;
-          const sub = braking
-            ? 'fail-safe braking'
+          const sub = failSafe
+            ? 'fail-safe hover · C2 link lost'
             : st === 'FAILED'
               ? 'link failed · still attached'
               : st === 'DEGRADING'

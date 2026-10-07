@@ -3,8 +3,8 @@ FlexiPath — procedural asset generator (Blender 4.x / 5.x, pure bpy + bmesh).
 
 Creates, materials and exports the six glTF-binary assets used by the digital twin:
 
-    flexipath_vehicle.glb   low-poly cyber-vehicle · carbon chassis · glowing cyan cabin · AntennaAnchor
-    legacy_vehicle.glb      identical chassis tinted crimson / burgundy
+    flexipath_drone.glb     X-frame quadcopter · carbon hull · glowing cyan canopy + prop guards · AntennaAnchor
+    legacy_drone.glb        identical airframe tinted crimson / burgundy
     wired_node.glb          pedestal charging / docking dock with emissive slate terminal ring
     wifi_node.glb           utility pole + dual-antenna Wi-Fi 6 access box (neon cyan)
     5g_tower.glb            hexagonal lattice tower + three angled panel antennas (emerald)
@@ -21,8 +21,8 @@ Safety: every asset is built in its own temporary scene and all of its datablock
 after export, so running this inside an open Blender session never touches the user's scenes.
 
 Conventions (Blender Z-up → glTF Y-up is handled by the exporter)
-    vehicles face +X · wheels are empties named Wheel_FL/FR/RL/RR (spin about the lateral axis)
-    roof antenna tip empty: AntennaAnchor · node beam attach point empty: BeamAnchor
+    drones face +X · rotors are empties named Rotor_FL/FR/RL/RR (spin about the vertical axis)
+    antenna tip empty: AntennaAnchor · node beam attach point empty: BeamAnchor
     emissive parts use Principled "Emission Color/Strength" → glTF emissive + KHR_materials_emissive_strength
 """
 
@@ -36,7 +36,7 @@ import bmesh
 import bpy
 from mathutils import Euler, Matrix, Vector
 
-GENERATOR_VERSION = "1.0.0"
+GENERATOR_VERSION = "1.1.0"
 TAU = math.tau
 
 
@@ -130,17 +130,16 @@ def bm_torus(bm, major_r, minor_r, center=(0, 0, 0), rot=None, major=40, minor=1
             bm.faces.new((a, b, c, d))
 
 
-def bm_prism(bm, profile_xz, width, y0=0.0):
-    """Extrude a closed side profile (X forward, Z up) across Y (width)."""
-    hw = width / 2.0
-    left = [bm.verts.new((x, y0 - hw, z)) for x, z in profile_xz]
-    right = [bm.verts.new((x, y0 + hw, z)) for x, z in profile_xz]
-    n = len(profile_xz)
+def bm_slab(bm, outline_xy, z0, z1):
+    """Extrude a closed top-view outline (X forward, Y left) from z0 up to z1."""
+    bottom = [bm.verts.new((x, y, z0)) for x, y in outline_xy]
+    top = [bm.verts.new((x, y, z1)) for x, y in outline_xy]
+    n = len(outline_xy)
     for i in range(n):
         j = (i + 1) % n
-        bm.faces.new((left[i], left[j], right[j], right[i]))
-    bm.faces.new(list(reversed(left)))
-    bm.faces.new(right)
+        bm.faces.new((bottom[i], bottom[j], top[j], top[i]))
+    bm.faces.new(list(reversed(bottom)))
+    bm.faces.new(top)
 
 
 def bm_strut(bm, p0, p1, radius, segments=6):
@@ -333,57 +332,94 @@ class AssetBuilder:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 1 & 2 — vehicles
+# 1 & 2 — drones
 # ─────────────────────────────────────────────────────────────────────────────
-VEHICLE_PALETTES = {
-    "flexipath": dict(body="#0b0f16", trim="#1f2937", accent="#00F0FF", cabin="#00F0FF", cabin_strength=1.1),
-    "legacy": dict(body="#3b0a16", trim="#4c0519", accent="#E11D48", cabin="#FB7185", cabin_strength=0.9),
+DRONE_PALETTES = {
+    "flexipath": dict(body="#0b0f16", trim="#1f2937", accent="#00F0FF", canopy="#00F0FF", canopy_strength=1.1),
+    "legacy": dict(body="#3b0a16", trim="#4c0519", accent="#E11D48", canopy="#FB7185", canopy_strength=0.9),
 }
 
-CHASSIS_PROFILE = [(-1.80, 0.30), (1.72, 0.30), (1.88, 0.50), (1.70, 0.70), (0.72, 0.86),
-                   (-1.25, 0.90), (-1.78, 0.80), (-1.88, 0.50)]
-CABIN_PROFILE = [(0.80, 0.84), (0.18, 1.30), (-0.92, 1.34), (-1.36, 0.90)]
-WHEEL_R = 0.36
+# Top-view outlines (X forward, Y left), extruded upwards. Keep in step with buildDrone() in VehicleManager.js.
+HULL_OUTLINE = [(0.62, 0.0), (0.40, 0.34), (-0.42, 0.36), (-0.62, 0.18), (-0.62, -0.18), (-0.42, -0.36), (0.40, -0.34)]
+CANOPY_OUTLINE = [(0.44, 0.0), (0.27, 0.20), (-0.30, 0.20), (-0.40, 0.0), (-0.30, -0.20), (0.27, -0.20)]
+ARM_REACH = 1.12  # motor centre offset along X and Y (X-frame quad)
+ROTOR_Z = 0.82  # rotor plane above the skids (skids rest on z = 0)
+GUARD_R = 0.70  # prop-guard ring radius (blade tips stay inside it)
+BLADE_LEN = 1.24
+MOTORS = (("FL", 1, 1), ("FR", 1, -1), ("RL", -1, 1), ("RR", -1, -1))
 
 
-def build_vehicle(kind):
-    p = VEHICLE_PALETTES[kind]
-    b = AssetBuilder(kind + "_vehicle")
-    carbon = b.mat("Chassis_" + kind, p["body"], metallic=0.75, roughness=0.32)
+def build_drone(kind):
+    p = DRONE_PALETTES[kind]
+    b = AssetBuilder(kind + "_drone")
+    carbon = b.mat("Hull_" + kind, p["body"], metallic=0.75, roughness=0.32)
     trim = b.mat("Trim_" + kind, p["trim"], metallic=0.6, roughness=0.45)
-    glass = b.mat("CabinGlow_" + kind, "#02060d", metallic=0.3, roughness=0.15, emission=p["cabin"], strength=p["cabin_strength"])
+    glass = b.mat("CanopyGlow_" + kind, "#02060d", metallic=0.3, roughness=0.15, emission=p["canopy"], strength=p["canopy_strength"])
     accent = b.mat("Accent_" + kind, "#05080f", roughness=0.4, emission=p["accent"], strength=2.6)
     head = b.mat("Headlight_" + kind, "#05080f", emission="#E0FDFF", strength=4.0)
     tail = b.mat("TailLight_" + kind, "#05080f", emission="#FF2848", strength=2.4)
-    tyre = b.mat("Tyre", "#05070b", metallic=0.1, roughness=0.9)
+    blade = b.mat("Blade", "#05070b", metallic=0.2, roughness=0.6)
 
-    b.part("Chassis", lambda bm: bm_prism(bm, CHASSIS_PROFILE, 1.64), carbon, bevel=0.035)
-    b.part("Cabin", lambda bm: bm_prism(bm, CABIN_PROFILE, 1.30), glass, bevel=0.03)
+    b.part("Hull", lambda bm: bm_slab(bm, HULL_OUTLINE, 0.41, 0.71), carbon, bevel=0.03)
+    b.part("Canopy", lambda bm: bm_slab(bm, CANOPY_OUTLINE, 0.71, 0.81), glass, bevel=0.02)
 
-    def skirts(bm):
+    def strips(bm):
         for side in (-1, 1):
-            bm_box(bm, (2.6, 0.04, 0.08), (0, side * 0.84, 0.42))
-        bm_box(bm, (0.9, 1.36, 0.02), (1.25, 0, 0.72), rot=(0, -0.16, 0))  # hood light blade
-    b.part("LightBlades", skirts, accent)
-    b.part("Headlights", lambda bm: bm_box(bm, (0.05, 1.34, 0.07), (1.86, 0, 0.60)), head)
-    b.part("TailLights", lambda bm: bm_box(bm, (0.05, 1.40, 0.08), (-1.88, 0, 0.62)), tail)
+            bm_box(bm, (0.8, 0.04, 0.05), (0.0, side * 0.355, 0.5))
+    b.part("LightStrips", strips, accent)
+    b.part("Headlight", lambda bm: bm_box(bm, (0.04, 0.3, 0.06), (0.63, 0, 0.56)), head)
+    b.part("TailLight", lambda bm: bm_box(bm, (0.04, 0.3, 0.06), (-0.63, 0, 0.56)), tail)
 
-    def antenna_body(bm):
-        bm_cyl(bm, 0.20, 0.16, 0.08, (-0.5, 0, 1.38), segments=20)
-        bm_cyl(bm, 0.03, 0.022, 0.62, (-0.5, 0, 1.72), segments=8)
-    b.part("RoofAntenna", antenna_body, trim, smooth=True)
-    b.part("AntennaTip", lambda bm: bm_sphere(bm, 0.07, (-0.5, 0, 2.04), 14, 10), accent, smooth=True)
-    b.empty("AntennaAnchor", (-0.5, 0, 2.06), display="SPHERE", size=0.12)
+    def arms(bm):
+        for _name, sx, sy in MOTORS:
+            mx, my = sx * ARM_REACH, sy * ARM_REACH
+            bm_strut(bm, (sx * 0.34, sy * 0.26, 0.6), (mx, my, 0.64), 0.065, 8)
+            bm_cyl(bm, 0.13, 0.13, 0.2, (mx, my, 0.66), segments=16)  # motor can
+            for k in (0, 1, 2):  # prop-guard struts, pointing away from the hull
+                a = math.atan2(sy, sx) + (k - 1) * TAU / 3
+                bm_strut(bm, (mx + 0.12 * math.cos(a), my + 0.12 * math.sin(a), 0.74),
+                         (mx + GUARD_R * math.cos(a), my + GUARD_R * math.sin(a), ROTOR_Z - 0.02), 0.02, 6)
+    b.part("Arms", arms, trim, smooth=True)
 
-    rot_axle = (math.pi / 2, 0, 0)  # cylinder axis Z → lateral Y
-    for name, x, y in (("FL", 1.12, 0.83), ("FR", 1.12, -0.83), ("RL", -1.14, 0.83), ("RR", -1.14, -0.83)):
-        pivot = b.empty("Wheel_" + name, (x, y, WHEEL_R), display="CIRCLE", size=0.3)
-        side = 1 if y > 0 else -1
-        b.part("Tyre_" + name, lambda bm: bm_cyl(bm, WHEEL_R, WHEEL_R, 0.28, rot=rot_axle, segments=24), tyre,
+    def guards(bm):
+        for _name, sx, sy in MOTORS:
+            bm_torus(bm, GUARD_R, 0.035, (sx * ARM_REACH, sy * ARM_REACH, ROTOR_Z - 0.02), major=40, minor=8)
+    b.part("PropGuards", guards, accent, smooth=True)
+
+    def skids(bm):
+        for side in (-1, 1):
+            bm_cyl(bm, 0.04, 0.04, 1.3, (0.0, side * 0.42, 0.05), rot=(0, math.pi / 2, 0), segments=10)
+            for x in (-0.32, 0.32):
+                bm_strut(bm, (x, side * 0.42, 0.05), (x * 0.8, side * 0.3, 0.42), 0.03, 6)
+    b.part("Skids", skids, trim, smooth=True)
+
+    def gimbal(bm):  # downward ISR camera under the nose
+        bm_cyl(bm, 0.05, 0.05, 0.12, (0.42, 0, 0.36), segments=10)
+        bm_sphere(bm, 0.16, (0.42, 0, 0.27), 16, 10)
+    b.part("Gimbal", gimbal, trim, smooth=True)
+    b.part("GimbalLens", lambda bm: bm_cyl(bm, 0.07, 0.07, 0.04, (0.575, 0, 0.27), rot=(0, math.pi / 2, 0), segments=16),
+           head, smooth=True)
+
+    def antenna_body(bm):  # multi-link antenna (Wi-Fi · 5G · LEO) on the canopy
+        bm_cyl(bm, 0.14, 0.12, 0.06, (-0.2, 0, 0.84), segments=20)
+        bm_cyl(bm, 0.022, 0.016, 0.5, (-0.2, 0, 1.1), segments=8)
+    b.part("Antenna", antenna_body, trim, smooth=True)
+    b.part("AntennaTip", lambda bm: bm_sphere(bm, 0.06, (-0.2, 0, 1.36), 14, 10), accent, smooth=True)
+    b.empty("AntennaAnchor", (-0.2, 0, 1.38), display="SPHERE", size=0.12)
+
+    for name, sx, sy in MOTORS:
+        pivot = b.empty("Rotor_" + name, (sx * ARM_REACH, sy * ARM_REACH, ROTOR_Z), display="CIRCLE", size=0.4)
+        along_x = sx * sy > 0  # alternate the resting blade angle
+        size = (BLADE_LEN, 0.1, 0.022) if along_x else (0.1, BLADE_LEN, 0.022)
+        b.part("Blades_" + name, lambda bm, size=size: bm_box(bm, size), blade, parent=pivot)
+
+        def tips(bm, along_x=along_x):
+            for s in (-1, 1):
+                d = s * (BLADE_LEN / 2 - 0.05)
+                bm_box(bm, (0.1, 0.1, 0.024), (d, 0, 0) if along_x else (0, d, 0))
+        b.part("BladeTips_" + name, tips, accent, parent=pivot)
+        b.part("Spinner_" + name, lambda bm: bm_cyl(bm, 0.06, 0.03, 0.06, (0, 0, 0.03), segments=12), trim,
                parent=pivot, smooth=True)
-        b.part("Rim_" + name, lambda bm: bm_torus(bm, 0.21, 0.03, rot=rot_axle, major=24, minor=6), accent,
-               parent=pivot, location=(0, side * 0.145, 0), smooth=True)
-        b.part("Hub_" + name, lambda bm: bm_box(bm, (0.36, 0.02, 0.05)), trim, parent=pivot, location=(0, side * 0.145, 0))
     return b
 
 
@@ -560,8 +596,8 @@ def build_leo_satellite():
 
 
 ASSETS = [
-    ("flexipath_vehicle.glb", lambda: build_vehicle("flexipath")),
-    ("legacy_vehicle.glb", lambda: build_vehicle("legacy")),
+    ("flexipath_drone.glb", lambda: build_drone("flexipath")),
+    ("legacy_drone.glb", lambda: build_drone("legacy")),
     ("wired_node.glb", build_wired_node),
     ("wifi_node.glb", build_wifi_node),
     ("5g_tower.glb", build_5g_tower),
@@ -582,8 +618,8 @@ def build_showcase(out_dir, files):
     scene = bpy.data.scenes.new(name)
     vl = scene.view_layers[0]
     layout = {
-        "flexipath_vehicle.glb": ((-4.0, -6.0, 0.0), 1.6),
-        "legacy_vehicle.glb": ((-4.0, 0.0, 0.0), 1.6),
+        "flexipath_drone.glb": ((-4.0, -6.0, 0.0), 1.6),
+        "legacy_drone.glb": ((-4.0, 0.0, 0.0), 1.6),
         "wired_node.glb": ((4.0, -9.0, 0.0), 1.4),
         "wifi_node.glb": ((5.5, -3.5, 0.0), 0.7),
         "5g_tower.glb": ((12.0, 3.0, 0.0), 0.3),
@@ -651,9 +687,10 @@ def main():
         "generatedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "conventions": {
             "up": "+Y (glTF)",
-            "vehicleForward": "+X",
-            "anchors": {"vehicles": "AntennaAnchor", "nodes": "BeamAnchor"},
-            "wheels": ["Wheel_FL", "Wheel_FR", "Wheel_RL", "Wheel_RR"],
+            "droneForward": "+X",
+            "anchors": {"drones": "AntennaAnchor", "nodes": "BeamAnchor"},
+            "rotors": ["Rotor_FL", "Rotor_FR", "Rotor_RL", "Rotor_RR"],
+            "rotorAxis": "+Y",
         },
         "assets": report,
     }
