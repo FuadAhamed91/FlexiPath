@@ -120,6 +120,7 @@ export class EnvironmentManager {
         { x: this.world.routeEndX, title: 'ROUTE END', sub: '1.2 KM · X = 240', color: '#f8fafc' },
       ],
       ribbon: (...args) => this._ribbon(...args),
+      renderer: this.sm.renderer,
     });
     this.group.add(this.real);
     this.setLook('real');
