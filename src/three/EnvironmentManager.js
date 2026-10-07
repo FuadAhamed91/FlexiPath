@@ -1,10 +1,12 @@
 /**
- * EnvironmentManager.js — static world dressing.
+ * EnvironmentManager.js — static world dressing, in two looks (`setLook`).
  *
+ * Shared: horizon sky dome (colours per look), star field, zone and dock labels.
+ * `real` (default): the night city and desert built by RealWorld.js.
+ * `twin` (the neon digital twin):
  *   • glowing cyan perspective grid floor (anti-aliased shader, focus glow + scan ring)
- *   • horizon sky dome and star field
  *   • road ribbon with lane markings built from the simulation's route spline
- *   • zone gates with labels, drone dock with a landing pad per drone
+ *   • zone gates, drone dock with a landing pad per drone
  *   • stylised wireframe buildings (urban zones 1–3) and the rural ridge (zone 4)
  */
 import * as THREE from 'three';
@@ -12,6 +14,13 @@ import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { Random } from '../utils/Random.js';
 import { MOBILITY_DEFAULTS } from '../simulation/MobilityModel.js';
 import { ENGINES } from '../simulation/SimulationEngine.js';
+import { buildRealWorld } from './RealWorld.js';
+
+/** Sky dome colours per look (the realistic night has a warm light-pollution glow on the horizon). */
+const SKY = {
+  twin: { top: '#010309', horizon: '#071329', glow: '#0e7490', stars: 0.85 },
+  real: { top: '#02040a', horizon: '#121a2b', glow: '#4a3a28', stars: 0.75 },
+};
 
 const GRID_VERT = /* glsl */ `
   #include <common>
@@ -87,7 +96,11 @@ export class EnvironmentManager {
     this.group.name = 'Environment';
     this.sm.scene.add(this.group);
     this.rng = new Random('flexipath-city');
+    this.twin = new THREE.Group(); // neon digital-twin world (the `twin` look)
+    this.twin.name = 'TwinWorld';
+    this.group.add(this.twin);
 
+    // Shared by both looks: sky dome, stars and the zone labels; everything else is per look.
     this._buildSky();
     this._buildStars();
     this._buildGround();
@@ -96,6 +109,32 @@ export class EnvironmentManager {
     this._buildZoneGates();
     this._buildCity();
     this._buildRidge();
+
+    const zones = this.world.zones;
+    this.real = buildRealWorld({
+      world: this.world,
+      boxes: this.cityBoxes,
+      pads: this.padFrames,
+      gates: [
+        ...zones.slice(1).map((z) => ({ x: z.x0, title: `ZONE ${z.id}`, sub: z.name.toUpperCase(), color: z.color })),
+        { x: this.world.routeEndX, title: 'ROUTE END', sub: '1.2 KM · X = 240', color: '#f8fafc' },
+      ],
+      ribbon: (...args) => this._ribbon(...args),
+    });
+    this.group.add(this.real);
+    this.setLook('real');
+  }
+
+  /** `real`: the night city and desert (RealWorld.js); `twin`: the original neon digital twin. */
+  setLook(look) {
+    const real = look === 'real';
+    this.twin.visible = !real;
+    this.real.visible = real;
+    const sky = real ? SKY.real : SKY.twin;
+    this.skyUniforms.uTop.value.set(sky.top);
+    this.skyUniforms.uHorizon.value.set(sky.horizon);
+    this.skyUniforms.uGlow.value.set(sky.glow);
+    this.stars.material.opacity = sky.stars;
   }
 
   _buildSky() {
@@ -106,11 +145,12 @@ export class EnvironmentManager {
       depthWrite: false,
       fog: false,
       uniforms: {
-        uTop: { value: new THREE.Color('#010309') },
-        uHorizon: { value: new THREE.Color('#071329') },
-        uGlow: { value: new THREE.Color('#0e7490') },
+        uTop: { value: new THREE.Color(SKY.twin.top) },
+        uHorizon: { value: new THREE.Color(SKY.twin.horizon) },
+        uGlow: { value: new THREE.Color(SKY.twin.glow) },
       },
     });
+    this.skyUniforms = mat.uniforms;
     const sky = new THREE.Mesh(new THREE.SphereGeometry(1400, 32, 16), mat);
     sky.position.set(120, 0, 0);
     sky.renderOrder = -10;
@@ -139,6 +179,7 @@ export class EnvironmentManager {
       geo,
       new THREE.PointsMaterial({ size: 2.2, sizeAttenuation: false, vertexColors: true, fog: false, transparent: true, opacity: 0.85 }),
     );
+    this.stars = stars;
     this.group.add(stars);
   }
 
@@ -161,7 +202,7 @@ export class EnvironmentManager {
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(1600, 900), mat);
     ground.rotation.x = -Math.PI / 2;
     ground.position.set(120, -0.02, -60);
-    this.group.add(ground);
+    this.twin.add(ground);
   }
 
   _ribbon(points, halfWidth, y, material) {
@@ -195,13 +236,13 @@ export class EnvironmentManager {
     const line = path.polyline(1);
     const asphalt = new THREE.MeshStandardMaterial({ color: '#070d1a', roughness: 0.85, metalness: 0.2 });
     const road = this._ribbon(line, 7.6, 0.01, asphalt);
-    this.group.add(road);
+    this.twin.add(road);
 
     // Edge lines (emissive cyan) and centre dashes.
     const edgeMat = new THREE.MeshBasicMaterial({ color: new THREE.Color('#22d3ee').multiplyScalar(1.1), toneMapped: false });
     for (const lateral of [-7.2, 7.2]) {
       const pts = path.polyline(1, lateral);
-      this.group.add(this._ribbon(pts, 0.09, 0.03, edgeMat));
+      this.twin.add(this._ribbon(pts, 0.09, 0.03, edgeMat));
     }
     const dashMat = new THREE.MeshBasicMaterial({ color: new THREE.Color('#94a3b8').multiplyScalar(0.9), toneMapped: false });
     const dashGeo = [];
@@ -209,7 +250,7 @@ export class EnvironmentManager {
       const seg = [path.frameAt(s), path.frameAt(Math.min(path.length, s + 3))];
       dashGeo.push(this._ribbon(seg, 0.1, 0.03, dashMat).geometry);
     }
-    this.group.add(new THREE.Mesh(mergeGeometries(dashGeo), dashMat));
+    this.twin.add(new THREE.Mesh(mergeGeometries(dashGeo), dashMat));
   }
 
   _buildDepot() {
@@ -220,14 +261,14 @@ export class EnvironmentManager {
     );
     pad.rotation.x = -Math.PI / 2;
     pad.position.set(-1, 0.035, 0);
-    this.group.add(pad);
+    this.twin.add(pad);
     const frame = new THREE.LineSegments(
       new THREE.EdgesGeometry(new THREE.PlaneGeometry(14, 16)),
       new THREE.LineBasicMaterial({ color: new THREE.Color('#3b82f6').multiplyScalar(1.8), toneMapped: false }),
     );
     frame.rotation.x = -Math.PI / 2;
     frame.position.set(-1, 0.04, 0);
-    this.group.add(frame);
+    this.twin.add(frame);
 
     const path = this.world.path;
     const sDock = path.sAtX(MOBILITY_DEFAULTS.startX);
@@ -243,8 +284,8 @@ export class EnvironmentManager {
       geo.rotateX(-Math.PI / 2);
       return new THREE.Mesh(geo, padMat);
     };
-    for (const id of ['flexipath', 'legacy']) {
-      const f = path.frameAt(sDock, ENGINES[id].laneOffset);
+    this.padFrames = ['flexipath', 'legacy'].map((id) => path.frameAt(sDock, ENGINES[id].laneOffset));
+    for (const f of this.padFrames) {
       const pad = new THREE.Group();
       pad.position.set(f.x, 0.045, f.z);
       pad.rotation.y = f.heading;
@@ -258,7 +299,7 @@ export class EnvironmentManager {
         bar.position.set(x, 0, z);
         pad.add(bar);
       }
-      this.group.add(pad);
+      this.twin.add(pad);
     }
     this._label('DRONE DOCK · ETH', 'Zone 1 start', '#3b82f6', new THREE.Vector3(-1, 0.2, 9.5));
   }
@@ -301,7 +342,7 @@ export class EnvironmentManager {
       gate.add(floor);
       gate.position.set(f.x, 0, f.z);
       gate.rotation.y = f.heading;
-      this.group.add(gate);
+      this.twin.add(gate);
       if (g.zone) {
         this._label(`ZONE ${g.zone.id}`, g.zone.name.toUpperCase(), g.zone.color, new THREE.Vector3(f.x, 9.2, f.z));
       } else {
@@ -337,6 +378,7 @@ export class EnvironmentManager {
       }
     }
 
+    this.cityBoxes = boxes; // the realistic look builds solid buildings on the same plots
     const count = boxes.length;
     const fillMat = new THREE.MeshStandardMaterial({
       color: '#0a1428',
@@ -357,7 +399,7 @@ export class EnvironmentManager {
         edges.push(b.x + edgeTemplate[k] * b.w, b.h / 2 + edgeTemplate[k + 1] * b.h, b.z + edgeTemplate[k + 2] * b.d);
       }
     });
-    this.group.add(inst);
+    this.twin.add(inst);
 
     const edgeGeo = new THREE.BufferGeometry();
     edgeGeo.setAttribute('position', new THREE.Float32BufferAttribute(edges, 3));
@@ -366,7 +408,7 @@ export class EnvironmentManager {
       transparent: true,
       opacity: 0.55,
     });
-    this.group.add(new THREE.LineSegments(edgeGeo, edgeMat));
+    this.twin.add(new THREE.LineSegments(edgeGeo, edgeMat));
 
     // Rooftop aviation beacons on the tallest towers.
     const tall = boxes.filter((b) => b.h > 18);
@@ -378,7 +420,7 @@ export class EnvironmentManager {
       beaconGeo,
       new THREE.PointsMaterial({ color: new THREE.Color('#ff2d55').multiplyScalar(2), size: 0.9, toneMapped: false }),
     );
-    this.group.add(this.beacons);
+    this.twin.add(this.beacons);
   }
 
   _buildRidge() {
@@ -405,7 +447,7 @@ export class EnvironmentManager {
     );
     ridge.rotation.x = -Math.PI / 2;
     ridge.position.set(215, 0, -44);
-    this.group.add(ridge);
+    this.twin.add(ridge);
     this._label('RIDGE SHADOW', '5G DIFFRACTION LOSS', '#f59e0b', new THREE.Vector3(200, 26, -52));
   }
 

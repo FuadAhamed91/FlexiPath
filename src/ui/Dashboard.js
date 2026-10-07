@@ -39,6 +39,7 @@ import {
   Download,
   Repeat,
   Box,
+  Building2,
   CircleHelp,
   Maximize2,
   Minimize2,
@@ -109,6 +110,7 @@ const ICONS = {
   Download,
   Repeat,
   Box,
+  Building2,
   CircleHelp,
   Maximize2,
   Minimize2,
@@ -151,7 +153,7 @@ export class Dashboard {
   constructor(root, engine, { mode = 'mission' } = {}) {
     this.root = root;
     this.engine = engine;
-    this.view = { focus: 'flexipath', showGhost: true, camera: 'chase', theatre: false, mode };
+    this.view = { focus: 'flexipath', showGhost: true, camera: 'chase', theatre: false, look: 'real', mode };
     this.hooks = {};
     this.replBands = [];
     this.stallBands = [];
@@ -309,6 +311,7 @@ export class Dashboard {
               <button type="button" class="px-2.5" data-cam="cinematic" aria-pressed="false"><i data-lucide="video"></i>Cinematic</button>
               <button type="button" class="px-2.5" data-cam="overview" aria-pressed="false"><i data-lucide="map"></i>Overview</button>
             </div>
+            <button type="button" class="btn overlay-glass h-[36px]!" data-ref="look" aria-label="Switch between the realistic and the neon digital-twin look (L)" title="Realistic night / neon digital twin (L)"></button>
             <button type="button" class="btn overlay-glass h-[36px]!" data-ref="theatre" aria-label="Theatre mode (T)" title="Theatre mode (T)"><i data-lucide="maximize-2"></i></button>
             <button type="button" class="btn overlay-glass h-[36px]!" data-ref="help" aria-label="Why FlexiPath, help and shortcuts" title="Why FlexiPath? · shortcuts (I)"><i data-lucide="circle-help"></i></button>
           </div>
@@ -416,6 +419,7 @@ export class Dashboard {
     this.refs.play.addEventListener('click', () => this.togglePause());
     this.refs.help.addEventListener('click', () => this.openInfo());
     this.refs.theatre.addEventListener('click', () => this.setTheatre(!this.view.theatre));
+    this.refs.look.addEventListener('click', () => this.setLook(this.view.look === 'real' ? 'twin' : 'real'));
     this.refs.modal.addEventListener('click', (e) => {
       if (e.target === this.refs.modal) this.closeModal();
     });
@@ -467,6 +471,7 @@ export class Dashboard {
         },
         v: () => this.setGhost(!this.view.showGhost),
         t: () => this.setTheatre(!this.view.theatre),
+        l: () => this.setLook(this.view.look === 'real' ? 'twin' : 'real'),
         m: () => this.setMode(this.view.mode === 'mission' ? 'advanced' : 'mission'),
         d: () => this.startDemo(),
         x: () => this.openExperiments(),
@@ -755,6 +760,16 @@ export class Dashboard {
     renderIcons(this.refs.theatre);
     this.dirty = true;
     if (!on) this._chartDirty = true;
+  }
+
+  /** World look: 'real' (night city and desert) or 'twin' (the neon digital twin). The network layer is the same in both. */
+  setLook(look, { quiet = false } = {}) {
+    this.view.look = look;
+    const real = look === 'real';
+    this.refs.look.innerHTML = `<i data-lucide="${real ? 'building-2' : 'box'}"></i>${real ? 'Real' : 'Twin'}`;
+    renderIcons(this.refs.look);
+    this.hooks.onLook?.(look);
+    if (!quiet) this.toast(real ? 'Look: realistic night · L for the neon twin' : 'Look: neon digital twin · L for the realistic night');
   }
 
   setCamera(mode) {
