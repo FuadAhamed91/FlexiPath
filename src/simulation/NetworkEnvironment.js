@@ -4,13 +4,13 @@
  *
  * All received-signal figures are mean (large-scale) values: deterministic path
  * loss plus a spatially correlated log-normal shadowing field. Small-scale fast
- * fading is added per vehicle in LinkModel.
+ * fading is added per drone in LinkModel.
  *
  *   Wi-Fi 6  : Friis R² free-space loss + linear clutter excess loss (dB/unit)
- *   5G SA    : log-distance (n = 3.8) + urban-canyon shadow near the depot
+ *   5G SA    : log-distance (n = 3.8) + urban-canyon shadow near the dock
  *              + terrain diffraction loss behind the rural ridge (zone 4)
  *   LEO sat  : SNR driven by elevation angle to the serving satellite
- *   Wired    : carrier present only while the vehicle sits on the depot dock
+ *   Wired    : carrier present only while the drone sits on its dock
  */
 import { Random, ValueNoise1D } from '../utils/Random.js';
 import { smoothstep } from '../utils/Metrics.js';
@@ -20,7 +20,7 @@ export const ZONES = [
   {
     id: 1,
     key: 'depot',
-    name: 'Depot · Urban Wi-Fi',
+    name: 'Dock · Urban Wi-Fi',
     x0: 0,
     x1: 40,
     color: '#00F0FF',
@@ -95,7 +95,7 @@ export const NODE_LAYOUT = {
 };
 
 export const RF = {
-  dock: { releaseX: 2.7 }, // pogo-pin dock contact ends 1.2 units after the parking spot
+  dock: { releaseX: 2.7 }, // pogo-pin dock contact ends 1.2 units after the docking position
   wifi: { p1: -22.8, clutterDbPerUnit: 0.62, clutterFree: 25, noiseFloor: -95, shadowStd: 1.8, assocFloor: -92 },
   cell: {
     p1: -11.65,
@@ -219,7 +219,7 @@ export class NetworkEnvironment {
   }
 
   /**
-   * Large-scale signal for one interface at the vehicle antenna.
+   * Large-scale signal for one interface at the drone antenna.
    * @param {string} id interface id
    * @param {{x:number,y:number,z:number}} pos centre-line antenna position
    * @param {{docked?: boolean}} vehicle kinematic context

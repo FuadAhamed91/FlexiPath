@@ -34,7 +34,7 @@ export const VERSION = '1.2.0';
 export const TICK_HZ = 10;
 export const DT = 1 / TICK_HZ;
 export const ANCHOR_IP = RELAY_PARAMS.anchorIp;
-export const FAILSAFE_OUTAGE_S = 0.3; // teleop policy: brake if critical telemetry is silent > 300 ms
+export const FAILSAFE_OUTAGE_S = 0.3; // lost-link policy: hover if critical (C2) telemetry is silent > 300 ms
 export const MOS_THRESHOLD = 3.6;
 
 export const ENGINES = {
@@ -234,7 +234,7 @@ export class SimulationEngine {
       engine: 'sys',
       level: 'info',
       code: 'POLICY',
-      message: `Fail-safe braking on critical-link loss ${on ? 'ENABLED' : 'DISABLED'}`,
+      message: `Fail-safe hover on C2-link loss ${on ? 'ENABLED' : 'DISABLED'}`,
     });
   }
 
@@ -272,7 +272,7 @@ export class SimulationEngine {
     if (this.completed) return this.snapshot;
     const t = this.tick * DT;
 
-    // Scenario-scheduled faults trigger on the FlexiPath vehicle's position (shared environment).
+    // Scenario-scheduled faults trigger on the FlexiPath drone's position (shared environment).
     if (this.pendingFaults.length) {
       const x = this.agents.flexipath.mobility.state.cx;
       for (let i = this.pendingFaults.length - 1; i >= 0; i--) {
@@ -314,8 +314,8 @@ export class SimulationEngine {
   _context(mob, mobility) {
     const docked = mob.cx < RF.dock.releaseX;
     const dockRelease = docked && mob.speedMps > 0.15;
-    // Time to the end of the dock from the vehicle's own speed plan (accelerating to cruise), not a
-    // constant-speed guess: right after departure the vehicle is still slow.
+    // Time to the end of the dock from the drone's own speed plan (accelerating to cruise), not a
+    // constant-speed guess: right after departure the drone is still slow.
     const dockTtf = dockRelease
       ? timeToCover((RF.dock.releaseX - mob.cx) * METERS_PER_UNIT, mob.speedMps, mobility?.opts.accel ?? 0, mobility?.targetMps ?? mob.speedMps)
       : Infinity;
@@ -337,7 +337,7 @@ export class SimulationEngine {
       agentEvents.push({
         level: 'crit',
         code: 'FAILSAFE',
-        message: `Critical telemetry silent > ${FAILSAFE_OUTAGE_S * 1000} ms → minimal-risk manoeuvre (braking)`,
+        message: `C2 telemetry silent > ${FAILSAFE_OUTAGE_S * 1000} ms → minimal-risk manoeuvre (hover)`,
       });
     }
 

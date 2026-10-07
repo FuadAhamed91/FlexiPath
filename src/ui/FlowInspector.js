@@ -46,7 +46,7 @@ export class FlowInspector {
             <div class="min-w-0">
               <div class="flex items-center gap-1.5">
                 <span class="${cls}">${text}</span>
-                <span class="font-mono text-[11px] font-semibold text-slate-100">${f.id}</span>
+                <span class="font-mono text-[11px] font-semibold text-slate-100">${f.tag ?? f.id}</span>
               </div>
               <div class="mt-0.5 truncate text-[10px] text-slate-500">${f.label}</div>
             </div>

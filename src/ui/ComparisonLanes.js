@@ -87,7 +87,7 @@ export class ComparisonLanes {
       const prim = snapshot.agents.flexipath.decision?.primary;
       return {
         what: prim ? `on ${linkName(prim)} · monitoring` : 'no path',
-        steps: ['Degradation predicted', 'Next path warm-validated', 'Burst replication', 'Path failed', 'Next path primary', 'Vehicle continues'].map((t1) => ({ t1, t2: 'waiting', state: '', color: C.neutral })),
+        steps: ['Degradation predicted', 'Next path warm-validated', 'Burst replication', 'Path failed', 'Next path primary', 'Drone continues'].map((t1) => ({ t1, t2: 'waiting', state: '', color: C.neutral })),
       };
     }
     const S = ep.stages;
@@ -113,7 +113,7 @@ export class ComparisonLanes {
     push(`${to} primary`, S.SWITCH, C.switch, {
       t2: S.SWITCH !== null ? `${at(S.SWITCH, ref)}${ep.switchKind === 'failover' ? ` · ${ep.blackoutMs} ms gap` : ' · 0 ms gap'}` : '',
     });
-    push('Vehicle continues', S.CONTINUE, C.ok, {
+    push('Drone continues', S.CONTINUE, C.ok, {
       t2: S.CONTINUE !== null ? `${ep.interruptionS.toFixed(2)} s interruption · ${ep.lostCritical + ep.lostRealtime} pkts lost` : '',
     });
 
@@ -152,7 +152,7 @@ export class ComparisonLanes {
       steps.push({ t1: `${name} degrading`, t2: `${at(tr.degradingT, ref)} · no prediction`, t: tr.degradingT, color: C.degrade });
       steps.push({ t1: `${name} failed`, t2: tr.failedT !== null ? `${at(tr.failedT, ref)} · still on it` : 'not yet', t: tr.failedT, color: C.fail, alarm: true });
       steps.push({ t1: 'CONNECTION INTERRUPTED', t2: `waits for the ${name} floor`, t: null, color: C.fail, alarm: true });
-      steps.push({ t1: 'Vehicle stopping', t2: '', t: null, color: C.fail });
+      steps.push({ t1: 'Drone hovering', t2: '', t: null, color: C.fail });
       steps.push({ t1: 'Recovered', t2: '', t: null, color: C.switch });
     } else if (src) {
       live = src === ep;
@@ -177,7 +177,7 @@ export class ComparisonLanes {
         alarm: true,
         title: src.notes?.INTERRUPTED ?? '',
       });
-      steps.push({ t1: 'Vehicle stopping', t2: S.STOPPING !== null ? `${at(S.STOPPING, ref)} · fail-safe` : live ? '' : 'no fail-safe stop', t: S.STOPPING, color: C.fail });
+      steps.push({ t1: 'Drone hovering', t2: S.STOPPING !== null ? `${at(S.STOPPING, ref)} · fail-safe` : live ? '' : 'no fail-safe hover', t: S.STOPPING, color: C.fail });
       steps.push({
         t1: `Recovered on ${to}`,
         t2: S.RECOVERED !== null ? `${at(S.RECOVERED, ref)} · after ${src.interruptionS.toFixed(1)} s` : live ? `${src.interruptionS.toFixed(1)} s so far` : '',
@@ -187,7 +187,7 @@ export class ComparisonLanes {
     } else {
       const name = linkName(lg.decision?.primary);
       what = `on ${name} · connected`;
-      for (const t1 of ['Path degrading', 'Path failed', 'CONNECTION INTERRUPTED', 'Vehicle stopping', 'Recovered']) steps.push({ t1, t2: 'waiting', t: null, color: C.neutral });
+      for (const t1 of ['Path degrading', 'Path failed', 'CONNECTION INTERRUPTED', 'Drone hovering', 'Recovered']) steps.push({ t1, t2: 'waiting', t: null, color: C.neutral });
     }
 
     let latest = -1;

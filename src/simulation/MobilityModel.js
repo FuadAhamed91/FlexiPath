@@ -1,5 +1,5 @@
 /**
- * MobilityModel.js — spline trajectory + longitudinal vehicle kinematics.
+ * MobilityModel.js — spline trajectory + longitudinal drone kinematics.
  *
  * Pure maths (no Three.js). The route is a uniform Catmull-Rom spline through
  * control points in the XZ plane, re-sampled to a constant arc-length table so
@@ -12,7 +12,7 @@ import { clamp } from '../utils/Metrics.js';
 
 export const METERS_PER_UNIT = 5;
 export const ROUTE_END_X = 240;
-export const ANTENNA_HEIGHT = 2.2; // roof antenna height used for RF geometry (units)
+export const ANTENNA_HEIGHT = 2.2; // antenna height used for RF geometry (units); the twin's flight altitude is visual only
 
 /** Gentle S-curves; X is strictly increasing so X ↔ s is a bijection. */
 export const DEFAULT_ROUTE = [
@@ -152,7 +152,7 @@ export class RoutePath {
     return (lo + f) * this.step;
   }
 
-  /** Down-sampled polyline for rendering (road ribbon, lane markings). */
+  /** Down-sampled polyline for rendering (route ribbon and markings). */
   polyline(spacing = 1, lateral = 0) {
     const out = [];
     for (let s = 0; s <= this.length; s += spacing) out.push(this.frameAt(s, lateral));
@@ -161,11 +161,11 @@ export class RoutePath {
 }
 
 export const MOBILITY_DEFAULTS = {
-  startX: 1.5, // parked at the depot dock
+  startX: 1.5, // docked at the drone dock
   departureDelay: 2.0, // s of dwell on the wired dock before departure
   accel: 2.6, // m/s² comfortable acceleration
-  brake: 3.5, // m/s² service braking (speed-slider decrease)
-  failSafeDecel: 7.0, // m/s² minimal-risk manoeuvre when critical telemetry is lost
+  brake: 3.5, // m/s² normal deceleration (speed-slider decrease)
+  failSafeDecel: 7.0, // m/s² minimal-risk manoeuvre (stop and hover) when C2 telemetry is lost
   endBrake: 6.0, // m/s² stop after the route end
 };
 
