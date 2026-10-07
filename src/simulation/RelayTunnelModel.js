@@ -1,7 +1,7 @@
 /**
  * RelayTunnelModel.js — carrier transparency and session persistence.
  *
- * FlexiPath carries every flow inside a userspace UDP tunnel to an anchor relay. The vehicle's
+ * FlexiPath carries every flow inside a userspace UDP tunnel to an anchor relay. The drone's
  * physical address changes with the network it uses (private Wi-Fi DHCP, carrier CGNAT, LEO CGNAT)
  * and carrier NATs rebind ports when a mapping idles out. The relay re-learns the outer address from
  * the authenticated tunnel packets themselves (no handshake), so remote services only ever see the
@@ -20,13 +20,13 @@ export const RELAY_PARAMS = {
 };
 
 const POOLS = {
-  eth0: { label: 'depot LAN · DHCP', kind: 'private', make: (r) => `10.42.0.${r.int(10, 240)}` },
+  eth0: { label: 'dock LAN · DHCP', kind: 'private', make: (r) => `10.42.0.${r.int(10, 240)}` },
   wlan0: { label: 'Wi-Fi AP · private DHCP', kind: 'private', make: (r) => `192.168.1.${r.int(100, 199)}` },
   wwan0: { label: '5G carrier · CGNAT', kind: 'cgnat', make: (r) => `100.84.${r.int(1, 254)}.${r.int(2, 254)}` },
   sat0: { label: 'LEO operator · CGNAT', kind: 'cgnat', make: (r) => `100.112.${r.int(1, 254)}.${r.int(2, 254)}` },
 };
 
-// First lease of each interface, fixed per vehicle so the demo reads the same every run.
+// First lease of each interface, fixed per drone so the demo reads the same every run.
 export const FIRST_LEASE = {
   flexipath: { eth0: '10.42.0.17', wlan0: '192.168.1.104', wwan0: '100.84.12.9', sat0: '100.112.47.3' },
   legacy: { eth0: '10.42.0.18', wlan0: '192.168.1.117', wwan0: '100.84.31.77', sat0: '100.112.9.201' },

@@ -74,7 +74,7 @@ async function boot() {
   dashboard.hooks.onBeforeReset = () => particles.clear();
   dashboard.setCamera(params.camera);
 
-  // A scenario may start anywhere on the route: snap the chase camera to the vehicles on reset.
+  // A scenario may start anywhere on the route: snap the chase camera to the drones on reset.
   let snapCamera = true;
   engine.on('reset', () => {
     snapCamera = true;
@@ -83,9 +83,9 @@ async function boot() {
   const focusPos = new THREE.Vector3();
   const otherPos = new THREE.Vector3();
   const ndc = new THREE.Vector3();
-  const LEGACY_STATE = { INTERRUPTED: 'SIMULATED INTERRUPTION', STOPPING: 'SIMULATED INTERRUPTION · stopping', RECOVERED: 'recovering', FAILED: 'on a failed link', DEGRADING: 'link degrading' };
+  const LEGACY_STATE = { INTERRUPTED: 'SIMULATED INTERRUPTION', STOPPING: 'SIMULATED INTERRUPTION · hovering', RECOVERED: 'recovering', FAILED: 'on a failed link', DEGRADING: 'link degrading' };
 
-  /** Edge marker for the comparison vehicle when it is outside the camera frame. */
+  /** Edge marker for the comparison drone when it is outside the camera frame. */
   const updateOffscreen = (snapshot, focus, other, showGhost) => {
     if (!showGhost || dashboard.view.camera === 'overview') return dashboard.updateOffscreen({ visible: false });
     vehicles.getPosition(other, ndc);

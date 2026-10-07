@@ -125,7 +125,7 @@ Both baselines share the legacy stack's measurements, attach thresholds and inte
 - A Linux-like 250 ms RTO (RFC 6298 recommends a 1 s minimum).
 - Perfect anchoring, with no MPTCP fallback and no `MP_JOIN` handshake time.
 
-**Pairing.** All four stacks drive the same route, seed, RF field and fault timing in one engine. Each agent has its own random streams, so adding the baselines leaves the FlexiPath and Legacy results byte-identical.
+**Pairing.** All four stacks fly the same route, seed, RF field and fault timing in one engine. Each agent has its own random streams, so adding the baselines leaves the FlexiPath and Legacy results byte-identical.
 
 ## Results (criterion 04)
 
@@ -167,7 +167,7 @@ Paired differences have 95 % confidence intervals, over 20 pairs per scenario:
    - cuts bulk head-of-line peaks 3–5× in A–C and 1.4× in D;
    - acts 1.3–4.6 s **before** the failure instead of 0.3–0.5 s after.
 
-   It also shrinks the gap of the one unpredictable outage in D from 0.35 s to 0.16 s. That is inside the 300 ms fail-safe budget; the reactive stack's gap exceeds it, which triggers braking. The price is about 0.1 W (≈ 9 %) more radio power, for the warm probe and the 400 ms burst.
+   It also shrinks the gap of the one unpredictable outage in D from 0.35 s to 0.16 s. That is inside the 300 ms fail-safe budget; the reactive stack's gap exceeds it, which triggers the fail-safe hover. The price is about 0.1 W (≈ 9 %) more radio power, for the warm probe and the 400 ms burst.
 3. **Permanent duplication is the most reliable, and the most expensive.** Always duplicate delivers 99.0–100 % with no gaps. It costs 2.65–3.39 W (2.1–2.6× FlexiPath) and duplicates 49–100 % of protected bytes, against FlexiPath's 0.9–1.4 %. FlexiPath keeps 98–99 % of protected packets at less than half of that power.
 
 FlexiPath sits between the two existing designs: near-redundant reliability at near-reactive cost.

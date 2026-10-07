@@ -1,34 +1,35 @@
 {
   "generator": "blender/generate_all_models.py",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "blender": "5.2.2 LTS",
-  "generatedAt": "2026-10-01T06:28:42Z",
+  "generatedAt": "2026-10-07T17:42:06Z",
   "conventions": {
     "up": "+Y (glTF)",
-    "vehicleForward": "+X",
+    "droneForward": "+X",
     "anchors": {
-      "vehicles": "AntennaAnchor",
+      "drones": "AntennaAnchor",
       "nodes": "BeamAnchor"
     },
-    "wheels": [
-      "Wheel_FL",
-      "Wheel_FR",
-      "Wheel_RL",
-      "Wheel_RR"
-    ]
+    "rotors": [
+      "Rotor_FL",
+      "Rotor_FR",
+      "Rotor_RL",
+      "Rotor_RR"
+    ],
+    "rotorAxis": "+Y"
   },
   "assets": [
     {
-      "file": "flexipath_vehicle.glb",
-      "bytes": 64632,
-      "faces": 1066,
-      "objects": 25
+      "file": "flexipath_drone.glb",
+      "bytes": 121448,
+      "faces": 2191,
+      "objects": 30
     },
     {
-      "file": "legacy_vehicle.glb",
-      "bytes": 64576,
-      "faces": 1066,
-      "objects": 25
+      "file": "legacy_drone.glb",
+      "bytes": 121392,
+      "faces": 2191,
+      "objects": 30
     },
     {
       "file": "wired_node.glb",

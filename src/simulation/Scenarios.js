@@ -1,11 +1,11 @@
 /**
  * Scenarios.js — controlled experiments shared by the live twin and the batch runner.
  *
- * A scenario fixes the route segment, the scheduled faults (triggered by the FlexiPath vehicle's X
+ * A scenario fixes the route segment, the scheduled faults (triggered by the FlexiPath drone's X
  * position) and the traffic mix. Both engines always run it *together*: same seed, same RF field,
  * same fault timing — every FlexiPath / Legacy comparison is paired by construction.
  *
- * Route X: 0 → 240 scene units (1 unit = 5 m). Zones: 1 depot/Wi-Fi 0–40 · 2 corridor 40–90 ·
+ * Route X: 0 → 240 scene units (1 unit = 5 m). Zones: 1 dock/Wi-Fi 0–40 · 2 corridor 40–90 ·
  * 3 5G core 90–160 · 4 rural/LEO 160–240.
  */
 
@@ -15,7 +15,7 @@ export const SCENARIOS = {
   mission: {
     id: 'mission',
     code: '·',
-    label: 'Full mission · depot → LEO',
+    label: 'Full mission · dock → LEO',
     description: 'Wired dock → Wi-Fi → 5G → LEO across all four zones. Inject faults by hand.',
     startX: 1.5,
     endX: 240,
@@ -85,7 +85,7 @@ export const SCENARIOS = {
     faults: [],
     traffic: 'bulk',
   },
-  // Guided demo: scenario A, cut shortly after the legacy vehicle recovers.
+  // Guided demo: scenario A, cut shortly after the legacy drone recovers.
   demo: {
     id: 'demo',
     code: 'A',
@@ -103,7 +103,7 @@ export const SCENARIOS = {
     id: 'baseline',
     code: '0',
     legacyMatrix: true,
-    label: 'Baseline drive (4 zones)',
+    label: 'Baseline flight (4 zones)',
     description: 'Same route as the full mission, no faults.',
     startX: 1.5,
     endX: 240,

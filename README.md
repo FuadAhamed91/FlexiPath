@@ -11,6 +11,13 @@ FlexiPath side by side with a **legacy break-before-make baseline** under identi
 decision HUD, controlled experiments, and a Blender pipeline that generates every 3D asset. No real-world
 measurements are included; every number below is a *measured simulation result* unless marked as a model parameter.
 
+**The scenario.** Two identical drones fly the same low-altitude corridor on the same mission, for example an
+inspection or emergency-response flight whose C2 link (flight commands + telemetry) must never drop. Each starts
+plugged into its dock (wired Ethernet), takes off over the city on Wi-Fi, follows a 5G corridor and ends in a rural
+zone covered only by LEO satellite. On the way it relays the ground team's push-to-talk voice and uploads HD camera
+video and survey data. One drone runs FlexiPath, the other the legacy stack, under the same seeded radio field and
+faults.
+
 **Phase 2** answers the three engineering objections a multipath design usually meets: **battery drain** (a
 three-tier radio sleep model), **packet reordering** (sequence-numbered replication, a TCP head-of-line model and
 delay-compensated pacing) and **carrier middleboxes / IP changes** (a userspace UDP tunnel to a static anchor relay).
@@ -34,10 +41,10 @@ Open the app and you get the **Mission view**, kept to the story — the 3D twin
 | Area | What it answers |
 | --- | --- |
 | **Decision loop** — DETECT → PREDICT → PREPARE → REPLICATE → SWITCH → CONTINUE | Which stage the controller is in right now, when it reached each stage, which stages were skipped (e.g. an abrupt outage cannot be predicted), and the radio state each stage runs at (DRX standby, warm probe, burst). |
-| **3D twin** | Two vehicles on the same route; the camera keeps both in frame and an edge marker points to the other vehicle if it falls out of view. The legacy car's label shows the distance it has lost. Sleeping modems draw no probe beams (a faint blink marks each DRX signal sample); a warm modem shows dashed heartbeat beams; both beams pulse purple during the burst. |
+| **3D twin** | Two drones on the same corridor; the camera keeps both in frame and an edge marker points to the other drone if it falls out of view. The legacy drone's label shows the distance it has lost. Sleeping modems draw no probe beams (a faint blink marks each DRX signal sample); a warm modem shows dashed heartbeat beams; both beams pulse purple during the burst. |
 | **Why did FlexiPath do that?** | The latest decision as a short card — headline, action and reason, beside the rule the legacy stack follows. **Show details** opens the full record (current path, status, alternate, traffic, **radio power tier**) and the decision history. |
 | **At a glance** | Which traffic is protected right now (critical, voice, bulk), and FlexiPath vs Legacy on radio power, the longest data stall and client IP changes seen by remote services. **Details** opens the Advanced view. |
-| **Legacy vs FlexiPath** | Both vehicles' latest transition step by step, timed relative to the moment the path *actually* failed, with the simulated interruption, critical packets lost and failures acted on before they happened. |
+| **Legacy vs FlexiPath** | Both drones' latest transition step by step, timed relative to the moment the path *actually* failed, with the simulated interruption, critical packets lost and failures acted on before they happened. |
 
 The header carries the status, the `SIMULATION` badge, the static **anchor relay** address and the clock.
 
@@ -54,8 +61,8 @@ as it happens; **Experiments** (`X`) runs paired trials and shows the existing-m
 ## Measured results (simulation)
 
 `npm run benchmark` runs scenarios A–F, 5 seeds × 4 speeds (30/60/90/120 km/h): 20 paired runs per scenario. In each run
-FlexiPath and Legacy drive together on the same seed, route, RF field and fault timing, and by default the two
-existing-mechanism baselines drive alongside them. Values are means over the 20 pairs. The baselines have their own random
+FlexiPath and Legacy fly together on the same seed, route, RF field and fault timing, and by default the two
+existing-mechanism baselines fly alongside them. Values are means over the 20 pairs. The baselines have their own random
 streams, so the FlexiPath and Legacy values below are identical with or without them (`--baselines none`).
 
 **Continuity**
@@ -92,8 +99,8 @@ How to read it:
   shows the cost side; F shows that bulk traffic is never duplicated.
 - **Radio power**: FlexiPath draws ≈ 8 % more radio power on average than the single-radio legacy stack (1.32 vs
   1.22 W in A–C) — the price of warm-probing the next modem (1.8 W) and of the 400 ms dual-radio burst (3.4 W). Keeping
-  both radios on all the time would cost 3.4 W. **Energy per journey** is lower for FlexiPath in A–E only because the
-  legacy vehicle brakes to a fail-safe stop and arrives later; in F (no critical telemetry, so no stop and identical
+  both radios on all the time would cost 3.4 W. **Radio energy per journey** is lower for FlexiPath in A–E only because
+  the legacy drone stops and hovers (fail-safe) and arrives later; in F (no C2 telemetry, so no hover and identical
   journey times) FlexiPath uses 7 % more energy (39.0 vs 36.3 J). Both are reported.
 - **Head-of-line**: the critical / real-time HoL stall is **0 ms in every run** — the receiver delivers the first copy
   of each sequence number and discards the late duplicate. Bulk HoL comes from the TCP model: a loss that fast
@@ -175,9 +182,9 @@ Link utility: `W = T^a / (RTT^b · (1 + 12·L²))` — critical `a = 0.4, b = 1.
 
 | Class | Flows | Protection | Why |
 | --- | --- | --- | --- |
-| **CRITICAL** (P1) | EMS telemetry (ECG + CAN) | Replicated on both paths during the ~400 ms handoff burst | Loss- and latency-sensitive; small (≈ 0.3 Mbit/s) |
-| **REAL-TIME** (P2) | VoIP (G.711, 20 ms) | Joins the burst only once its measured loss exceeds 2 % or failure is < 1 s away | Packet-loss concealment hides ≤ 2 % loss (< 0.2 MOS); copying earlier is overhead |
-| **BULK** (P3+) | HD video uplink, OTA / map file sync | Never replicated: carried on the primary (one radio awake) and moved to the next path within the burst with delay-compensated pacing | A copy would add tens of Mbit/s; reliable transport recovers bulk losses |
+| **CRITICAL** (P1) | C2 link (flight commands + telemetry) | Replicated on both paths during the ~400 ms handoff burst | Loss- and latency-sensitive; small (≈ 0.3 Mbit/s) |
+| **REAL-TIME** (P2) | Push-to-talk voice (G.711, 20 ms) | Joins the burst only once its measured loss exceeds 2 % or failure is < 1 s away | Packet-loss concealment hides ≤ 2 % loss (< 0.2 MOS); copying earlier is overhead |
+| **BULK** (P3+) | HD camera uplink, survey imagery / map sync | Never replicated: carried on the primary (one radio awake) and moved to the next path within the burst with delay-compensated pacing | A copy would add tens of Mbit/s; reliable transport recovers bulk losses |
 
 Every packet of a critical or real-time flow carries a 32-bit sequence number. The receiver delivers the first copy
 and discards the late duplicate, so replication never adds head-of-line delay. Overhead is counted per byte:
@@ -206,9 +213,9 @@ Stock OS behaviour: static metric order `eth0 > wlan0 > wwan0 > sat0`, sticky un
 | **Simulated interruption** | **3.8 s** | **2.0 s** |
 
 A preferred interface coming back (e.g. Wi-Fi after a fade) triggers a voluntary switch-back with a 1.8 s interruption.
-With the default fail-safe policy, a vehicle whose critical telemetry is silent for > 300 ms brakes to a stop. The
-legacy stack uses one radio at a time (the others idle in DRX, the scan / attach phase counts as a second awake radio),
-binds its sockets to its physical address and runs single-path TCP.
+With the default fail-safe policy, a drone whose C2 telemetry is silent for > 300 ms stops and hovers in place
+(simulated lost-link policy). The legacy stack uses one radio at a time (the others idle in DRX, the scan / attach
+phase counts as a second awake radio), binds its sockets to its physical address and runs single-path TCP.
 
 ---
 
@@ -222,7 +229,7 @@ binds its sockets to its physical address and runs single-path TCP.
 | 1 · Warm probing | 1.8 W | One secondary is awake: woken by a predicted degradation, a > 2 % rise of the primary's loss within 1 s, or primary health ≤ 75. It sends 64-byte heartbeats every 100 ms. |
 | 2 · Burst replication | 3.4 W | Both radios transmit — only during the ~400 ms handoff window. |
 
-Power is integrated per tick into energy (J) for each vehicle until it completes its route. The HUD shows the live
+Power is integrated per tick into energy (J) for each drone until it completes its route. The HUD shows the live
 watts and tier, each interface's radio state, journey energy, mean power, time per tier, bursts, wakes and heartbeat
 bytes.
 
@@ -242,7 +249,7 @@ bytes.
 ### Carrier middleboxes and IP changes (`RelayTunnelModel.js`)
 
 FlexiPath carries every flow in a **userspace UDP tunnel** (48-byte header: IPv6 + UDP + session ID) to an **anchor
-relay** at `198.51.100.24:443`. Each interface gets its own address from its network — depot LAN DHCP, Wi-Fi private
+relay** at `198.51.100.24:443`. Each interface gets its own address from its network — dock LAN DHCP, Wi-Fi private
 DHCP (e.g. `192.168.1.104`), 5G carrier CGNAT (e.g. `100.84.12.9`), LEO operator CGNAT — with a new lease on every
 reattach, and carrier NATs rebind the outer port after 30 s idle. The relay re-learns the outer address from the
 tunnel packets themselves, so a path change or NAT rebinding is a `REBIND` event and remote services keep seeing the
@@ -288,7 +295,7 @@ URL parameters: `?scenario=A&seed=2026&speed=90&mode=advanced&focus=legacy&camer
 the intro screen, `demo=1` starts the guided demo, `models=procedural` forces the built-in primitive models.
 
 Keys: `Space` pause · `M` mission / advanced · `D` guided demo · `X` experiments · `I` why FlexiPath? · `F` Wi-Fi fade ·
-`G` 5G outage · `R` reset · `1`/`2` focus · `C` camera · `V` ghost vehicle · `T` theatre · `E` export JSON.
+`G` 5G outage · `R` reset · `1`/`2` focus · `C` camera · `V` ghost drone · `T` theatre · `E` export JSON.
 
 ### Exports
 
@@ -324,7 +331,7 @@ radio power is higher than a single-radio stack's, and the RF, satellite and pow
 flowchart LR
   subgraph SIM["src/simulation — pure JS, 10 Hz fixed step"]
     SC[Scenarios] --> ENG[SimulationEngine]
-    ENV[NetworkEnvironment<br/>4-zone RF + faults] --> LM[LinkModel ×4<br/>per vehicle]
+    ENV[NetworkEnvironment<br/>4-zone RF + faults] --> LM[LinkModel ×4<br/>per drone]
     MOB[MobilityModel] --> LM
     LM --> FP[FlexiPathController<br/>predict · wake · burst · switch]
     LM --> LG[LegacyController]
@@ -352,9 +359,9 @@ its snapshots. The same engine drives the 60 fps twin and the headless experimen
 
 | File | Asset |
 | --- | --- |
-| `flexipath_vehicle.glb` | low-poly cyber-vehicle, carbon chassis, glowing cyan cabin, `AntennaAnchor`, `Wheel_*` pivots |
-| `legacy_vehicle.glb` | the same chassis in crimson / burgundy |
-| `wired_node.glb` | pedestal charging dock, emissive slate terminal ring, `BeamAnchor` |
+| `flexipath_drone.glb` | X-frame quadcopter: carbon hull, glowing cyan canopy and prop guards, camera gimbal, multi-link antenna (`AntennaAnchor`), `Rotor_*` pivots |
+| `legacy_drone.glb` | the same airframe in crimson / burgundy |
+| `wired_node.glb` | pedestal dock terminal, emissive slate terminal ring, `BeamAnchor` |
 | `wifi_node.glb` | utility pole with dual-antenna Wi-Fi 6 box (neon cyan) |
 | `5g_tower.glb` | hexagonal lattice tower, three down-tilted panel antennas (emerald) |
 | `leo_satellite.glb` | CubeSat: gold-foil core, PV wings, downward transponder dish (amber) |
@@ -374,6 +381,11 @@ runpy.run_path(r"<repo>/blender/generate_all_models.py", run_name="__main__")
 
 Each asset is built in its own temporary scene and removed after export. If a GLB is missing, an equivalent procedural
 model is built from Three.js primitives, so the twin never fails on assets. Tested with Blender 5.2 LTS.
+
+In the twin, the drones wait on their dock pads, climb out on departure and fly the corridor at a fixed height (about
+25 m); the height is visual only (see *Modelling notes and limitations*). A ring on the ground under each drone
+carries its state colour (cyan, purple during the burst, red during an interruption) and a faint line joins it to the
+drone.
 
 Colours: Wi-Fi `#00F0FF` · 5G `#10B981` · LEO `#F59E0B` · wired `#64748B` · replication `#A855F7` · failure `#EF4444` ·
 healthy `#22C55E`.
@@ -409,7 +421,7 @@ Stack: Vite 8 · Three.js r186 · Chart.js 4 · Tailwind CSS 4 · Lucide.
 
 - **Simulation only.** RF is a calibrated stylised model (path loss + correlated shadowing + AR(1) fast fading), not
   ray-traced; LEO SNR and RTT come from a two-satellite elevation model, not a real constellation.
-- Both vehicles are evaluated on the road centre-line, so their large-scale channels are identical; each has its own
+- Both drones are evaluated on the corridor centre-line, so their large-scale channels are identical; each has its own
   fast-fading and probe-noise streams.
 - Legacy recovery durations are model parameters, so interruption totals scale with the number of legacy breaks.
 - Packet fate is Bernoulli per packet for critical and real-time flows; bulk flows are fluid (water-filled goodput).
@@ -417,13 +429,17 @@ Stack: Vite 8 · Three.js r186 · Chart.js 4 · Tailwind CSS 4 · Lucide.
   applied identically to both engines.
 - Prediction is a linear trend extrapolation. It cannot foresee abrupt outages (scenario D shows the resulting
   failover gap) and it can release a prediction when a trend reverses — both are shown, not hidden.
-- **Power** is three system-level tiers (assumptions for a multi-modem telematics unit, not measurements): no per-bit
-  transmit-power scaling, no per-technology difference between Wi-Fi and cellular modems, no RRC tail states beyond the
-  tiers. A DRX modem's score is estimated from its signal with the same PHY curves as the link model, without fading.
+- **Power** is three system-level tiers of the radio subsystem (assumptions for an onboard multi-modem radio unit, not
+  measurements; propulsion is not modelled): no per-bit transmit-power scaling, no per-technology difference between
+  Wi-Fi and cellular modems, no RRC tail states beyond the tiers. A DRX modem's score is estimated from its signal with
+  the same PHY curves as the link model, without fading.
 - **Head-of-line**: critical and real-time flows are packet-level; bulk TCP is an analytical per-tick model (loss
   repair by fast retransmit or RTO), not a packet-level TCP implementation.
-- **Tunnel**: the relay is assumed close to the vehicle's networks (no extra relay latency); addresses are illustrative
+- **Tunnel**: the relay is assumed close to the drone's networks (no extra relay latency); addresses are illustrative
   (`198.51.100.0/24` is RFC 5737 documentation space, `100.64.0.0/10` is RFC 6598 CGNAT space).
+- **Drone altitude**: the drones fly a low-altitude corridor above the route, and the radio model is the ground-level
+  model evaluated on the corridor centre-line; altitude effects (cell antennas tilted down, line-of-sight interference
+  from many cells, air-to-ground fading) are not modelled. The altitude shown in the 3D twin is visual only.
 - Everything is deterministic per seed: the same seed and inputs reproduce the same run.
 
 ## License
