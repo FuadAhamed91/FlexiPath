@@ -38,8 +38,8 @@ There is no test suite, linter or type checker. Verify changes with `npm run bui
   re-run it and update them.
 
 In the browser, URL parameters give reproducible states: `?scenario=A&seed=2026&speed=90&mode=advanced&focus=legacy
-&camera=overview&intro=0&paused=1` (`paused` only applies with `intro=0`); `demo=1` starts the guided demo and
-`models=procedural` forces the primitive models. `window.flexipath` exposes `{ engine, dashboard, sceneManager,
+&camera=overview&intro=0&paused=1` (`paused` only applies with `intro=0`); `demo=1` starts the guided demo,
+`models=procedural` forces the primitive models and `look=twin` starts in the neon look. `window.flexipath` exposes `{ engine, dashboard, sceneManager,
 vehicles, nodes, beams, particles }` in the console.
 
 ## Architecture
@@ -154,3 +154,16 @@ vehicles, nodes, beams, particles }` in the console.
 - Drone altitude is visual only (`VehicleManager`: on the dock pad, a climb-out over the first route units, then a
   fixed corridor height); the simulation and its radio model stay at ground level, and the README states that limit.
   `getPosition()` returns the drone at altitude (the cameras follow it); the halo ring stays on the ground.
+
+### Looks (`real` / `twin`)
+
+- Two worlds around the same network layer (drones, beams, packets, coverage rings, labels): `real` (default, a
+  moonlit city and desert) and `twin` (the original neon digital twin). `L`, the Real / Twin button and `?look=twin`
+  switch them; `Dashboard.setLook` → `hooks.onLook` (wired in `main.js`) → `setLook` on `SceneManager` (lights, fog,
+  bloom), `EnvironmentManager` (sky colours; shows `this.real` or `this.twin`) and `NetworkNodeManager` (steel colours
+  and `REAL_EMISSIVE` glow, both kept per material so switching back is exact).
+- `RealWorld.js` builds the realistic world once, procedurally (canvas textures, merged or instanced geometry, no
+  image files), from the route, the twin city's plots (`EnvironmentManager.cityBoxes`) and the dock pad frames. It
+  uses its own `Random('flexipath-real')`. Anything that belongs only to the neon world goes into
+  `EnvironmentManager.twin`; labels and the sky dome are shared.
+- The drones' corridor passes under the gantries' signs (`GANTRY_Y`); keep that clearance if either height changes.

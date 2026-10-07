@@ -88,6 +88,7 @@ const KEYS = [
   ['R', 'Reset scenario (same seed)'],
   ['1 / 2', 'Focus FlexiPath / Legacy'],
   ['C · V · T', 'Camera · ghost drone · theatre'],
+  ['L', 'Realistic night ↔ neon digital twin'],
   ['E', 'Export run as JSON'],
 ];
 
