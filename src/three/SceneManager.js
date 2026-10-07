@@ -1,8 +1,8 @@
 /**
  * SceneManager.js — renderer, camera rig, bloom post-processing and label layer.
  *
- * Dark high-contrast digital twin: #030712 background, exponential depth fog,
- * ACES tone mapping and an UnrealBloom pass so emissive beams and packets glow.
+ * Exponential depth fog, ACES tone mapping and an UnrealBloom pass so emissive beams and packets glow.
+ * `setLook()` switches the lighting, fog and bloom between the moonlit `real` look and the dark neon `twin`.
  */
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -13,7 +13,38 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 
 export const BACKGROUND = 0x030712;
-const FOG_DENSITY = 0.0058;
+
+/** Direction towards the moon in the realistic look (RealWorld places the moon disc on it). */
+export const MOON_DIRECTION = new THREE.Vector3(0.62, 0.42, -0.66).normalize();
+
+/**
+ * Scene-wide settings per look: `real` is a moonlit night over a real city and desert, `twin` the
+ * original neon digital twin. The network layer (beams, packets, coverage, drones, labels) is the same in both.
+ */
+const LOOKS = {
+  twin: {
+    background: BACKGROUND,
+    fog: BACKGROUND,
+    fogDensity: 0.0058,
+    hemi: { sky: 0x5b8cff, ground: 0x020617, intensity: 0.9 },
+    moon: { color: 0xc7d9ff, intensity: 1.6, position: new THREE.Vector3(-80, 140, 90) },
+    rim: 0.55,
+    ambient: { color: 0x1e293b, intensity: 0.6 },
+    bloom: 0.9,
+    exposure: 1.05,
+  },
+  real: {
+    background: 0x05070c,
+    fog: 0x0a0e16,
+    fogDensity: 0.005,
+    hemi: { sky: 0x5d6f99, ground: 0x2a2219, intensity: 0.65 },
+    moon: { color: 0xd6defa, intensity: 1.6, position: MOON_DIRECTION.clone().multiplyScalar(400) },
+    rim: 0.12,
+    ambient: { color: 0x161c27, intensity: 0.45 },
+    bloom: 0.72,
+    exposure: 1.0,
+  },
+};
 
 const CHASE_OFFSET = new THREE.Vector3(-15, 9.5, 20);
 const OVERVIEW_POSE = { position: new THREE.Vector3(118, 150, 205), target: new THREE.Vector3(118, 0, -12) };
@@ -23,7 +54,8 @@ export class SceneManager {
     this.container = container;
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(BACKGROUND);
-    this.scene.fog = new THREE.FogExp2(BACKGROUND, FOG_DENSITY);
+    this.scene.fog = new THREE.FogExp2(BACKGROUND, LOOKS.twin.fogDensity);
+    this.fogDensity = LOOKS.twin.fogDensity;
 
     this.camera = new THREE.PerspectiveCamera(46, 1, 0.1, 2000);
     this.camera.position.set(7, 1, -1.5).add(CHASE_OFFSET);
@@ -95,7 +127,29 @@ export class SceneManager {
     const rim = new THREE.DirectionalLight(0x00f0ff, 0.55);
     rim.position.set(120, 40, -160);
     this.scene.add(rim);
-    this.scene.add(new THREE.AmbientLight(0x1e293b, 0.6));
+    const ambient = new THREE.AmbientLight(0x1e293b, 0.6);
+    this.scene.add(ambient);
+    this.lights = { hemi, moon, rim, ambient };
+  }
+
+  /** Switch the scene-wide lighting, fog and bloom between the `real` and `twin` looks. */
+  setLook(look) {
+    const L = LOOKS[look] ?? LOOKS.twin;
+    const { hemi, moon, rim, ambient } = this.lights;
+    this.scene.background.set(L.background);
+    this.scene.fog.color.set(L.fog);
+    this.fogDensity = L.fogDensity;
+    hemi.color.set(L.hemi.sky);
+    hemi.groundColor.set(L.hemi.ground);
+    hemi.intensity = L.hemi.intensity;
+    moon.color.set(L.moon.color);
+    moon.intensity = L.moon.intensity;
+    moon.position.copy(L.moon.position);
+    rim.intensity = L.rim;
+    ambient.color.set(L.ambient.color);
+    ambient.intensity = L.ambient.intensity;
+    this.bloom.strength = L.bloom;
+    this.renderer.toneMappingExposure = L.exposure;
   }
 
   resize() {
@@ -197,7 +251,7 @@ export class SceneManager {
     this.controls.update();
     // Depth fog tuned for the chase camera; thin it out as the camera pulls back so overviews stay legible.
     const dist = this.camera.position.distanceTo(this.controls.target);
-    this.scene.fog.density = FOG_DENSITY * Math.min(1, Math.max(0.3, 42 / dist));
+    this.scene.fog.density = this.fogDensity * Math.min(1, Math.max(0.3, 42 / dist));
     this.composer.render();
     this.labelRenderer.render(this.scene, this.camera);
   }
