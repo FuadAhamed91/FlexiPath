@@ -97,7 +97,7 @@ function provenance(meta) {
     <div class="mt-3 rounded-lg border border-slate-800 bg-slate-950/50 p-3 text-[11px] leading-relaxed text-slate-400">
       <div class="mb-1.5 flex flex-wrap items-center gap-1.5">${tag('measured')}<span class="font-semibold text-slate-300">Measured simulation results, not real-world measurements.</span></div>
       Each trial runs FlexiPath and Legacy together on the same seed, route, RF field and fault timing, so every row compares matched pairs.
-      Seeds: ${esc(meta.seeds.join(', '))} · speed ${esc(meta.speeds.join(', '))} km/h · fail-safe braking ${meta.failSafe ? 'on' : 'off'}.
+      Seeds: ${esc(meta.seeds.join(', '))} · speed ${esc(meta.speeds.join(', '))} km/h · fail-safe hover ${meta.failSafe ? 'on' : 'off'}.
       <div class="mt-1.5 flex flex-wrap items-center gap-1.5">${tag('param')}<span>Values that come straight from the model:</span></div>
       legacy break-before-make recovery ${LEGACY_WIRELESS_STALL_S.toFixed(1)} s (detect 1.0 + attach 0.8 + DHCP 0.5 + TCP/TLS 1.5) · FlexiPath failover detection ${p.failoverDetectMs} ms · switch at ${(p.switchLoss * 100).toFixed(0)} % loss · protection trigger TTF &lt; ${p.ttfTriggerS} s.
       The interruption rows therefore reflect how <i>often</i> each stack breaks the session, with each break lasting a model-defined time.
@@ -145,7 +145,7 @@ export function openExperiments(dash, { scenario = 'A', trials = 10, speed = nul
   const scnOpts = [
     `<option value="__all__">All controlled scenarios (A–F)</option>`,
     ...EXPERIMENT_SCENARIOS.map((id) => `<option value="${id}" ${id === scenario ? 'selected' : ''}>${esc(`${id} · ${SCENARIOS[id].label}`)}</option>`),
-    `<option value="mission" ${scenario === 'mission' ? 'selected' : ''}>Full mission · depot → LEO</option>`,
+    `<option value="mission" ${scenario === 'mission' ? 'selected' : ''}>Full mission · dock → LEO</option>`,
     ...['baseline', 'wifi-fade', 'cell-outage'].map((id) => `<option value="${id}" ${id === scenario ? 'selected' : ''}>${esc(`Original matrix · ${SCENARIOS[id].label}`)}</option>`),
   ].join('');
   const speeds = [30, 60, 90, 120];

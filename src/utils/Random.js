@@ -78,8 +78,8 @@ export class Random {
 
 /**
  * Smooth 1-D value noise with a fixed lattice — a spatially correlated random
- * field (used for log-normal shadow fading, so both vehicles see the same
- * obstruction pattern at the same point on the road).
+ * field (used for log-normal shadow fading, so both drones see the same
+ * obstruction pattern at the same point on the route).
  */
 export class ValueNoise1D {
   constructor(rng, { spacing = 6, size = 256 } = {}) {

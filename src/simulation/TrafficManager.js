@@ -4,7 +4,7 @@
  * Not all traffic is treated the same. Every flow belongs to a class whose protection matches what
  * it actually needs:
  *
- *   CRITICAL  (P1)  emergency / control, medical telemetry
+ *   CRITICAL  (P1)  command and control (C2), flight telemetry
  *                   per-packet · replicated during the ~400 ms handoff burst
  *   REAL-TIME (P2)  VoIP, interactive sessions
  *                   per-packet · replicated in the burst only once its loss budget is exceeded or
@@ -29,7 +29,7 @@ export const TRAFFIC_CLASSES = {
     label: 'Critical',
     priority: 1,
     color: '#F8FAFC',
-    examples: 'Emergency / control · medical telemetry · safety data',
+    examples: 'Command and control (C2) · flight telemetry · safety data',
     sensitivity: 'Loss + latency',
     policy: 'Replicated during the ~400 ms handoff burst; first copy delivered, late duplicate discarded',
   },
@@ -56,11 +56,13 @@ export const TRAFFIC_CLASSES = {
 export const PACKET_CLASSES = ['CRITICAL', 'REALTIME'];
 
 // Order matters for reproducibility: packet fates draw from one seeded stream in this order.
+// `id` also names each flow's random-stream forks, so it stays fixed; `tag` is the name the HUD shows.
 export const FLOW_DEFS = [
   {
     id: 'voip-01',
-    label: 'VoIP call · G.711 20 ms',
-    name: 'VoIP call',
+    tag: 'ptt-voice',
+    label: 'Push-to-talk voice · G.711 20 ms',
+    name: 'Push-to-talk voice',
     cls: 'REALTIME',
     priority: 2,
     mode: 'packet',
@@ -70,8 +72,9 @@ export const FLOW_DEFS = [
   },
   {
     id: 'ems-tlm',
-    label: 'EMS telemetry · ECG + CAN',
-    name: 'Medical telemetry',
+    tag: 'c2-link',
+    label: 'C2 link · flight commands + telemetry',
+    name: 'C2 link',
     cls: 'CRITICAL',
     priority: 1,
     mode: 'packet',
@@ -80,7 +83,8 @@ export const FLOW_DEFS = [
   },
   {
     id: 'cam-hd',
-    label: 'HD dash-cam uplink',
+    tag: 'cam-hd',
+    label: 'HD camera uplink',
     name: 'HD video uplink',
     cls: 'BULK',
     priority: 3,
@@ -89,8 +93,9 @@ export const FLOW_DEFS = [
   },
   {
     id: 'ota-sync',
-    label: 'Bulk file sync · OTA / maps',
-    name: 'File sync (OTA / maps)',
+    tag: 'data-sync',
+    label: 'Bulk sync · survey imagery / maps',
+    name: 'Survey data sync',
     cls: 'BULK',
     priority: 4,
     mode: 'fluid',
@@ -103,7 +108,7 @@ export const FLOW_DEFS = [
 export const TRAFFIC_PROFILES = {
   mixed: { id: 'mixed', label: 'Mixed: critical + real-time + bulk', flows: ['voip-01', 'ems-tlm', 'cam-hd', 'ota-sync'] },
   protected: { id: 'protected', label: 'Critical + real-time only', flows: ['voip-01', 'ems-tlm'] },
-  bulk: { id: 'bulk', label: 'Bulk only (video + file sync)', flows: ['cam-hd', 'ota-sync'] },
+  bulk: { id: 'bulk', label: 'Bulk only (video + data sync)', flows: ['cam-hd', 'ota-sync'] },
 };
 
 export function flowsForProfile(profile = 'mixed') {

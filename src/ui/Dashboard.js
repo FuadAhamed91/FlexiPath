@@ -298,8 +298,8 @@ export class Dashboard {
           <div class="overlay-glass pointer-events-none absolute inset-x-3 top-3 px-3 pt-2 pb-2.5">
             <div class="relative">
               <div class="flex">${zones}</div>
-              <div class="zone-marker fp" data-ref="markFp" style="left:0%" title="FlexiPath vehicle"></div>
-              <div class="zone-marker lg" data-ref="markLg" style="left:0%" title="Legacy vehicle"></div>
+              <div class="zone-marker fp" data-ref="markFp" style="left:0%" title="FlexiPath drone"></div>
+              <div class="zone-marker lg" data-ref="markLg" style="left:0%" title="Legacy drone"></div>
             </div>
           </div>
 
@@ -835,9 +835,9 @@ export class Dashboard {
   }
 
   /**
-   * Edge marker for the comparison vehicle when the camera cannot see it.
+   * Edge marker for the comparison drone when the camera cannot see it.
    * @param {{visible:boolean, x?:number, y?:number, angle?:number, text?:string, legacy?:boolean}} info
-   *   x / y in viewport pixels, angle = direction towards the vehicle (radians, screen space)
+   *   x / y in viewport pixels, angle = direction towards the drone (radians, screen space)
    */
   updateOffscreen(info) {
     const el = this.refs.offscreen;
