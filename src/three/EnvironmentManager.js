@@ -4,12 +4,14 @@
  *   • glowing cyan perspective grid floor (anti-aliased shader, focus glow + scan ring)
  *   • horizon sky dome and star field
  *   • road ribbon with lane markings built from the simulation's route spline
- *   • zone gates with labels, depot pad
+ *   • zone gates with labels, drone dock with a landing pad per drone
  *   • stylised wireframe buildings (urban zones 1–3) and the rural ridge (zone 4)
  */
 import * as THREE from 'three';
 import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { Random } from '../utils/Random.js';
+import { MOBILITY_DEFAULTS } from '../simulation/MobilityModel.js';
+import { ENGINES } from '../simulation/SimulationEngine.js';
 
 const GRID_VERT = /* glsl */ `
   #include <common>
@@ -211,7 +213,7 @@ export class EnvironmentManager {
   }
 
   _buildDepot() {
-    // Charging pad around the dock with parking bays for both vehicles.
+    // Dock apron with a landing pad per drone, where it sits plugged into the wired dock before take-off.
     const pad = new THREE.Mesh(
       new THREE.PlaneGeometry(14, 16),
       new THREE.MeshBasicMaterial({ color: '#1d4ed8', transparent: true, opacity: 0.1, depthWrite: false, toneMapped: false }),
@@ -226,7 +228,39 @@ export class EnvironmentManager {
     frame.rotation.x = -Math.PI / 2;
     frame.position.set(-1, 0.04, 0);
     this.group.add(frame);
-    this._label('DEPOT · ETH DOCK', 'Zone 1 start', '#3b82f6', new THREE.Vector3(-1, 0.2, 9.5));
+
+    const path = this.world.path;
+    const sDock = path.sAtX(MOBILITY_DEFAULTS.startX);
+    const padMat = new THREE.MeshBasicMaterial({
+      color: new THREE.Color('#3b82f6').multiplyScalar(1.6),
+      transparent: true,
+      opacity: 0.75,
+      depthWrite: false,
+      toneMapped: false,
+      side: THREE.DoubleSide,
+    });
+    const flat = (geo) => {
+      geo.rotateX(-Math.PI / 2);
+      return new THREE.Mesh(geo, padMat);
+    };
+    for (const id of ['flexipath', 'legacy']) {
+      const f = path.frameAt(sDock, ENGINES[id].laneOffset);
+      const pad = new THREE.Group();
+      pad.position.set(f.x, 0.045, f.z);
+      pad.rotation.y = f.heading;
+      pad.add(flat(new THREE.RingGeometry(2.05, 2.2, 56)));
+      for (const [w, d, x, z] of [
+        [1.5, 0.16, 0, -0.5],
+        [1.5, 0.16, 0, 0.5],
+        [0.16, 1.0, 0, 0],
+      ]) {
+        const bar = flat(new THREE.PlaneGeometry(w, d));
+        bar.position.set(x, 0, z);
+        pad.add(bar);
+      }
+      this.group.add(pad);
+    }
+    this._label('DRONE DOCK · ETH', 'Zone 1 start', '#3b82f6', new THREE.Vector3(-1, 0.2, 9.5));
   }
 
   _label(title, sub, color, position) {
