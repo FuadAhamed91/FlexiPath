@@ -89,7 +89,7 @@ export class Controls {
         <button type="button" class="btn btn-primary w-full" data-ref="exportJson" title="Full experiment record: config, summary, events, 10 Hz time series"><i data-lucide="file-json"></i>Export Experiment Data (JSON)</button>
         <div class="mt-1.5 grid grid-cols-2 gap-1.5">
           <button type="button" class="btn" data-ref="exportCsv" title="10 Hz time series for both engines"><i data-lucide="file-spreadsheet"></i>Export CSV</button>
-          <button type="button" class="btn" data-ref="bench" title="Paired Legacy vs FlexiPath trials across scenarios A–F"><i data-lucide="flask-conical"></i>Experiments</button>
+          <button type="button" class="btn" data-ref="bench" title="Paired Legacy vs FlexiPath trials across scenarios A–H"><i data-lucide="flask-conical"></i>Experiments</button>
         </div>
       </section>`;
 

@@ -283,10 +283,11 @@
         <div class="lp-wrap">
           <div class="lp-reveal max-w-[760px]">
             <p class="lp-kicker">Our solutions</p>
-            <h2 class="lp-h2">Six ideas that make the handover invisible.</h2>
+            <h2 class="lp-h2">Seven ideas that make the handover invisible.</h2>
             <p class="lp-lead">
               FlexiPath adapts what already exists, multipath anchoring from MPTCP and 3GPP ATSSS and packet duplication,
-              and adds prediction, sleeping standby radios and protection that lasts only as long as the risk.
+              and adds prediction, a coverage map of the flight plan, sleeping standby radios and protection that lasts only
+              as long as the risk.
             </p>
           </div>
 
@@ -344,6 +345,33 @@
                 beside the rule the legacy stack follows.
               </p>
               <span class="lp-tag lp-tag-sim mt-4">SIMULATED</span>
+            </article>
+            <article class="lp-card lp-reveal p-6 sm:col-span-2 lg:col-span-3">
+              <div class="grid gap-6 lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:items-center">
+                <div>
+                  <span class="lp-icon" style="--c: #dc2626"><i data-lucide="map"></i></span>
+                  <h3 class="mt-5 text-[18px] font-bold text-slate-900">Know the route</h3>
+                  <p class="mt-2 text-[15px] leading-relaxed text-slate-600">
+                    A drone flies a planned route, so FlexiPath also reads a coverage map of it, built from earlier survey
+                    flights. Where Wi-Fi and 5G die at the same place (an urban canyon, a ridge), no trend can warn in time and
+                    the usual backup dies too. FlexiPath sees the dead zone 8 s ahead, wakes the satellite, and is on it before
+                    the shadow. If the map is out of date, it pays for a needless move, and a new shadow is handled by fast
+                    failover.
+                  </p>
+                  <span class="lp-tag lp-tag-measured mt-4">MEASURED · SIM</span>
+                </div>
+                <div class="rounded-xl border border-slate-200 bg-[#f6f8fb] p-4">
+                  <p class="font-mono text-[11px] font-bold tracking-[0.12em] text-slate-500">SCENARIO G · WI-FI AND 5G BLOCKED TOGETHER · 20 FLIGHTS</p>
+                  <dl class="mt-3 grid grid-cols-[minmax(0,1fr)_auto_auto] items-baseline gap-x-4 gap-y-2 text-[13.5px]">
+                    <dt class="font-mono text-[11px] text-slate-500">STACK</dt><dd class="font-mono text-[11px] text-slate-500">KEPT C2</dd><dd class="font-mono text-[11px] text-slate-500">GAP</dd>
+                    <dt class="text-slate-600">Legacy OS</dt><dd class="font-mono text-legacy">0 / 20</dd><dd class="font-mono text-slate-700">7.9 s</dd>
+                    <dt class="text-slate-600">Reactive multipath</dt><dd class="font-mono text-slate-700">0 / 20</dd><dd class="font-mono text-slate-700">0.39 s</dd>
+                    <dt class="text-slate-600">Always duplicate</dt><dd class="font-mono text-slate-700">8 / 20</dd><dd class="font-mono text-slate-700">0.21 s</dd>
+                    <dt class="font-semibold text-fp">FlexiPath</dt><dd class="font-mono font-semibold text-slate-900">20 / 20</dd><dd class="font-mono font-semibold text-slate-900">0 s</dd>
+                  </dl>
+                  <p class="mt-3 text-[12px] leading-snug text-slate-500">Kept C2 = no fail-safe hover (C2 never silent for more than 300 ms). The cost: 7.5 Mbps less mean throughput than flying without the map, from the extra time on the satellite.</p>
+                </div>
+              </div>
             </article>
           </div>
 
@@ -495,7 +523,40 @@
               <h3 class="text-[15px] font-bold text-slate-900">Against always duplicate</h3>
               <p class="mt-2 text-[14.5px] leading-relaxed text-slate-600">
                 Permanent duplication delivers the most critical packets, 99–100 %, but draws 2.1–2.6× FlexiPath’s radio
-                power and copies 49–100 % of protected bytes, against FlexiPath’s ≈ 1 %.
+                power and copies 49–100 % of protected bytes, against FlexiPath’s ≈ 1 %. When Wi-Fi and 5G die together
+                (scenario G), its two copies die together too: it kept C2 on 8 of 20 flights, FlexiPath on 20 of 20.
+              </p>
+            </div>
+          </div>
+
+          <div class="lp-reveal mt-12 flex items-center gap-3">
+            <span class="lp-icon" style="--c: #0891b2"><i data-lucide="flask-conical"></i></span>
+            <h3 class="text-[20px] font-bold tracking-tight text-slate-900">How we know which part does the work</h3>
+          </div>
+          <div class="mt-5 grid gap-4 md:grid-cols-3">
+            <div class="lp-card lp-reveal p-5 sm:p-6">
+              <h4 class="text-[15px] font-bold text-slate-900">Ablation: one part off at a time</h4>
+              <p class="mt-2 text-[14px] leading-relaxed text-slate-600">
+                FlexiPath flies again with one part switched off, on the same random streams. Without trend prediction it
+                loses 10–30 more critical packets per flight (A–E) and acts early on 13–40 % of failures instead of
+                62–100 %. Without the map, the 0.20 s gap comes back in G. Without the 400 ms burst, nothing measurable changes
+                (within ±0.1 pp) and it saves 0.03 W: in this model the gain comes from prediction and preparation.
+              </p>
+            </div>
+            <div class="lp-card lp-reveal p-5 sm:p-6">
+              <h4 class="text-[15px] font-bold text-slate-900">Checked once on unseen seeds</h4>
+              <p class="mt-2 text-[14px] leading-relaxed text-slate-600">
+                Every scenario was re-run on a held-out block of seeds never used while building or tuning FlexiPath. The
+                conclusions hold: 0.6–1.1 points more critical packets than reactive multipath (95 % intervals exclude
+                zero), and FlexiPath again kept C2 on every flight.
+              </p>
+            </div>
+            <div class="lp-card lp-reveal p-5 sm:p-6">
+              <h4 class="text-[15px] font-bold text-slate-900">How good the prediction is</h4>
+              <p class="mt-2 text-[14px] leading-relaxed text-slate-600">
+                Recall, the failures acted on before they happened: 100 % in A–C, E–G, and 62 % in D, where one outage per
+                flight is abrupt. Precision, the early moves a real failure followed: 97–100 %, falling to 70 % with an
+                out-of-date map (H).
               </p>
             </div>
           </div>
@@ -554,10 +615,10 @@
         <div class="lp-wrap">
           <div class="lp-reveal max-w-[760px]">
             <p class="lp-kicker">QoS / QoE guidelines</p>
-            <h2 class="lp-h2">Eight rules for connectivity that never makes users wait.</h2>
-            <p class="lp-lead">Each one is backed by the same 120 paired simulation runs.</p>
+            <h2 class="lp-h2">Nine rules for connectivity that never makes users wait.</h2>
+            <p class="lp-lead">Each one is backed by the same paired simulation runs, scenarios A–H.</p>
           </div>
-          <ol class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <ol class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             <li class="lp-card lp-reveal p-5">
               <span class="font-mono text-[13px] font-bold text-fp">01</span>
               <h3 class="mt-2 text-[16px] leading-snug font-bold text-slate-900">Anchor the session, not the interface</h3>
@@ -598,6 +659,11 @@
               <h3 class="mt-2 text-[16px] leading-snug font-bold text-slate-900">Measure what users feel, on matched pairs</h3>
               <p class="mt-2 text-[14px] leading-relaxed text-slate-600">Judge experience and cost under identical conditions, not throughput alone.</p>
             </li>
+            <li class="lp-card lp-reveal p-5">
+              <span class="font-mono text-[13px] font-bold text-fp">09</span>
+              <h3 class="mt-2 text-[16px] leading-snug font-bold text-slate-900">Use what you know about the route</h3>
+              <p class="mt-2 text-[14px] leading-relaxed text-slate-600">Map known dead zones and prepare before them; keep the map current, because a stale one costs.</p>
+            </li>
           </ol>
         </div>
       </section>
@@ -615,7 +681,7 @@
               <span class="pin" aria-hidden="true"></span>
               <span class="lp-status">Done</span>
               <h3 class="mt-3 text-[18px] font-bold text-slate-900">Simulation prototype</h3>
-              <p class="mt-2 text-[14.5px] leading-relaxed text-slate-600">Deterministic network simulation, 3D digital twin, comparison with two existing designs over 120 paired runs, and QoS/QoE guidelines.</p>
+              <p class="mt-2 text-[14.5px] leading-relaxed text-slate-600">Deterministic network simulation, 3D digital twin, comparison with two existing designs and three ablations over 160 paired runs, checked on held-out seeds, and QoS/QoE guidelines.</p>
             </li>
             <li class="lp-phase lp-reveal" style="--c: #2563eb">
               <span class="pin" aria-hidden="true"></span>
@@ -648,6 +714,8 @@
               <li class="flex gap-3"><span class="mt-2 size-1.5 shrink-0 rounded-full bg-slate-400"></span>An outage no trend can predict still costs a detection gap: 0.16 s in scenario D.</li>
               <li class="flex gap-3"><span class="mt-2 size-1.5 shrink-0 rounded-full bg-slate-400"></span>FlexiPath uses about 8 % more radio power than a single-radio stack.</li>
               <li class="flex gap-3"><span class="mt-2 size-1.5 shrink-0 rounded-full bg-slate-400"></span>Drone altitude is visual only; the radio model is evaluated at ground level.</li>
+              <li class="flex gap-3"><span class="mt-2 size-1.5 shrink-0 rounded-full bg-slate-400"></span>The coverage map knows only persistent geography; an out-of-date map costs a needless move (scenario H).</li>
+              <li class="flex gap-3"><span class="mt-2 size-1.5 shrink-0 rounded-full bg-slate-400"></span>In this model the 400 ms duplication burst adds no measurable reliability; prediction and preparation do.</li>
             </ul>
           </div>
         </div>

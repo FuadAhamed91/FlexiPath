@@ -296,6 +296,7 @@ export class Dashboard {
           <div class="overlay-glass pointer-events-none absolute inset-x-3 top-3 px-3 pt-2 pb-2.5">
             <div class="relative">
               <div class="flex">${zones}</div>
+              <div class="absolute inset-x-0 bottom-0 h-[6px]" data-ref="shadowStrip"></div>
               <div class="zone-marker fp" data-ref="markFp" style="left:0%" title="FlexiPath drone"></div>
               <div class="zone-marker lg" data-ref="markLg" style="left:0%" title="Legacy drone"></div>
             </div>
@@ -587,6 +588,27 @@ export class Dashboard {
     for (const o of [...sel.options]) if (o.dataset.extra && o.value !== sc.id) o.remove();
     sel.value = sc.id;
     sel.title = sc.description;
+    this._renderShadows(sc);
+  }
+
+  /** Radio shadows on the route strip: hatched where links are really blocked, dashed where the coverage map says so. */
+  _renderShadows(sc) {
+    const pct = (x) => `${Math.min(100, Math.max(0, (x / ROUTE_END_X) * 100)).toFixed(2)}%`;
+    const real = sc.shadows ?? [];
+    const mapped = sc.mapShadows ?? real;
+    const same = (a, b) => a.x0 === b.x0 && a.x1 === b.x1;
+    const parts = [];
+    for (const s of real) {
+      const onMap = mapped.some((m) => same(m, s));
+      parts.push(`<div class="shadow-zone" style="left:${pct(s.x0)};width:${pct(s.x1 - s.x0)}"></div>`);
+      parts.push(`<div class="shadow-tag" style="left:${pct((s.x0 + s.x1) / 2)}">${onMap ? 'RADIO SHADOW · ON MAP' : 'RADIO SHADOW · NOT ON MAP'}</div>`);
+    }
+    for (const m of mapped) {
+      const e = m.edge ?? 1;
+      parts.push(`<div class="map-zone" style="left:${pct(m.x0 - e)};width:${pct(m.x1 - m.x0 + 2 * e)}"></div>`);
+      if (!real.some((s) => same(m, s))) parts.push(`<div class="shadow-tag is-stale" style="left:${pct((m.x0 + m.x1) / 2)}">ON MAP · NO LONGER THERE</div>`);
+    }
+    this.refs.shadowStrip.innerHTML = parts.join('');
   }
 
   // ── Per-tick data flow ──────────────────────────────────────────────────
@@ -957,6 +979,7 @@ export class Dashboard {
     const lg = summary.legacy;
     const sc = summary.meta.scenario;
     const rows = [
+      ['Fail-safe hovers (C2 silent > 300 ms)', 'failSafeStops', '', 0],
       ['Simulated interruption (total)', 'interruptionS', 's', 2],
       ['Longest single interruption', 'longestInterruptionS', 's', 2],
       ['Packet delivery (critical + real-time)', 'packetDeliveryPct', '%', 2],
@@ -986,9 +1009,25 @@ export class Dashboard {
         return `<tr><td>${label}</td><td>${f(a, d, u)}</td><td>${f(b, d, u)}</td><td class="font-semibold">${ds}</td></tr>`;
       })
       .join('');
+    // The outcome in words (C2 kept or not), then the costs of acting early next to the wins.
+    const times = (n) => `${n} time${n === 1 ? '' : 's'}`;
+    const outcome =
+      fp.c2KeptPct === null
+        ? ''
+        : `<p class="mb-3 text-[13px] font-semibold text-slate-800">${
+            fp.failSafeStops === 0 ? 'FlexiPath kept the C2 link the whole flight.' : `FlexiPath lost the C2 link long enough to hover ${times(fp.failSafeStops)}.`
+          } ${lg.failSafeStops === 0 ? 'The legacy drone kept it too.' : `The legacy drone lost it ${times(lg.failSafeStops)} and had to hover.`}</p>`;
+    const cost = `
+        <div class="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-600">
+          <b class="text-slate-800">What acting early cost.</b>
+          Mean radio power ${f(fp.meanPowerW, 2, 'W')} vs ${f(lg.meanPowerW, 2, 'W')} (warm probe ${f(fp.warmTimeS, 1, 's')}, dual-radio burst ${f(fp.burstTimeS, 1, 's')}) ·
+          path changes ${fp.seamlessHandovers + fp.unplannedFailovers} vs ${lg.breakBeforeMakeHandovers} ·
+          duplicate bytes ${f(fp.replicationOverheadPct, 1, '%')} of protected traffic · mean throughput ${f(fp.meanThroughputMbps, 1, 'Mbps')} vs ${f(lg.meanThroughputMbps, 1, 'Mbps')}.
+        </div>`;
     const html = `
       ${this._modalHeader(`Run complete · ${esc(sc.code)} · ${esc(sc.label)}`, `seed ${summary.meta.seed} · ${summary.meta.speedKmh} km/h · ${summary.meta.simTimeS} s simulated · ${summary.faults.length} fault(s) · one paired run`)}
       <div class="px-5 py-4">
+        ${outcome}
         <div class="mb-3 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-600">${tag('measured')}<span>One simulated run, both stacks on identical conditions. A single run is an example; use paired trials for evidence.</span></div>
         <div class="hud-scroll overflow-x-auto">
           <table class="exp-table">
@@ -996,6 +1035,7 @@ export class Dashboard {
             <tbody>${body}</tbody>
           </table>
         </div>
+        ${cost}
         <div class="mt-5 flex flex-wrap justify-end gap-2">
           <button type="button" class="btn" data-act="json"><i data-lucide="file-json"></i>Export JSON</button>
           <button type="button" class="btn" data-act="csv"><i data-lucide="file-spreadsheet"></i>Export CSV</button>
