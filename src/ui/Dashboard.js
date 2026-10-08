@@ -249,7 +249,7 @@ export class Dashboard {
     <div class="fp-shell hud-scroll flex h-full flex-col overflow-y-auto" data-ref="shell" data-mode="mission">
       <header class="relative z-10 flex shrink-0 flex-wrap items-center gap-x-5 gap-y-2 border-b border-slate-200 bg-white/90 px-4 py-1.5 backdrop-blur">
         <div class="flex min-w-0 shrink-0 items-center gap-3 max-sm:w-full max-sm:shrink">
-          <a href="./" class="shrink-0 rounded-md" title="FlexiPath home page" aria-label="FlexiPath home page">${LOGO}</a>
+          ${LOGO}
           <div class="min-w-0">
             <h1 class="font-display text-[12px] font-extrabold tracking-[0.12em] text-slate-900 sm:text-[14px] sm:tracking-[0.22em]">FLEXIPATH <span class="text-fp">CONNECTIVITY ENGINE</span></h1>
           </div>
