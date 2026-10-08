@@ -7,6 +7,7 @@
  * Headless experiments can add baselines modelled on existing mechanisms (config.agents):
  *   • mptcp     — ReactiveMultipathController  (MPTCP backup subflow / ATSSS active-standby)
  *   • redundant — RedundantMultipathController (MPTCP redundant scheduler / PDCP duplication)
+ * and ablations of FlexiPath with one part switched off (fpNoPred, fpNoBurst, fpNoMap).
  *
  * The engine is renderer-agnostic: the 3D layer and HUD subscribe to events
  * ('tick', 'event', 'decision', 'reset', 'complete') and read interpolated render state.
@@ -25,7 +26,7 @@ import { LegacyController, LEGACY_PARAMS } from './LegacyController.js';
 import { ReactiveMultipathController, RedundantMultipathController, MULTIPATH_PARAMS } from './MultipathController.js';
 import { QoEModel } from './QoEModel.js';
 import { FlexiPathTrace, LegacyTrace, MultipathTrace, TRACE_PARAMS } from './DecisionTrace.js';
-import { resolveScenario } from './Scenarios.js';
+import { resolveScenario, coverageMapFor } from './Scenarios.js';
 import { PowerTracker, POWER_PARAMS } from './PowerModel.js';
 import { RelayTunnelModel, RELAY_PARAMS } from './RelayTunnelModel.js';
 import { HOL_PARAMS } from './ReorderingBuffer.js';
@@ -43,10 +44,46 @@ export const ENGINES = {
   // Comparison baselines (existing mechanisms). Headless only: the twin renders FlexiPath and Legacy.
   mptcp: { id: 'mptcp', label: 'Reactive multipath', short: 'MP', laneOffset: 0, color: '#F59E0B', mechanism: 'MPTCP backup subflow / 3GPP ATSSS active-standby' },
   redundant: { id: 'redundant', label: 'Always duplicate', short: 'RD', laneOffset: 0, color: '#A3E635', mechanism: 'MPTCP redundant scheduler / PDCP duplication' },
+  // Ablations: FlexiPath with one part switched off, to measure what each part contributes. Headless only.
+  // They replay FlexiPath's own random streams (common random numbers, `rngOf`): the same fading, the same
+  // link states, so a difference can only come from the part that was switched off.
+  fpNoPred: {
+    id: 'fpNoPred',
+    label: 'FlexiPath · no trend prediction',
+    short: 'NP',
+    laneOffset: 0,
+    color: '#38BDF8',
+    ablation: 'Signal-trend prediction off: acts on measured loss / RTT, link drops, the dock release and the map only',
+    params: { trendPrediction: false },
+    rngOf: 'flexipath',
+  },
+  fpNoBurst: {
+    id: 'fpNoBurst',
+    label: 'FlexiPath · no burst',
+    short: 'NB',
+    laneOffset: 0,
+    color: '#818CF8',
+    ablation: 'Duplication window off: switches to the prepared path at once',
+    params: { burst: false },
+    rngOf: 'flexipath',
+  },
+  fpNoMap: {
+    id: 'fpNoMap',
+    label: 'FlexiPath · no coverage map',
+    short: 'NM',
+    laneOffset: 0,
+    color: '#2DD4BF',
+    ablation: 'Coverage map off: trends and fast failover only',
+    params: { useMap: false },
+    rngOf: 'flexipath',
+  },
 };
 
 /** Baselines modelled on existing seamless-connectivity mechanisms (docs/existing-mechanisms.md). */
 export const BASELINE_ENGINES = ['mptcp', 'redundant'];
+/** FlexiPath with one part switched off (ablation study). */
+export const ABLATION_ENGINES = ['fpNoPred', 'fpNoBurst', 'fpNoMap'];
+const isFlexiPath = (id) => id === 'flexipath' || ABLATION_ENGINES.includes(id);
 
 export const DEFAULT_CONFIG = {
   seed: 2026,
@@ -54,7 +91,7 @@ export const DEFAULT_CONFIG = {
   failSafe: true,
   simRate: 1,
   scenario: 'mission',
-  agents: ['flexipath', 'legacy'], // + any of BASELINE_ENGINES (headless experiments)
+  agents: ['flexipath', 'legacy'], // + any of BASELINE_ENGINES / ABLATION_ENGINES (headless experiments)
   recordHistory: true,
   maxHistory: 36000,
   maxEvents: 5000,
@@ -104,7 +141,8 @@ export class SimulationEngine {
     this.scenario = resolveScenario(this.config.scenario);
     this.config.scenario = this.scenario.id;
     const root = new Random(this.config.seed);
-    this.env = new NetworkEnvironment({ rng: root.fork('environment') });
+    this.env = new NetworkEnvironment({ rng: root.fork('environment'), shadows: this.scenario.shadows ?? [] });
+    this.coverageMap = coverageMapFor(this.scenario);
     this.tick = 0;
     this.t = 0;
     this.accumulator = 0;
@@ -141,7 +179,7 @@ export class SimulationEngine {
   _createAgent(id, root) {
     const meta = ENGINES[id];
     const sc = this.scenario;
-    const rng = root.fork(`agent:${id}`);
+    const rng = root.fork(`agent:${meta.rngOf ?? id}`);
     const mobility = new MobilityModel({
       path: this.path,
       laneOffset: meta.laneOffset,
@@ -158,14 +196,13 @@ export class SimulationEngine {
     for (const lid of INTERFACE_IDS) links[lid] = new LinkModel(INTERFACE_SPECS[lid], rng.fork(`link:${lid}`));
     const flows = flowsForProfile(sc.traffic);
     const classes = Object.fromEntries(Object.keys(TRAFFIC_CLASSES).map((c) => [c, flows.some((f) => f.cls === c)]));
-    const controller =
-      id === 'flexipath'
-        ? new FlexiPathController({ dt: DT, classes })
-        : id === 'mptcp'
-          ? new ReactiveMultipathController({ dt: DT })
-          : id === 'redundant'
-            ? new RedundantMultipathController({ dt: DT, classes })
-            : new LegacyController({ dt: DT });
+    const controller = isFlexiPath(id)
+      ? new FlexiPathController({ dt: DT, classes, map: this.coverageMap, params: meta.params })
+      : id === 'mptcp'
+        ? new ReactiveMultipathController({ dt: DT })
+        : id === 'redundant'
+          ? new RedundantMultipathController({ dt: DT, classes })
+          : new LegacyController({ dt: DT });
     const hasVoice = flows.some((f) => f.voice);
     return {
       id,
@@ -179,7 +216,7 @@ export class SimulationEngine {
       hasPacket: flows.some((f) => f.mode === 'packet'),
       traffic: new TrafficManager({ rng: rng.fork('traffic'), flows }),
       qoe: new QoEModel(),
-      trace: id === 'flexipath' ? new FlexiPathTrace() : id === 'legacy' ? new LegacyTrace() : new MultipathTrace(),
+      trace: isFlexiPath(id) ? new FlexiPathTrace() : id === 'legacy' ? new LegacyTrace() : new MultipathTrace(),
       power: new PowerTracker(),
       // Sessions are anchored for FlexiPath (relay tunnel) and the multipath baselines (MPTCP proxy / ATSSS
       // anchor); only the legacy stack binds sockets to its physical address.
@@ -200,6 +237,7 @@ export class SimulationEngine {
       stats: {
         stallTime: 0,
         stallEvents: 0,
+        failSafeStops: 0,
         longestInterruption: 0,
         seamlessHandovers: 0,
         breakHandovers: 0,
@@ -334,6 +372,7 @@ export class SimulationEngine {
     const mob = mobility.update(DT, t);
     agent.failSafeActive = mob.failSafe;
     if (mob.failSafe && !wasFailSafe) {
+      agent.stats.failSafeStops++;
       agentEvents.push({
         level: 'crit',
         code: 'FAILSAFE',
@@ -471,6 +510,7 @@ export class SimulationEngine {
       stats: {
         stallTime: S.stallTime,
         stallEvents: S.stallEvents,
+        failSafeStops: S.failSafeStops,
         longestInterruption: S.longestInterruption,
         seamlessHandovers: S.seamlessHandovers,
         breakHandovers: S.breakHandovers,
@@ -600,6 +640,9 @@ export class SimulationEngine {
       // Interruption (break in delivery of every flow)
       interruptionS: round(S.stallTime, 3),
       interruptionEvents: S.stallEvents,
+      // Mission outcome: C2 silent > 300 ms forces the fail-safe hover. A flight "kept C2" if that never happened.
+      failSafeStops: S.failSafeStops,
+      c2KeptPct: agent.hasCritical ? (S.failSafeStops === 0 ? 100 : 0) : null,
       longestInterruptionS: round(S.longestInterruption, 3),
       meanRecoveryS: S.stallEvents ? round(S.stallTime / S.stallEvents, 3) : null,
       stallTimeS: round(S.stallTime, 3),
@@ -635,6 +678,9 @@ export class SimulationEngine {
       predictedFailures: counts.predictedFailures,
       abruptFailures: counts.abruptFailures,
       falseAlarms: counts.falseAlarms,
+      // Prediction precision inputs: early moves (before any failure) and how many the path's failure confirmed.
+      earlyActions: counts.earlyActions ?? null,
+      earlyActionsConfirmed: counts.earlyActionsConfirmed ?? null,
       // QoE, latency, throughput
       meanMos: S.mos.count ? round(S.mos.mean, 3) : null,
       minMos: S.mos.count ? round(S.mos.min, 3) : null,
@@ -711,6 +757,8 @@ export class SimulationEngine {
         flows: FLOW_DEFS,
         activeFlows: this.agents.flexipath.flows.map((f) => f.id),
         faults: FAULTS,
+        radioShadows: this.scenario.shadows ?? [],
+        coverageMap: this.coverageMap,
         flexipathParams: FLEXIPATH_PARAMS,
         legacyParams: LEGACY_PARAMS,
         multipathParams: MULTIPATH_PARAMS,

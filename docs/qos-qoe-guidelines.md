@@ -4,7 +4,7 @@ This note covers success criterion 05 of the EDGE challenge statement: "create g
 
 Each guideline gives:
 - **the rule**;
-- **the evidence**: measured simulation results from `npm run benchmark`, scenarios A–F, 20 paired runs each. Stacks are compared as in [existing-mechanisms.md](existing-mechanisms.md): Legacy OS, Reactive multipath (MPTCP backup / ATSSS active-standby), Always duplicate (redundant / PDCP duplication) and FlexiPath;
+- **the evidence**: measured simulation results from `npm run benchmark`, scenarios A–H (G and H test the coverage map), 20 paired runs each. Stacks are compared as in [existing-mechanisms.md](existing-mechanisms.md): Legacy OS, Reactive multipath (MPTCP backup / ATSSS active-standby), Always duplicate (redundant / PDCP duplication) and FlexiPath;
 - **how to apply it**;
 - **where FlexiPath implements it**.
 
@@ -48,6 +48,7 @@ The relay should learn the outer address from the authenticated tunnel packets t
 - FlexiPath acts **1.3–4.6 s before** the path fails.
 - Reactive multipath acts 0.3–0.5 s after, and the legacy stack 1.0–2.3 s after.
 - Against reactive multipath on the same runs, FlexiPath loses **25–40 % fewer critical packets** (A: 35 vs 54 per journey; D: 160 vs 265). It also lifts voice MOS by 0.07–0.10 (95 % CIs exclude zero).
+- The ablation isolates the trend: with trend prediction switched off (same random streams), FlexiPath loses **10–30 more critical packets per flight** in A–E and acts early on 13–40 % of failures instead of 62–100 %.
 
 **How:**
 - Regress the primary's signal over ~3 s.
@@ -89,6 +90,8 @@ The relay should learn the outer address from the authenticated tunnel packets t
 - Critical telemetry is copied on both paths for a ~400 ms burst around the switch.
 - Voice joins the burst only when its measured loss exceeds its 2 % concealment budget, or failure is under 1 s away.
 - Bulk is moved to the new path with delay-compensated pacing instead of being copied. A copy would cost tens of Mbit/s.
+
+**What the ablation says.** Switching FlexiPath's 400 ms burst off changes critical delivery by less than 0.1 pp in A–E and saves 0.02–0.04 W: in this model, switching early onto a validated path does the protecting. Keep any duplication short and selective, as insurance against switch-over effects the model leaves out (route convergence, NAT binding, a congestion window restarting), and prepare the next path early first.
 
 **In FlexiPath:** `FlexiPathController` burst logic, `TrafficManager.js`.
 
@@ -153,14 +156,33 @@ The difference only shows when all of these are reported together.
 - Report interruption, critical delivery, voice MOS and time below MOS 3.6, HoL stalls, overhead bytes, radio power and energy.
 - Run every stack on the same seeds, route, RF field and fault timing.
 - Give paired differences with 95 % confidence intervals instead of a single score or a "winner".
+- Find out which part does the work: fly ablations (one part off at a time, on the same random streams) and report the predictor's precision and recall, not only its wins.
+- Tune on one block of seeds and check once on a held-out block. FlexiPath's conclusions held on seeds never used while building it (+0.58 to +1.09 pp critical delivery over reactive multipath).
 
-**In FlexiPath:** `ExperimentRunner.js`, `npm run benchmark`, the in-app Experiments panel.
+**In FlexiPath:** `ExperimentRunner.js`, `npm run benchmark` (`--seed-block test`), the in-app Experiments panel.
+
+### 9. Use what you know about the route
+
+**Rule.** Where the route is planned, as for a drone's flight plan, keep a coverage map of it and prepare before known dead zones. A trend cannot warn of a shadow whose edge is abrupt, and where two networks die at the same place the usual backup dies too.
+
+**Evidence** in scenario G (Wi-Fi and 5G blocked together for 40 m):
+- With the map, FlexiPath is on the satellite before the shadow: **0 s gap, C2 kept on 20 of 20 flights**.
+- Without the map it fails over in 0.20 s (1 flight hovers); reactive multipath (0.35 s) hovers on all 20; always duplicate, whose two copies die together, on 12 of 20.
+- The cost is 7.5 Mbps less mean throughput, from the time on the satellite. With an out-of-date map (H) the move is needless and costs 21.8 Mbps, and a new shadow the map does not know is handled only by fast failover.
+
+**How:**
+- Record where links died on earlier flights of the route; keep only persistent geography (buildings, terrain), never passing faults.
+- Look ahead a few seconds at the current speed. Wake and validate a path the map says survives the zone, and switch a few seconds before it.
+- Never wake or upgrade onto a path the map says is about to die.
+- Refresh the map: a stale one costs throughput and lowers the predictor's precision (70 % in H).
+
+**In FlexiPath:** `coverageMapFor` (`Scenarios.js`), `FlexiPathController._mapZoneAhead`, `mapHorizonS`.
 
 ---
 
 ## Choosing a design: the trade-off in one table
 
-These are means over scenarios A–D, read from the results table in [existing-mechanisms.md](existing-mechanisms.md).
+These are means over scenarios A–D (the dead-zone row: scenario G), read from the results tables in [existing-mechanisms.md](existing-mechanisms.md).
 
 | | Legacy OS | Reactive multipath | Always duplicate | FlexiPath |
 |---|---|---|---|---|
@@ -168,4 +190,5 @@ These are means over scenarios A–D, read from the results table in [existing-m
 | Critical delivered | 77–85 % | 97.0–98.3 % | 99.0–100 % | 98.2–99.0 % |
 | Duplicate bytes · protected flows | 0 % | 0 % | 49–100 % | 0.9–1.4 % |
 | Mean radio power | 1.22 W | 1.20 W | 2.65–3.39 W | 1.25–1.32 W |
+| Shared dead zone (G): flights that kept C2 | 0 / 20 | 0 / 20 | 8 / 20 | 20 / 20 |
 | Use it when… | (baseline) | power matters most and a few lost packets are acceptable | every packet matters and power is no object | critical traffic must survive without paying for two radios all the time |

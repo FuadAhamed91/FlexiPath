@@ -11,7 +11,9 @@ C2 link (critical), push-to-talk voice (real-time) and camera / survey uploads (
 and LEO zones; the code still calls them vehicles (`agent.vehicle`, `VehicleManager`, `render.vehicles`). A Three.js digital
 twin and an explainable HUD render it live; a headless runner produces paired experiments, by default also against two
 baselines modelled on existing mechanisms (reactive multipath = MPTCP backup subflow / ATSSS active-standby; always
-duplicate = MPTCP redundant scheduler / PDCP duplication). Plain ES modules, no framework, no TypeScript. `README.md`
+duplicate = MPTCP redundant scheduler / PDCP duplication) and three FlexiPath ablations (no trend prediction, no
+duplication burst, no coverage map). FlexiPath also reads a coverage map of the flight plan (dead zones from earlier
+survey flights); scenarios G and H put a radio shadow on the route. Plain ES modules, no framework, no TypeScript. `README.md`
 documents the model rules, parameters and published results; `docs/existing-mechanisms.md` and
 `docs/qos-qoe-guidelines.md` hold the references analysis, the four-stack comparison and the guidelines.
 
@@ -21,19 +23,22 @@ documents the model rules, parameters and published results; `docs/existing-mech
 npm run dev          # Vite dev server: landing page http://localhost:5173, simulator /simulator.html
 npm run build        # production bundle → dist/ (base './', sourcemaps on)
 npm run preview      # serve dist/ on :4173
-npm run benchmark    # headless paired experiments in Node → results/benchmark_<stamp>.{json,csv} + _comparison / _mechanisms CSVs
+npm run benchmark    # headless paired experiments in Node → results/benchmark_<stamp>.{json,csv} + _comparison / _mechanisms / _ablations / _prediction CSVs
 npm run models       # regenerate public/models/*.glb (needs `blender` on PATH)
 ```
 
 There is no test suite, linter or type checker. Verify changes with `npm run build` and the benchmark:
 
 - Narrow runs: `npm run benchmark -- --quick` (3 seeds, 60 km/h), or e.g. `-- --seeds 1 --speeds 60 --scenarios A,D`;
-  also `--no-failsafe`, `--out <dir>` and `--baselines mptcp,redundant` (default) or `--baselines none`. The default is
-  scenarios A–F × 5 seeds × 30/60/90/120 km/h = 120 paired runs.
+  also `--no-failsafe`, `--out <dir>`, `--baselines mptcp,redundant` (default) or `none`, `--ablations
+  fpNoPred,fpNoBurst,fpNoMap` (default) or `none`, and `--seed-block dev` (default: `1000 + 7919·i`, the block FlexiPath
+  was tuned on) or `test` (held out: `900001 + 7919·i`). The default is scenarios A–H × 5 seeds × 30/60/90/120 km/h =
+  160 paired runs.
 - Runs are deterministic per seed. For a change that must not alter behaviour, benchmark into two `--out` dirs (before
   and after) and compare: both CSVs must be byte-identical; the JSON differs only in `meta` (timestamps, wall time).
-  The baselines never change FlexiPath / Legacy values (own random streams): a `--baselines none` run reproduces the
-  FP/LG-only CSVs exactly, and the `fp_` / `lg_` columns of a full run match them.
+  The baselines and ablations never change FlexiPath / Legacy values: a `--baselines none --ablations none` run
+  reproduces the FP/LG-only CSVs exactly, and the `fp_` / `lg_` columns of a full run match them. When you add a
+  metric, append it to `SUMMARY_METRICS` so earlier CSV columns keep their order, and compare old vs new by column name.
 - The README's "Measured results" tables come from the default `npm run benchmark`; when model behaviour changes,
   re-run it and update them.
 
@@ -53,9 +58,11 @@ vehicles, nodes, beams, particles }` in the console.
 - `SimulationEngine` is the hub. `advance(realDt)` accumulates wall time × `simRate` and runs whole fixed ticks
   (`DT = 0.1 s`, at most 40 per call), returning an interpolation `alpha`; `getRenderState()` interpolates vehicle arc
   length and satellites between `prevSnapshot` and `snapshot` for rendering.
-- Agents: `flexipath` and `legacy` always; `config.agents` may add `mptcp` / `redundant` (`BASELINE_ENGINES`), which
-  `ExperimentRunner` does by default. The live twin and HUD use only the first two; `_capture`, `getSummary` and the
-  exports cover every agent present, and `getRenderState` iterates the snapshot's agents.
+- Agents: `flexipath` and `legacy` always; `config.agents` may add `mptcp` / `redundant` (`BASELINE_ENGINES`) and
+  `fpNoPred` / `fpNoBurst` / `fpNoMap` (`ABLATION_ENGINES`: a `FlexiPathController` with `ENGINES[id].params`), which
+  the benchmark CLI does by default (the in-app Experiments panel runs the baselines only). The live twin and HUD use
+  only the first two; `_capture`, `getSummary` and the exports cover every agent present, and `getRenderState` iterates
+  the snapshot's agents.
 - One `step()`: scenario faults fire once the FlexiPath vehicle's X passes their `atX` → `env.update(t)` → for each
   agent (`flexipath`, `legacy`, then any baselines): fail-safe check → `MobilityModel.update` → `LinkModel.sample(env.signal(…))` for
   `eth0, wlan0, wwan0, sat0` → `controller.update({ t, links, ctx })` → `TrafficManager.step(decision, links)` →
@@ -72,10 +79,14 @@ vehicles, nodes, beams, particles }` in the console.
 - `_summarizeAgent` defines the per-run metric keys. `SUMMARY_METRICS` / `COMPARISON_METRICS` in `ExperimentRunner`,
   the CSV exports, the Experiments panel (which reads some keys without null checks) and the README tables use them by
   name, so rename everywhere or not at all.
-- Scenarios (`mission`, `A`–`F`, the hidden `demo`, and the original matrix `baseline` / `wifi-fade` / `cell-outage`)
+- Scenarios (`mission`, `A`–`H`, the hidden `demo`, and the original matrix `baseline` / `wifi-fade` / `cell-outage`)
   are defined once in `Scenarios.js` and shared by the live twin and the runner. Route X runs 0 → 240 scene units
   (1 unit = 5 m) across four zones; X must stay strictly increasing along the route (`sAtX`, X-triggered faults,
   `zoneAt` and the finish test rely on it).
+- Radio shadows (G, H) are persistent geography: a scenario's `shadows` (what is really there; `NetworkEnvironment`
+  subtracts `shadowDb` from Wi-Fi / 5G) and `mapShadows` (what the coverage map recorded; defaults to `shadows`).
+  `coverageMapFor(scenario)` turns them into the map's dead zones, which the engine hands to every FlexiPath controller.
+  Faults (`FAULTS`) are transient and never on the map.
 
 ### Controllers
 
@@ -84,6 +95,11 @@ vehicles, nodes, beams, particles }` in the console.
   `_watch` (before `_radioPlan`, so a predicted degradation wakes a modem on the onset tick) → `_radioPlan` → burst /
   upgrade logic → `_radioStates` (writes the radio states, so it runs after any switch).
 - Time comparisons subtract `1e-9` because `t = tick × 0.1` is inexact; do the same for new timers.
+- Coverage map: `_mapZoneAhead(id, ctx)` finds a mapped dead zone within `mapHorizonS` (8 s at the current speed);
+  `_predict` adds the `map` trigger (watch from 8 s, act < 3 s) and `_bestCandidate({ ctx })` skips paths the map says
+  are about to die (`anyIfUnsafe` only for failover). With no mapped zones every code path must stay exactly as it was,
+  so A–F results stay byte-identical. The ablation switches `trendPrediction`, `burst` and `useMap` are in
+  `FLEXIPATH_PARAMS`.
 - `decision.replicate` must be an explicit per-class map: `TrafficManager` mirrors every packet flow when it is
   undefined.
 - `MultipathController.js`: `ReactiveMultipathController` (anchored session, standby radio in DRX, moves after loss >
@@ -101,6 +117,8 @@ vehicles, nodes, beams, particles }` in the console.
 - All randomness comes from `Random` (Mulberry32) seeded by `config.seed` (`'2026'` and `2026` are the same seed).
   Subsystems get independent streams from `rng.fork(label)`: `environment` → `shadow:<if>`; `agent:<id>` →
   `link:<if>`, `traffic` (→ `seq`, `hol` → `<flow>:<link>`, `pacing`) and `tunnel`. A fork depends only on seed + label.
+  Ablations fork `agent:flexipath` (`rngOf` in `ENGINES`): common random numbers, so their differences from FlexiPath
+  come only from the switched-off part. Don't give them their own streams.
 - Within a stream the draw order is part of the result (flows iterate in `FLOW_DEFS` order; `gaussian()` caches a
   spare value; a link draws more when it is up). Adding or removing a draw, or changing a threshold that gates draws,
   shifts every later value in that stream. Give a new random consumer its own `fork('<label>')`, and never use
@@ -131,6 +149,9 @@ vehicles, nodes, beams, particles }` in the console.
   (it keeps moving while paused); HUD values come from the latest 10 Hz snapshot.
 - The HUD and the twin hold no simulation state. Anything derived belongs in the engine and its snapshot, not in UI
   code.
+- Radio shadows are drawn per scenario: `EnvironmentManager.setScenario()` (called from `main.js` at start and on every
+  engine `reset`) rebuilds a red volume per real shadow and a dashed outline per stale map zone, in both looks;
+  `Dashboard._renderShadows()` marks them on the route strip.
 - `Dashboard.js` builds the DOM from template strings and collects `[data-ref]` into `this.refs` before the child
   panels render, so each panel scopes its own lookups. Panels refresh at most every 90 ms when dirty; charts every
   180 ms and only while the Advanced view shows them. `makeSetter` (`format.js`) skips unchanged DOM writes; pass dynamic text

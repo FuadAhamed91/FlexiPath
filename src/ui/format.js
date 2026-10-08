@@ -21,6 +21,15 @@ export function inkHex(hex, pct = 55) {
   return `rgb(${mix(16, 15)}, ${mix(8, 23)}, ${mix(0, 42)})`;
 }
 
+/** A dead zone ahead on the coverage map, e.g. "Wi-Fi + 5G blocked in ≈ 4.2 s (140 m)". */
+export function mapAheadText(ahead) {
+  if (!ahead) return '';
+  const links = ahead.zone.links.map((id) => linkName(id)).join(' + ');
+  if (ahead.inside) return `${links} blocked here`;
+  const s = ahead.tEnter < 1 ? ahead.tEnter.toFixed(2) : ahead.tEnter.toFixed(1);
+  return `${links} blocked in ≈ ${s} s (${ahead.distM.toFixed(0)} m)`;
+}
+
 /** Coloured link chip, e.g. "Wi-Fi" in cyan. */
 export function linkChip(id, text) {
   if (!id) return '<span class="text-slate-500">—</span>';

@@ -31,12 +31,24 @@
  *              back to DRX.
  *   CONTINUE   sessions ride the anchor relay (198.51.100.24): a path change never resets a socket.
  *
+ * Coverage map (flight plan): a drone flies a planned route, so FlexiPath also reads a map of the dead
+ * zones earlier survey flights recorded along it (radio shadows: an urban canyon, a ridge cut). When the
+ * primary enters a mapped dead zone within the next 8 s, the controller watches it like a predicted
+ * degradation, wakes a path the map says survives the zone, and bursts onto it once the zone is < 3 s
+ * away. Wake-up, validation and upgrades never pick a path that is about to enter a mapped dead zone.
+ * The map only knows persistent geography; trends and fast failover still cover everything else.
+ *
+ * Ablation switches (experiments only): `trendPrediction: false` stops extrapolating the signal trend
+ * (it acts on measured loss / RTT, link drops and the dock release only), `burst: false` switches to
+ * the prepared path at once without a duplication window, `useMap: false` ignores the coverage map.
+ *
  * Every important decision also produces a structured record (current path, status, alternate,
  * traffic, action, reason, radio power) built from the values the controller had at that tick.
  */
 import { TrendMonitor, clamp } from '../utils/Metrics.js';
 import { INTERFACE_IDS, INTERFACE_SPECS, failureSignalLevel, estimateLinkFromSignal, nominalLinkMetrics } from './LinkModel.js';
 import { POWER_PARAMS } from './PowerModel.js';
+import { METERS_PER_UNIT } from './MobilityModel.js';
 
 export const FLEXIPATH_PARAMS = {
   alpha: 12.0,
@@ -68,6 +80,10 @@ export const FLEXIPATH_PARAMS = {
   failoverDetectMs: 60, // 3 missed probes × 20 ms
   bulkMinShare: 0.04,
   bulkMaxLoss: 0.2,
+  mapHorizonS: 8.0, // coverage map: look 8 s ahead along the flight plan for mapped dead zones
+  useMap: true, // ablation switch: false = ignore the coverage map
+  trendPrediction: true, // ablation switch: false = no signal-trend extrapolation (act on measured trouble only)
+  burst: true, // ablation switch: false = switch to the prepared path at once, without a duplication window
 };
 
 export const SCORE_PROFILES = {
@@ -117,12 +133,14 @@ const POWER_HINT = {
 
 export class FlexiPathController {
   /**
-   * @param {{params?: object, dt?: number, classes?: {CRITICAL:boolean, REALTIME:boolean, BULK:boolean}}} opts
+   * @param {{params?: object, dt?: number, classes?: {CRITICAL:boolean, REALTIME:boolean, BULK:boolean}, map?: {zones: Array<{x0:number, x1:number, links:string[], label?:string}>}|null}} opts
    *   `classes` — which traffic classes are present, so protection is planned for the traffic that exists.
+   *   `map` — the coverage map of the flight plan (dead zones recorded by earlier survey flights).
    */
-  constructor({ params = {}, dt = 0.1, classes = { CRITICAL: true, REALTIME: true, BULK: true } } = {}) {
+  constructor({ params = {}, dt = 0.1, classes = { CRITICAL: true, REALTIME: true, BULK: true }, map = null } = {}) {
     this.p = { ...FLEXIPATH_PARAMS, ...params };
     this.dt = dt;
+    this.map = this.p.useMap && map?.zones?.length ? map : null;
     this.classes = { CRITICAL: !!classes.CRITICAL, REALTIME: !!classes.REALTIME, BULK: !!classes.BULK };
     this.nominal = Object.fromEntries(
       INTERFACE_IDS.map((id) => [id, linkScore(nominalLinkMetrics(INTERFACE_SPECS[id]), SCORE_PROFILES.CRITICAL, this.p.alpha)]),
@@ -266,7 +284,8 @@ export class FlexiPathController {
     const p = this.p;
     const m = this.monitors[id];
     const spec = INTERFACE_SPECS[id];
-    const H = p.predictionHorizonS;
+    const trend = p.trendPrediction;
+    const H = trend ? p.predictionHorizonS : 0; // no extrapolation: the predicted values are the measured ones
     const predicted = {
       throughputMbps: Math.max(0, m.thr.predict(H)),
       rttMs: Math.max(spec.baseRtt, m.rtt.predict(H)),
@@ -287,8 +306,8 @@ export class FlexiPathController {
     } else if (m.sig.value !== null) {
       failLevel = failureSignalLevel(spec, p.switchLoss);
       margin = m.sig.value - failLevel;
-      if (m.sig.slope < -p.minSignalSlope && margin < p.ttfMarginDb) ttf = Math.max(0, margin / -m.sig.slope);
-      if (m.sigLong.slope < -p.minSignalSlope && margin < p.watchMarginDb) {
+      if (trend && m.sig.slope < -p.minSignalSlope && margin < p.ttfMarginDb) ttf = Math.max(0, margin / -m.sig.slope);
+      if (trend && m.sigLong.slope < -p.minSignalSlope && margin < p.watchMarginDb) {
         projectedTtf = Math.max(0, margin / -m.sigLong.slope);
       }
     }
@@ -296,20 +315,25 @@ export class FlexiPathController {
     const ttfHits = ttf < p.ttfTriggerS ? (m.ttfHits ?? 0) + 1 : 0;
     if (!peek) m.ttfHits = ttfHits;
 
+    // Coverage map: a known dead zone on the primary's way. Watched from the map horizon, acted on < 3 s.
+    const mapAhead = this._mapZoneAhead(id, ctx);
+    const mapTtf = mapAhead ? mapAhead.tEnter : Infinity;
+
     const loss = m.loss.value ?? 0;
     const rtt = m.rtt.value ?? spec.baseRtt;
     const triggers = {
       deltaLoss: m.loss.delta > p.deltaLossTrigger,
       lossRate: loss > p.lossTrigger,
-      rttDrift: m.rtt.slope > p.rttDriftFactor * spec.baseRtt && rtt > p.rttDriftLevel * spec.baseRtt,
+      rttDrift: (trend ? m.rtt.slope > p.rttDriftFactor * spec.baseRtt : true) && rtt > p.rttDriftLevel * spec.baseRtt,
       ttf: spec.tech === 'wired' ? ttf < p.ttfTriggerS : ttfHits >= p.ttfConfirmTicks,
-      rapidFade: spec.tech !== 'wired' && m.sig.slope < -p.rapidFadeSlope,
+      rapidFade: trend && spec.tech !== 'wired' && m.sig.slope < -p.rapidFadeSlope,
       context: spec.tech === 'wired' && !!ctx.dockRelease,
+      map: !!mapAhead && mapTtf < p.ttfTriggerS,
     };
     const degrading = Object.values(triggers).some(Boolean);
     const failureImminent =
-      predicted.lossRate > p.switchLoss || triggers.ttf || triggers.rapidFade || triggers.context;
-    const watch = degrading || ttfHits > 0 || projectedTtf < p.watchHorizonS;
+      predicted.lossRate > p.switchLoss || triggers.ttf || triggers.rapidFade || triggers.context || triggers.map;
+    const watch = degrading || ttfHits > 0 || projectedTtf < p.watchHorizonS || !!mapAhead;
     return {
       link: id,
       dockDistM: spec.tech === 'wired' ? ctx.dockDistM ?? null : null,
@@ -327,6 +351,8 @@ export class FlexiPathController {
       predictedCritical,
       ttf,
       projectedTtf,
+      mapAhead,
+      mapTtf,
       triggers,
       degrading,
       failureImminent,
@@ -345,23 +371,54 @@ export class FlexiPathController {
     return L.upSince === undefined || t - L.upSince >= this.p.candidateMinUpS;
   }
 
-  /** strict: validated (probed) paths only. Otherwise any up path, ranked on measured or DRX-estimated score. */
-  _bestCandidate(scores, links, t, exclude, { strict = true } = {}) {
+  // ── Coverage map (flight plan) ─────────────────────────────────────────
+  /**
+   * The nearest mapped dead zone of interface `id` that the drone is inside or reaches within the map
+   * horizon at its current speed. Null without a map, or when the path is clear.
+   */
+  _mapZoneAhead(id, ctx) {
+    if (!this.map || !Number.isFinite(ctx?.x)) return null;
+    const v = Math.max(ctx.speedMps ?? 0, 0.5);
+    const horizon = (v * this.p.mapHorizonS) / METERS_PER_UNIT;
+    let best = null;
+    for (const zone of this.map.zones) {
+      if (!zone.links.includes(id) || zone.x1 <= ctx.x || zone.x0 - ctx.x > horizon) continue;
+      const distM = Math.max(0, (zone.x0 - ctx.x) * METERS_PER_UNIT);
+      const tEnter = distM / v;
+      if (!best || tEnter < best.tEnter) best = { zone, link: id, distM, tEnter, inside: ctx.x >= zone.x0 };
+    }
+    return best;
+  }
+
+  /** A path the map does not expect to die within the horizon (always true without a map). */
+  _mapSafe(id, ctx) {
+    return !this.map || !this._mapZoneAhead(id, ctx);
+  }
+
+  /**
+   * strict: validated (probed) paths only. Otherwise any up path, ranked on measured or DRX-estimated score.
+   * With `ctx` and a coverage map, paths about to enter a mapped dead zone are skipped; `anyIfUnsafe`
+   * falls back to them when nothing else is up (failover: any path beats none).
+   */
+  _bestCandidate(scores, links, t, exclude, { strict = true, ctx = null, anyIfUnsafe = false } = {}) {
+    const mapAware = !!ctx && !!this.map;
     let best = null;
     for (const id of INTERFACE_IDS) {
       if (id === exclude || !links[id].up) continue;
       if (strict && !this._validated(id, links, t)) continue;
       if (!strict && !(scores[id].critical > 0)) continue;
+      if (mapAware && !this._mapSafe(id, ctx)) continue;
       if (!best || scores[id].critical > scores[best].critical) best = id;
     }
+    if (!best && mapAware && anyIfUnsafe) return this._bestCandidate(scores, links, t, exclude, { strict });
     return best;
   }
 
   /** Which sleeping modem to wake: best estimated score, keeping the current target unless clearly beaten. */
-  _wakeCandidate(scores, links, t) {
-    const best = this._bestCandidate(scores, links, t, this.primary, { strict: false });
+  _wakeCandidate(scores, links, t, ctx = null) {
+    const best = this._bestCandidate(scores, links, t, this.primary, { strict: false, ctx });
     const cur = this.warmTarget;
-    if (cur && cur !== this.primary && links[cur]?.up && scores[cur].critical > 0.8 * (scores[best]?.critical ?? 0)) return cur;
+    if (cur && cur !== this.primary && links[cur]?.up && this._mapSafe(cur, ctx) && scores[cur].critical > 0.8 * (scores[best]?.critical ?? 0)) return cur;
     return best;
   }
 
@@ -374,6 +431,7 @@ export class FlexiPathController {
     if (tr.context) {
       out.push(`dock release: drone departing, wired carrier ends ${Number.isFinite(pred.dockDistM) ? `${pred.dockDistM.toFixed(0)} m ahead` : 'imminently'}`);
     }
+    if (tr.map && pred.mapAhead) out.push(`coverage map: ${this._mapZoneText(pred.mapAhead)}`);
     if (tr.rapidFade) out.push(`signal collapsing ${pred.signalSlope.toFixed(0)} dB/s (steeper than −${p.rapidFadeSlope} dB/s)`);
     if (tr.ttf && !tr.context && Number.isFinite(pred.ttf)) {
       out.push(`predicted time-to-failure ${secs(pred.ttf)} s < ${p.ttfTriggerS.toFixed(1)} s trigger`);
@@ -382,6 +440,14 @@ export class FlexiPathController {
     if (tr.lossRate) out.push(`loss ${pct(pred.loss)} > ${pct(p.lossTrigger)}`);
     if (tr.rttDrift) out.push(`RTT drifting +${pred.rttSlope.toFixed(1)} ms/s`);
     return out;
+  }
+
+  /** "Wi-Fi + 5G blocked 140 m ahead (urban canyon, ≈ 8.4 s)" */
+  _mapZoneText(ahead) {
+    const z = ahead.zone;
+    const what = `${z.links.map(name).join(' + ')} blocked`;
+    const where = ahead.inside ? 'here' : `${ahead.distM.toFixed(0)} m ahead`;
+    return `${what} ${where}${z.label ? ` (${z.label.toLowerCase()}${ahead.inside ? '' : `, ≈ ${secs(ahead.tEnter)} s`})` : ''}`;
   }
 
   _linkView(id, links, pred, statusOverride) {
@@ -475,11 +541,12 @@ export class FlexiPathController {
 
   // ── Radio power plan ───────────────────────────────────────────────────
   /** Decide which secondary (if any) is awake: DRX ↔ WAKING → WARM. */
-  _radioPlan(t, links, pred, scores, events) {
+  _radioPlan(t, links, pred, scores, events, ctx = null) {
     const P = POWER_PARAMS;
     const reasons = [];
     if (this.primary) {
       if (this.state === 'REPLICATING') reasons.push('handoff burst');
+      if (pred?.mapAhead) reasons.push(`coverage map: ${this._mapZoneText(pred.mapAhead)}`);
       if (this.watching) reasons.push('degradation predicted');
       if (pred && pred.dLoss > P.lossDeltaWake) reasons.push(`primary loss rose ${pct(pred.dLoss)} in 1 s (> ${pct(P.lossDeltaWake)})`);
       const h = scores[this.primary]?.health;
@@ -492,7 +559,7 @@ export class FlexiPathController {
     let target = null;
     if (reasons.length) {
       this.warmLastReasonT = t;
-      target = this.state === 'REPLICATING' ? this.replica : (this.upgradeProbe ?? this._wakeCandidate(scores, links, t));
+      target = this.state === 'REPLICATING' ? this.replica : (this.upgradeProbe ?? this._wakeCandidate(scores, links, t, ctx));
     } else if (this.warmTarget && t - this.warmLastReasonT < P.warmReleaseS) {
       target = this.warmTarget; // dwell before going back to sleep
     }
@@ -560,6 +627,7 @@ export class FlexiPathController {
   // ── REPLICATE: the handoff burst ───────────────────────────────────────
   _startBurst(candidate, t, reason, pred, scores, links, events, { emergency = false } = {}) {
     const p = this.p;
+    if (!p.burst) return this._switchWithoutBurst(candidate, t, reason, pred, scores, links, events, { emergency });
     this.state = 'REPLICATING';
     if (this.prepared !== candidate) this.preparedSince = t;
     this.prepared = candidate;
@@ -600,8 +668,10 @@ export class FlexiPathController {
         });
       }
       const wiredPrimary = INTERFACE_SPECS[this.primary].tech === 'wired';
+      const fromMap = !!pred?.triggers?.map && !!pred.mapAhead;
+      const lead = wiredPrimary ? 'Dock release detected' : fromMap ? 'Dead zone ahead on the coverage map' : `${name(this.primary)} degradation predicted`;
       this._record(t, 'PROTECT', {
-        headline: `${wiredPrimary ? 'Dock release detected' : `${name(this.primary)} degradation predicted`} · ${name(candidate)} ${emergency ? 'woken' : 'warm-validated'} · ${
+        headline: `${lead} · ${name(candidate)} ${emergency ? 'woken' : 'warm-validated'} · ${
           this._eligible ? `${this.classes.CRITICAL ? 'critical' : 'real-time'} flow protection enabled` : 'bulk moved to it (nothing to replicate)'
         }`,
         current: this._linkView(this.primary, links, pred),
@@ -610,9 +680,13 @@ export class FlexiPathController {
         action: this._eligible
           ? `Burst-replicate ${classes || 'no'} traffic on ${name(this.primary)} + ${name(candidate)} for the ${windowMs} ms handoff window (${W[2]} W), then make ${name(candidate)} primary`
           : `Move bulk traffic to ${name(candidate)} with delay-compensated pacing over ${windowMs} ms (no critical or real-time flows to replicate)`,
-        reason: `${why.length ? `Predicted degradation exceeds threshold: ${why.join('; ')}` : 'Predicted score of the primary falls below the prepared path'}.${
-          emergency ? ` Failure imminent: ${name(candidate)} used as soon as it woke (no time for full validation).` : probe
-        }`,
+        reason: `${
+          fromMap
+            ? `Coverage map: ${this._mapZoneText(pred.mapAhead)}; ${name(candidate)} is not blocked there`
+            : why.length
+              ? `Predicted degradation exceeds threshold: ${why.join('; ')}`
+              : 'Predicted score of the primary falls below the prepared path'
+        }.${emergency ? ` Failure imminent: ${name(candidate)} used as soon as it woke (no time for full validation).` : probe}`,
         preparedLeadS: this.preparedSince !== null && this.prepared === candidate ? t - this.preparedSince : 0,
         power,
       });
@@ -632,6 +706,27 @@ export class FlexiPathController {
     }
   }
 
+  /** Ablation (`burst: false`): move every flow to the prepared path at once, with no duplication window. */
+  _switchWithoutBurst(candidate, t, reason, pred, scores, links, events, { emergency = false } = {}) {
+    const from = this.primary;
+    const why = this._triggerReasons(pred);
+    const upgrade = reason === 'UPGRADE';
+    if (this.prepared !== candidate) this.preparedSince = t;
+    this.prepared = candidate;
+    this._switchTo(candidate, t, `${upgrade ? 'better path' : 'predicted degradation'} · switched at once (no burst)`, events, {
+      from,
+      record: {
+        headline: `Switched primary path to ${name(candidate)} (no burst)`,
+        current: this._linkView(from, links, pred, upgrade ? ['Healthy', 'ok'] : undefined),
+        alternate: this._altView(candidate, scores, links, t, emergency ? 'Woken path (emergency)' : 'Prepared path → new primary'),
+        traffic: { replicated: [], standby: [], notReplicated: this.classes.BULK ? ['BULK'] : [], text: 'No duplication window: every flow moves at once' },
+        action: `Make ${name(candidate)} primary now; ${name(from)} radio back to DRX sleep`,
+        reason: why.length ? why.join('; ') : upgrade ? 'Better path available' : 'Predicted degradation',
+        power: { ...POWER_HINT.DRX },
+      },
+    });
+  }
+
   _realtimeNeedsCover(pred) {
     if (!pred) return false;
     const p = this.p;
@@ -639,7 +734,8 @@ export class FlexiPathController {
       pred.loss > p.realtimeLossBudget ||
       (Number.isFinite(pred.ttf) && pred.ttf < p.realtimeTtfS) ||
       pred.triggers.rapidFade ||
-      pred.triggers.context
+      pred.triggers.context ||
+      pred.triggers.map
     );
   }
 
@@ -722,6 +818,10 @@ export class FlexiPathController {
         this.watchSince = t;
         const wired = INTERFACE_SPECS[this.primary].tech === 'wired';
         const why = this._triggerReasons(pred);
+        if (pred.mapAhead && !wired) {
+          this._watchFromMap(t, pred, wakeCand, scores, links, events);
+          return this._prepare(t, ready, scores, links, pred, events);
+        }
         let projText;
         if (wired) projText = why.join(' · ') || 'dock release';
         else if (Number.isFinite(pred.projectedTtf)) projText = `failure level in ≈ ${secs(pred.projectedTtf)} s (3 s trend ${pred.signalSlopeLong.toFixed(1)} dB/s)`;
@@ -755,7 +855,40 @@ export class FlexiPathController {
       events.push({ level: 'info', code: 'TREND_OFF', message: `${this.primary} trend recovered — prediction released, no action needed` });
     }
 
-    // PREPARE: the next path is the woken modem once its heartbeats have validated it.
+    this._prepare(t, ready, scores, links, pred, events);
+  }
+
+  /** PREDICT from the coverage map: the primary reaches a mapped dead zone within the map horizon. */
+  _watchFromMap(t, pred, wakeCand, scores, links, events) {
+    const p = this.p;
+    const ahead = pred.mapAhead;
+    const zoneText = this._mapZoneText(ahead);
+    const shared = ahead.zone.links.length > 1;
+    events.push({
+      level: 'warn',
+      code: 'PREDICT',
+      message: `PREDICT ${this.primary} lost ahead · coverage map: ${zoneText}${wakeCand ? ` · waking ${wakeCand}, which the map says survives it` : ''}`,
+    });
+    this._record(t, 'PREDICT', {
+      headline: `Dead zone ahead on the coverage map: ${ahead.zone.links.map(name).join(' and ')} blocked`,
+      current: this._linkView(this.primary, links, pred, ['Dead zone ahead (map)', 'warn']),
+      alternate: wakeCand ? this._altView(wakeCand, scores, links, t, 'Survives the dead zone (map)') : null,
+      traffic: this._trafficView(),
+      action: wakeCand
+        ? `${name(wakeCand)} modem primed to Warm Probe state (${W[1]} W) now, so it is validated before the zone; burst-replicate critical traffic onto it ${p.ttfTriggerS.toFixed(1)} s before the zone`
+        : 'No path survives the dead zone on the map: stay, and fail over fast if the link drops',
+      reason: `Coverage map from earlier survey flights: ${zoneText}. ${
+        shared
+          ? 'The current path and its usual backup die at the same place, so a trend would leave nothing warm to switch to.'
+          : 'The link drops abruptly there, too fast for a trend to warn.'
+      }`,
+      power: wakeCand ? { ...POWER_HINT.WARM } : { ...POWER_HINT.DRX },
+    });
+  }
+
+  /** PREPARE: the next path is the woken modem once its heartbeats have validated it. */
+  _prepare(t, ready, scores, links, pred, events) {
+    const p = this.p;
     const want = this.state === 'REPLICATING' ? this.replica : this.watching ? ready : null;
     if (want !== this.prepared) {
       const changed = this.prepared && want;
@@ -773,7 +906,9 @@ export class FlexiPathController {
           current: this._linkView(this.primary, links, pred),
           alternate: this._altView(want, scores, links, t, 'Prepared path (warm)'),
           traffic: this._trafficView(),
-          action: `Keep ${name(want)} in Warm Probe (${W[1]} W); burst-replicate critical traffic if time-to-failure < ${p.ttfTriggerS.toFixed(1)} s`,
+          action: pred?.mapAhead
+            ? `Keep ${name(want)} in Warm Probe (${W[1]} W); burst-replicate critical traffic onto it ${p.ttfTriggerS.toFixed(1)} s before the dead zone`
+            : `Keep ${name(want)} in Warm Probe (${W[1]} W); burst-replicate critical traffic if time-to-failure < ${p.ttfTriggerS.toFixed(1)} s`,
           reason: `${name(want)} answered ${Math.round(POWER_PARAMS.warmValidateS / POWER_PARAMS.heartbeatIntervalS)}+ heartbeats: RTT ${met.rttMs.toFixed(0)} ms, loss ${pct(met.lossRate)} ≤ ${pct(p.candidateMaxLoss)}, best critical score of the awake paths`,
           power: { ...POWER_HINT.WARM },
         });
@@ -835,7 +970,7 @@ export class FlexiPathController {
           },
         });
       } else {
-        const fb = this._bestCandidate(scores, links, t, lost, { strict: false });
+        const fb = this._bestCandidate(scores, links, t, lost, { strict: false, ctx, anyIfUnsafe: true });
         if (fb) {
           const asleep = INTERFACE_SPECS[fb].tech !== 'wired' && this.radio[fb].state !== 'WARM';
           const wakeMs = asleep ? P.wakeLatencyS * 1000 : 0;
@@ -882,11 +1017,11 @@ export class FlexiPathController {
     }
 
     const pred = this.primary ? this._predict(this.primary, ctx) : null;
-    const wakeCand = this.primary ? this._wakeCandidate(scores, links, t) : null;
-    let ready = this.primary ? this._bestCandidate(scores, links, t, this.primary, { strict: true }) : null;
+    const wakeCand = this.primary ? this._wakeCandidate(scores, links, t, ctx) : null;
+    let ready = this.primary ? this._bestCandidate(scores, links, t, this.primary, { strict: true, ctx }) : null;
     this._watch(t, pred, wakeCand, ready, scores, links, events);
-    this._radioPlan(t, links, pred, scores, events);
-    ready = this.primary ? this._bestCandidate(scores, links, t, this.primary, { strict: true }) : null;
+    this._radioPlan(t, links, pred, scores, events, ctx);
+    ready = this.primary ? this._bestCandidate(scores, links, t, this.primary, { strict: true, ctx }) : null;
 
     if (this.state === 'STEADY' && this.primary) {
       if (pred.degrading) {
@@ -900,8 +1035,9 @@ export class FlexiPathController {
         this.upgradeTicks = 0;
         this.upgradeProbe = null;
       } else if (t >= this.holdUntil && !this.watching) {
-        // Upgrade: a sleeping link estimated (from its DRX signal) to be much better and well inside coverage.
-        const cand = this._bestCandidate(scores, links, t, this.primary, { strict: false });
+        // Upgrade: a sleeping link estimated (from its DRX signal) to be much better and well inside coverage
+        // (and, with a coverage map, not about to enter a mapped dead zone).
+        const cand = this._bestCandidate(scores, links, t, this.primary, { strict: false, ctx });
         const margin = cand ? scores[cand].marginDb : null;
         const better = cand && scores[cand].critical > p.upgradeRatio * scores[this.primary].critical;
         const deep = cand && (margin === null || margin >= p.upgradeMinMarginDb);
@@ -913,7 +1049,7 @@ export class FlexiPathController {
           this.upgradeProbe = null;
         }
         const probe = this.upgradeProbe;
-        if (probe && this._validated(probe, links, t) && scores[probe].critical > p.upgradeRatio * scores[this.primary].critical) {
+        if (probe && this._validated(probe, links, t) && this._mapSafe(probe, ctx) && scores[probe].critical > p.upgradeRatio * scores[this.primary].critical) {
           this._startBurst(probe, t, 'UPGRADE', pred, scores, links, events);
         }
       }
@@ -1004,6 +1140,8 @@ export class FlexiPathController {
       pacing: true, // bulk spanning two paths during a burst is sent with delay-compensated pacing
       warmTarget: this.warmTarget,
       warmReason: this.warmReason,
+      mapActive: !!this.map,
+      mapAhead: pred?.mapAhead ?? null,
       health: this.primary ? scores[this.primary]?.health ?? null : null,
       blackoutMs,
       blackoutEvent,

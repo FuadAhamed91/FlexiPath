@@ -8,9 +8,11 @@ import {
   CircleCheck,
   Copy,
   Drone,
+  FlaskConical,
   Layers,
   ListOrdered,
   Lock,
+  Map as MapIcon,
   MessageSquareText,
   Moon,
   Play,
@@ -20,7 +22,7 @@ import {
 } from 'lucide';
 
 createIcons({
-  icons: { Activity, CircleCheck, Copy, Drone, Layers, ListOrdered, Lock, MessageSquareText, Moon, Play, Presentation, Server, TriangleAlert },
+  icons: { Activity, CircleCheck, Copy, Drone, FlaskConical, Layers, ListOrdered, Lock, Map: MapIcon, MessageSquareText, Moon, Play, Presentation, Server, TriangleAlert },
   attrs: { 'stroke-width': '1.75' },
 });
 

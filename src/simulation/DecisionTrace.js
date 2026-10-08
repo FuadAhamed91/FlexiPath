@@ -83,7 +83,7 @@ export class FlexiPathTrace {
     this.count++;
     this.episode = {
       id: this.count,
-      kind, // predicted | dock | upgrade | abrupt
+      kind, // predicted | dock | map | upgrade | abrupt
       from,
       to: null,
       start: t,
@@ -153,18 +153,23 @@ export class FlexiPathTrace {
         ep = this._open(t, 'upgrade', d.primary, marks);
         ep.skipped.PREDICT = 'No degradation: a better path became available';
       } else if (d.watching || ev.REPL_ON || ev.DRAIN || ev.PREDICT) {
-        ep = this._open(d.watchSince ?? t, d.primary === 'eth0' ? 'dock' : 'predicted', d.primary, marks);
+        const kind = d.primary === 'eth0' ? 'dock' : d.mapAhead ? 'map' : 'predicted';
+        ep = this._open(d.watchSince ?? t, kind, d.primary, marks);
       }
     }
     if (!ep) return;
 
     const S = ep.stages;
     const pred = d.prediction;
-    if ((ep.kind === 'predicted' || ep.kind === 'dock') && S.PREDICT === null) {
+    if ((ep.kind === 'predicted' || ep.kind === 'dock' || ep.kind === 'map') && S.PREDICT === null) {
       S.PREDICT = d.watchSince ?? t;
       if (pred) {
         const proj = Number.isFinite(pred.projectedTtf) ? pred.projectedTtf : pred.ttf;
         if (pred.triggers?.context) ep.notes.PREDICT = `${nm(ep.from)} ends at dock release`;
+        else if (pred.mapAhead) {
+          const ahead = pred.mapAhead;
+          ep.notes.PREDICT = `coverage map: ${ahead.zone.links.map(nm).join(' + ')} blocked ${ahead.inside ? 'here' : `in ≈ ${secs(ahead.tEnter)} s`}`;
+        }
         else if (pred.triggers?.rapidFade) ep.notes.PREDICT = `${nm(ep.from)} collapsing ${pred.signalSlope.toFixed(0)} dB/s`;
         else ep.notes.PREDICT = Number.isFinite(proj) ? `${nm(ep.from)} failure in ≈ ${secs(proj)} s` : `${nm(ep.from)} degrading`;
       }
@@ -264,12 +269,16 @@ export class FlexiPathTrace {
 
   counts() {
     const all = [...this.history, ...(this.episode ? [this.episode] : [])];
+    // Early moves: a predicted / dock / map episode that acted while the path it left was still working.
+    const early = all.filter((e) => (e.kind === 'predicted' || e.kind === 'dock' || e.kind === 'map') && e.actionT !== null && (e.failureT === null || e.actionT < e.failureT));
     return {
       episodes: all.length,
       pathFailures: all.filter((e) => e.failureT !== null).length,
       predictedFailures: all.filter((e) => e.kind !== 'abrupt' && e.failureT !== null && (e.actionT ?? Infinity) < e.failureT).length,
       abruptFailures: all.filter((e) => e.kind === 'abrupt').length,
       falseAlarms: all.filter((e) => e.status === 'stood-down' && e.failureT === null).length,
+      earlyActions: early.length,
+      earlyActionsConfirmed: early.filter((e) => e.failureT !== null).length,
     };
   }
 }

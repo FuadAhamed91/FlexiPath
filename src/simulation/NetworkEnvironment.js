@@ -119,13 +119,28 @@ export const FAULTS = {
 const dist3 = (a, b) => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
 
 export class NetworkEnvironment {
-  constructor({ rng = new Random(1) } = {}) {
+  /**
+   * @param {{rng?: Random, shadows?: Array<{x0:number, x1:number, edge?:number, links:string[], depthDb:number, label?:string}>}} opts
+   *   `shadows` — persistent radio shadows on the route (buildings, terrain), from the scenario.
+   */
+  constructor({ rng = new Random(1), shadows = [] } = {}) {
     this.rng = rng;
     this.shadow = {
       wlan0: new ValueNoise1D(rng.fork('shadow:wlan0'), { spacing: 7 }),
       wwan0: new ValueNoise1D(rng.fork('shadow:wwan0'), { spacing: 9 }),
     };
+    this.radioShadows = shadows.map((s) => ({ edge: 1, ...s }));
     this.reset();
+  }
+
+  /** Extra loss (dB) on one link inside a radio shadow: full depth over [x0, x1], ramps of `edge` units. */
+  shadowDb(id, x) {
+    let db = 0;
+    for (const s of this.radioShadows) {
+      if (!s.links.includes(id)) continue;
+      db += s.depthDb * smoothstep(s.x0 - s.edge, s.x0, x) * (1 - smoothstep(s.x1, s.x1 + s.edge, x));
+    }
+    return db;
   }
 
   reset() {
@@ -190,7 +205,8 @@ export class NetworkEnvironment {
     const d = Math.max(1, dist3(NODE_LAYOUT.wlan0.antenna, pos));
     const friis = c.p1 - 20 * Math.log10(d);
     const clutter = c.clutterDbPerUnit * Math.max(0, d - c.clutterFree);
-    return friis - clutter + c.shadowStd * this.shadow.wlan0.sample(pos.x) - this.wifiFadeDb();
+    const rssi = friis - clutter + c.shadowStd * this.shadow.wlan0.sample(pos.x) - this.wifiFadeDb();
+    return this.radioShadows.length ? rssi - this.shadowDb('wlan0', pos.x) : rssi;
   }
 
   /** Mean 5G RSRP (dBm) at an antenna position. */
@@ -201,7 +217,8 @@ export class NetworkEnvironment {
     const urban = c.urbanShadowDb * (1 - smoothstep(8, 78, pos.x));
     const over = pos.x - c.terrainStartX;
     const terrain = over > 0 ? Math.min(c.terrainMaxDb, c.terrainDbPerUnit * over * smoothstep(0, 6, over)) : 0;
-    return c.p1 - pathLoss - urban - terrain + c.shadowStd * this.shadow.wwan0.sample(pos.x);
+    const rsrp = c.p1 - pathLoss - urban - terrain + c.shadowStd * this.shadow.wwan0.sample(pos.x);
+    return this.radioShadows.length ? rsrp - this.shadowDb('wwan0', pos.x) : rsrp;
   }
 
   /** Serving LEO satellite (highest elevation) and link geometry. */
