@@ -29,7 +29,46 @@ const PALETTE = {
   flexipath: { body: '#0b0f16', accent: '#00F0FF', canopy: '#00F0FF', trim: '#1f2937' },
   legacy: { body: '#3b0a16', accent: '#E11D48', canopy: '#FB7185', trim: '#4c0519' },
 };
-const VEHICLE_SCALE = 1.3; // stylised: drones read clearly against 1.2 km of route
+
+/** Realistic look: an enterprise-drone paint job instead of neon. FlexiPath white with cyan, Legacy graphite with red. */
+const PAINT = {
+  flexipath: { body: '#f1f4f7', guard: '#d6dbe1', trim: '#2a2e34', accent: '#13c4d6', canopy: '#123038', led: '#00F0FF' },
+  legacy: { body: '#3b4047', guard: '#4b5058', trim: '#1c1f23', accent: '#d8283f', canopy: '#2b1419', led: '#ff3b55' },
+};
+const DISC_REAL = '#cfd6de'; // spinning props read as a faint pale disc
+/** Part name (Blender object / procedural mesh) → paint slot; anything else is trim. Order matters. */
+const PAINT_PARTS = [
+  [/^Hull/, 'body'],
+  [/^Canopy/, 'canopy'],
+  [/^LightStrips/, 'stripe'],
+  [/^Headlight/, 'head'],
+  [/^GimbalLens/, 'head'],
+  [/^TailLight/, 'tail'],
+  [/^PropGuards/, 'guard'],
+  [/^AntennaTip/, 'led'],
+  [/^BladeTips/, 'tip'],
+  [/^Blades/, 'blade'],
+];
+
+function paintedMaterials(kind) {
+  const p = PAINT[kind];
+  const std = (o) => new THREE.MeshStandardMaterial(o);
+  const tail = std({ color: '#05080f', emissive: '#ff2848', emissiveIntensity: 2.2 });
+  tail.name = 'TailLight';
+  return {
+    body: std({ color: p.body, roughness: 0.55, metalness: 0.08 }),
+    guard: std({ color: p.guard, roughness: 0.6, metalness: 0.05 }),
+    trim: std({ color: p.trim, roughness: 0.5, metalness: 0.35 }),
+    canopy: std({ color: p.canopy, roughness: 0.18, metalness: 0.4, emissive: p.led, emissiveIntensity: 0.12 }),
+    stripe: std({ color: p.accent, roughness: 0.45, emissive: p.led, emissiveIntensity: 0.6 }),
+    tip: std({ color: p.accent, roughness: 0.5 }),
+    blade: std({ color: '#16191d', roughness: 0.6, metalness: 0.2 }),
+    led: std({ color: '#05080f', emissive: p.led, emissiveIntensity: 2.2 }),
+    head: std({ color: '#05080f', emissive: '#E0FDFF', emissiveIntensity: 3 }),
+    tail,
+  };
+}
+const VEHICLE_SCALE = 1.45; // stylised: drones read clearly against 1.2 km of route
 const CRUISE_ALT = 5; // world units (≈ 25 m) above the route; visual only
 const CLIMB_S = 9; // route units over which a drone climbs away from its dock pad
 const ROTOR_IDLE = 9; // rad/s while waiting on the pad
@@ -68,65 +107,67 @@ export function buildDrone(kind = 'flexipath') {
   tail.name = 'TailLight';
   const blade = new THREE.MeshStandardMaterial({ color: '#05070b', metalness: 0.2, roughness: 0.6 });
 
-  const add = (parent, geo, mat, pos) => {
+  // Part names match the Blender objects, so both models can be repainted part by part (VehicleManager.setLook).
+  const add = (parent, geo, mat, pos, name = '') => {
     const m = new THREE.Mesh(geo, mat);
+    m.name = name;
     if (pos) m.position.copy(pos);
     parent.add(m);
     return m;
   };
   // Top-view outline extruded upwards from z0 to z1 (rotateX maps the shape's Y to −Z, depth to +Y).
-  const slab = (outline, z0, z1, mat) => {
+  const slab = (outline, z0, z1, mat, name) => {
     const bevel = 0.02;
     const shape = new THREE.Shape(outline.map(([x, y]) => new THREE.Vector2(x, y)));
     const geo = new THREE.ExtrudeGeometry(shape, { depth: z1 - z0 - 2 * bevel, bevelEnabled: true, bevelThickness: bevel, bevelSize: bevel, bevelSegments: 1 });
     geo.rotateX(-Math.PI / 2);
     geo.translate(0, z0 + bevel, 0);
-    return add(root, geo, mat);
+    return add(root, geo, mat, null, name);
   };
-  const strut = (p0, p1, r, mat, parent = root) => {
+  const strut = (p0, p1, r, mat, name) => {
     const dir = new THREE.Vector3().subVectors(p1, p0);
-    const m = add(parent, new THREE.CylinderGeometry(r, r, dir.length(), 8), mat, p0.clone().lerp(p1, 0.5));
+    const m = add(root, new THREE.CylinderGeometry(r, r, dir.length(), 8), mat, p0.clone().lerp(p1, 0.5), name);
     m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
     return m;
   };
 
-  slab(HULL_OUTLINE, 0.41, 0.71, carbon);
-  slab(CANOPY_OUTLINE, 0.71, 0.81, glass);
-  for (const side of [-1, 1]) add(root, new THREE.BoxGeometry(0.8, 0.05, 0.04), accent, B(0, side * 0.355, 0.5));
-  add(root, new THREE.BoxGeometry(0.04, 0.06, 0.3), head, B(0.63, 0, 0.56));
-  add(root, new THREE.BoxGeometry(0.04, 0.06, 0.3), tail, B(-0.63, 0, 0.56));
+  slab(HULL_OUTLINE, 0.41, 0.71, carbon, 'Hull');
+  slab(CANOPY_OUTLINE, 0.71, 0.81, glass, 'Canopy');
+  for (const side of [-1, 1]) add(root, new THREE.BoxGeometry(0.8, 0.05, 0.04), accent, B(0, side * 0.355, 0.5), 'LightStrips');
+  add(root, new THREE.BoxGeometry(0.04, 0.06, 0.3), head, B(0.63, 0, 0.56), 'Headlight');
+  add(root, new THREE.BoxGeometry(0.04, 0.06, 0.3), tail, B(-0.63, 0, 0.56), 'TailLight');
 
   // Arms, motor cans, prop guards and their struts.
   for (const [, sx, sy] of MOTORS) {
     const mx = sx * ARM_REACH;
     const my = sy * ARM_REACH;
-    strut(B(sx * 0.34, sy * 0.26, 0.6), B(mx, my, 0.64), 0.065, trim);
-    add(root, new THREE.CylinderGeometry(0.13, 0.13, 0.2, 16), trim, B(mx, my, 0.66));
+    strut(B(sx * 0.34, sy * 0.26, 0.6), B(mx, my, 0.64), 0.065, trim, 'Arms');
+    add(root, new THREE.CylinderGeometry(0.13, 0.13, 0.2, 16), trim, B(mx, my, 0.66), 'Arms');
     for (let k = 0; k < 3; k++) {
       const a = Math.atan2(sy, sx) + ((k - 1) * Math.PI * 2) / 3;
-      strut(B(mx + 0.12 * Math.cos(a), my + 0.12 * Math.sin(a), 0.74), B(mx + GUARD_R * Math.cos(a), my + GUARD_R * Math.sin(a), ROTOR_Z - 0.02), 0.02, trim);
+      strut(B(mx + 0.12 * Math.cos(a), my + 0.12 * Math.sin(a), 0.74), B(mx + GUARD_R * Math.cos(a), my + GUARD_R * Math.sin(a), ROTOR_Z - 0.02), 0.02, trim, 'Arms');
     }
-    const guard = add(root, new THREE.TorusGeometry(GUARD_R, 0.035, 8, 40), accent, B(mx, my, ROTOR_Z - 0.02));
+    const guard = add(root, new THREE.TorusGeometry(GUARD_R, 0.035, 8, 40), accent, B(mx, my, ROTOR_Z - 0.02), 'PropGuards');
     guard.rotation.x = Math.PI / 2;
   }
 
   // Landing skids.
   for (const side of [-1, 1]) {
-    const rail = add(root, new THREE.CylinderGeometry(0.04, 0.04, 1.3, 10), trim, B(0, side * 0.42, 0.05));
+    const rail = add(root, new THREE.CylinderGeometry(0.04, 0.04, 1.3, 10), trim, B(0, side * 0.42, 0.05), 'Skids');
     rail.rotation.z = Math.PI / 2;
-    for (const x of [-0.32, 0.32]) strut(B(x, side * 0.42, 0.05), B(x * 0.8, side * 0.3, 0.42), 0.03, trim);
+    for (const x of [-0.32, 0.32]) strut(B(x, side * 0.42, 0.05), B(x * 0.8, side * 0.3, 0.42), 0.03, trim, 'Skids');
   }
 
   // ISR camera gimbal under the nose.
-  add(root, new THREE.CylinderGeometry(0.05, 0.05, 0.12, 10), trim, B(0.42, 0, 0.36));
-  add(root, new THREE.SphereGeometry(0.16, 16, 10), trim, B(0.42, 0, 0.27));
-  const lens = add(root, new THREE.CylinderGeometry(0.07, 0.07, 0.04, 16), head, B(0.575, 0, 0.27));
+  add(root, new THREE.CylinderGeometry(0.05, 0.05, 0.12, 10), trim, B(0.42, 0, 0.36), 'Gimbal');
+  add(root, new THREE.SphereGeometry(0.16, 16, 10), trim, B(0.42, 0, 0.27), 'Gimbal');
+  const lens = add(root, new THREE.CylinderGeometry(0.07, 0.07, 0.04, 16), head, B(0.575, 0, 0.27), 'GimbalLens');
   lens.rotation.z = Math.PI / 2;
 
   // Multi-link antenna (Wi-Fi · 5G · LEO) + AntennaAnchor.
-  add(root, new THREE.CylinderGeometry(0.12, 0.14, 0.06, 20), trim, B(-0.2, 0, 0.84));
-  add(root, new THREE.CylinderGeometry(0.016, 0.022, 0.5, 8), trim, B(-0.2, 0, 1.1));
-  add(root, new THREE.SphereGeometry(0.06, 14, 10), accent, B(-0.2, 0, 1.36));
+  add(root, new THREE.CylinderGeometry(0.12, 0.14, 0.06, 20), trim, B(-0.2, 0, 0.84), 'Antenna');
+  add(root, new THREE.CylinderGeometry(0.016, 0.022, 0.5, 8), trim, B(-0.2, 0, 1.1), 'Antenna');
+  add(root, new THREE.SphereGeometry(0.06, 14, 10), accent, B(-0.2, 0, 1.36), 'AntennaTip');
   const anchorObj = new THREE.Object3D();
   anchorObj.name = 'AntennaAnchor';
   anchorObj.position.copy(B(-0.2, 0, 1.38));
@@ -139,12 +180,12 @@ export function buildDrone(kind = 'flexipath') {
     pivot.position.copy(B(sx * ARM_REACH, sy * ARM_REACH, ROTOR_Z));
     root.add(pivot);
     const alongX = sx * sy > 0;
-    add(pivot, alongX ? new THREE.BoxGeometry(BLADE_LEN, 0.022, 0.1) : new THREE.BoxGeometry(0.1, 0.022, BLADE_LEN), blade);
+    add(pivot, alongX ? new THREE.BoxGeometry(BLADE_LEN, 0.022, 0.1) : new THREE.BoxGeometry(0.1, 0.022, BLADE_LEN), blade, null, `Blades_${name}`);
     for (const s of [-1, 1]) {
       const d = s * (BLADE_LEN / 2 - 0.05);
-      add(pivot, new THREE.BoxGeometry(0.1, 0.024, 0.1), accent, alongX ? new THREE.Vector3(d, 0, 0) : new THREE.Vector3(0, 0, d));
+      add(pivot, new THREE.BoxGeometry(0.1, 0.024, 0.1), accent, alongX ? new THREE.Vector3(d, 0, 0) : new THREE.Vector3(0, 0, d), `BladeTips_${name}`);
     }
-    add(pivot, new THREE.CylinderGeometry(0.03, 0.06, 0.06, 12), trim, new THREE.Vector3(0, 0.03, 0));
+    add(pivot, new THREE.CylinderGeometry(0.03, 0.06, 0.06, 12), trim, new THREE.Vector3(0, 0.03, 0), `Spinner_${name}`);
   }
   return root;
 }
@@ -243,16 +284,35 @@ export class VehicleManager {
     const emissives = collectEmissives(model, 1.0, 0.3); // no boost: body detail must stay readable under bloom
     const tailLights = emissives.filter((m) => m.name === 'TailLight' || /tail|brake/i.test(m.name));
 
+    // Realistic-look paint for every part (by part name), kept beside the neon materials for setLook().
+    const paint = paintedMaterials(id);
+    const parts = [];
+    model.traverse((o) => {
+      if (!o.isMesh) return;
+      const key = PAINT_PARTS.find(([re]) => re.test(o.name))?.[1] ?? 'trim';
+      parts.push({ mesh: o, twin: o.material, real: paint[key] });
+    });
+    // Navigation LEDs under the motors (realistic look only): they keep a painted drone easy to spot at night.
+    const motorLeds = new THREE.Group();
+    motorLeds.visible = false;
+    for (const [, sx, sy] of MOTORS) {
+      const led = new THREE.Mesh(new THREE.SphereGeometry(0.055, 10, 8), paint.led);
+      led.position.copy(B(sx * ARM_REACH, sy * ARM_REACH, 0.54));
+      motorLeds.add(led);
+    }
+    model.add(motorLeds);
+    const realEmissives = Object.values(paint).filter((m) => m.emissiveIntensity > 0 && m.emissive.getHex() !== 0);
+    for (const m of realEmissives) {
+      m.userData.baseEmissive = m.emissiveIntensity;
+      m.userData.baseEmissiveColor = m.emissive.clone();
+    }
+
     if (id === 'legacy') {
       // Ghost treatment: slightly translucent so the FlexiPath drone reads as the hero.
-      model.traverse((o) => {
-        if (!o.isMesh) return;
-        const mats = Array.isArray(o.material) ? o.material : [o.material];
-        for (const m of mats) {
-          m.transparent = true;
-          m.opacity = 0.86;
-        }
-      });
+      for (const m of [...parts.map((p) => p.twin), ...Object.values(paint)]) {
+        m.transparent = true;
+        m.opacity = 0.86;
+      }
     }
 
     // Motion-blur discs over the spinning blades (added after the ghost pass, which would make them opaque).
@@ -281,6 +341,13 @@ export class VehicleManager {
       anchor: anchorObj,
       emissives,
       tailLights,
+      parts,
+      motorLeds,
+      twinEmissives: emissives,
+      twinTailLights: tailLights,
+      realEmissives,
+      realTailLights: [paint.tail],
+      discColor: new THREE.Color(PALETTE[id].accent),
       halo,
       glow,
       label,
@@ -292,6 +359,19 @@ export class VehicleManager {
       visible: true,
       baseHalo: new THREE.Color(id === 'legacy' ? '#E11D48' : '#00F0FF'),
     };
+  }
+
+  /** `real`: painted airframes (white / graphite with cyan / red accents); `twin`: the neon drones. */
+  setLook(look) {
+    const real = look === 'real';
+    for (const v of Object.values(this.vehicles)) {
+      for (const p of v.parts) p.mesh.material = real ? p.real : p.twin;
+      v.emissives = real ? v.realEmissives : v.twinEmissives;
+      v.tailLights = real ? v.realTailLights : v.twinTailLights;
+      v.discColor.set(real ? DISC_REAL : PALETTE[v.id].accent);
+      v.discScale = real ? 0.6 : 1;
+      v.motorLeds.visible = real;
+    }
   }
 
   setVisible(id, visible) {
@@ -391,8 +471,8 @@ export class VehicleManager {
       }
       // Fail-safe hover: the rear light strobes.
       for (const m of v.tailLights) if (failSafe && !flashOn) m.emissiveIntensity = m.userData.baseEmissive * (Math.sin(time * 10) > 0 ? 3 : 0.6);
-      v.discMat.opacity = 0.02 + 0.07 * (v.rotorSpeed / ROTOR_FLIGHT);
-      v.discMat.color.copy(stalled && flashOn ? STALL_RED : v.baseHalo);
+      v.discMat.opacity = (0.02 + 0.07 * (v.rotorSpeed / ROTOR_FLIGHT)) * (v.discScale ?? 1);
+      v.discMat.color.copy(stalled && flashOn ? STALL_RED : v.discColor);
 
       // Halo ring on the ground under the drone, joined to it by the altitude line.
       const hm = v.halo.material;
