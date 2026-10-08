@@ -133,25 +133,30 @@ vehicles, nodes, beams, particles }` in the console.
   code.
 - `Dashboard.js` builds the DOM from template strings and collects `[data-ref]` into `this.refs` before the child
   panels render, so each panel scopes its own lookups. Panels refresh at most every 90 ms when dirty; charts every
-  180 ms and only in the Advanced view. `makeSetter` (`format.js`) skips unchanged DOM writes; pass dynamic text
+  180 ms and only while the Advanced view shows them. `makeSetter` (`format.js`) skips unchanged DOM writes; pass dynamic text
   through `esc()`.
 - Views: `data-mode="mission|advanced"` on `.fp-shell`, elements tagged `data-view`; theatre mode (`data-theatre`)
   hides `.fp-deck`, `.fp-bottom` and `.fp-toolbar`. These rules sit at the end of `styles.css`, outside `@layer`,
   with `!important`.
-- The Mission view is deliberately compact. A block of Mission-scoped rules near the end of `styles.css` hides or shrinks:
-  - `.tb-text` toolbar labels (the buttons become icons);
-  - `.loop-head` and inactive loop captions;
+- Both views are deliberately compact:
+  - The header, toolbar and decision loop are one line each.
+  - The loop is a stepper where only the active stage shows its caption and time. Every stage keeps its caption as a
+    tooltip.
+  - Toolbar actions are icon buttons (`btn-icon`) with a `title` and `aria-label`.
+  - The beam legend (`.fp-legend`) stays hidden until the legend button sets `data-legend="1"`.
+- The Mission view also hides, near the end of `styles.css`:
   - the decision card's `.dp-sub` / `.dp-legacy` lines;
   - `.glance-note`;
   - the lanes body (until **Show steps** adds `is-open`).
 
-  Put new detail in the Advanced view rather than growing the Mission view. In both views the beam legend (`.fp-legend`)
-  stays hidden until the legend button sets `data-legend="1"`.
-- The Advanced view groups its side-column panels behind tabs (`LEFT_TABS` / `RIGHT_TABS` in `Dashboard.js`):
+  Put new detail in the Advanced view rather than growing the Mission view.
+- The Advanced view puts every panel in one column beside the twin, behind tabs (`PANEL_TABS` in `Dashboard.js`):
   - each panel carries `data-tab-panel="<tab>"`;
-  - `setDeckTab()` gives the others `is-tab-off`, a rule that applies only in the Advanced view, so the Mission view
+  - `setPanelTab()` gives the others `is-tab-off`, a rule that applies only in the Advanced view, so the Mission view
     always keeps its decision card;
-  - the choice is remembered in `localStorage`;
+  - the charts row shows only while `setCharts(true)` sets `data-charts="1"` (the **Charts** button), and charts
+    render only then, but they keep recording;
+  - the tab and the charts toggle are remembered in `localStorage`;
   - hidden panels keep updating, so a tab shows current values the moment it opens.
 
   A new Advanced panel needs a tab.
