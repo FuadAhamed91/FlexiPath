@@ -143,10 +143,18 @@ vehicles, nodes, beams, particles }` in the console.
   - `.loop-head` and inactive loop captions;
   - the decision card's `.dp-sub` / `.dp-legacy` lines;
   - `.glance-note`;
-  - the lanes body (until **Show steps** adds `is-open`);
-  - `.fp-legend` (until the legend button sets `data-legend="1"`).
+  - the lanes body (until **Show steps** adds `is-open`).
 
-  Put new detail in the Advanced view rather than growing the Mission view.
+  Put new detail in the Advanced view rather than growing the Mission view. In both views the beam legend (`.fp-legend`)
+  stays hidden until the legend button sets `data-legend="1"`.
+- The Advanced view groups its side-column panels behind tabs (`LEFT_TABS` / `RIGHT_TABS` in `Dashboard.js`):
+  - each panel carries `data-tab-panel="<tab>"`;
+  - `setDeckTab()` gives the others `is-tab-off`, a rule that applies only in the Advanced view, so the Mission view
+    always keeps its decision card;
+  - the choice is remembered in `localStorage`;
+  - hidden panels keep updating, so a tab shows current values the moment it opens.
+
+  A new Advanced panel needs a tab.
 - Lucide: an `<i data-lucide="name">` renders only if the icon is imported and added to `ICONS` in `Dashboard.js`,
   and `renderIcons(subtree)` runs after the HTML is injected.
 - Chart.js is tree-shaken: `BaseTimeSeriesChart.js` registers only the components it uses; register any new

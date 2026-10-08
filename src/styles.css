@@ -256,7 +256,8 @@ body {
 .seg button:hover {
   color: var(--ui-text);
 }
-.seg button[aria-pressed='true'] {
+.seg button[aria-pressed='true'],
+.seg button[aria-selected='true'] {
   color: var(--fp-ink);
   background: color-mix(in srgb, var(--fp) 13%, white);
   box-shadow:
@@ -1649,6 +1650,14 @@ body {
 .fp-shell[data-demo='1'] .fp-camctl {
   display: none;
 }
+/* Advanced view: each side column shows one tab's panels (Dashboard.setDeckTab); the loop captions fit one line. */
+.fp-shell[data-mode='advanced'] [data-tab-panel].is-tab-off {
+  display: none !important;
+}
+.fp-shell[data-mode='advanced'] .loop-stage .cap {
+  min-height: 0;
+  -webkit-line-clamp: 1;
+}
 /* Mission view: the 3D twin and one short column beside it; the left deck only holds Advanced panels. */
 .fp-shell[data-mode='mission'] [data-ref='leftDeck'] {
   display: none !important;
@@ -1738,7 +1747,7 @@ body {
 .fp-shell[data-mode='mission'] [data-ref='lanes']:not(.is-open) .lanes-body {
   display: none;
 }
-.fp-shell[data-mode='mission']:not([data-legend='1']) .fp-legend {
+.fp-shell:not([data-legend='1']) .fp-legend {
   display: none !important;
 }
 /* Phones: inactive loop stages shrink to their number, and the camera buttons to their icons. */
