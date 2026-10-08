@@ -32,15 +32,20 @@ There is no test suite, linter or type checker. Verify changes with `npm run bui
 - Narrow runs: `npm run benchmark -- --quick` (3 seeds, 60 km/h), or e.g. `-- --seeds 1 --speeds 60 --scenarios A,D`;
   also `--no-failsafe`, `--out <dir>`, `--baselines mptcp,redundant` (default) or `none`, `--ablations
   fpNoPred,fpNoBurst,fpNoMap` (default) or `none`, and `--seed-block dev` (default: `1000 + 7919·i`, the block FlexiPath
-  was tuned on) or `test` (held out: `900001 + 7919·i`). The default is scenarios A–H × 5 seeds × 30/60/90/120 km/h =
-  160 paired runs.
+  was tuned on) or `test` (held out: `900001 + 7919·i`), and `--failsafe-ms 1000` (the hover rule, default 300 ms =
+  piloted flight; 1000 = waypoint flight, 3GPP TS 22.125; non-default runs get `_failsafe<ms>ms` file names). The
+  default is scenarios A–H × 5 seeds × 30/60/90/120 km/h = 160 paired runs.
 - Runs are deterministic per seed. For a change that must not alter behaviour, benchmark into two `--out` dirs (before
   and after) and compare: both CSVs must be byte-identical; the JSON differs only in `meta` (timestamps, wall time).
   The baselines and ablations never change FlexiPath / Legacy values: a `--baselines none --ablations none` run
   reproduces the FP/LG-only CSVs exactly, and the `fp_` / `lg_` columns of a full run match them. When you add a
   metric, append it to `SUMMARY_METRICS` so earlier CSV columns keep their order, and compare old vs new by column name.
 - The README's "Measured results" tables come from the default `npm run benchmark`; when model behaviour changes,
-  re-run it and update them.
+  re-run it and update them, the hover-rule table (re-run with `--failsafe-ms 1000`) and the trade-off chart:
+  `node scripts/tradeoff-chart.js results/benchmark_mechanisms_<stamp>.csv` redraws `public/landing/tradeoff.svg`
+  (README and landing page).
+- `node scripts/handover-probe.js` measures one real network change on the laptop it runs on (README "Real-world
+  check"). It is not part of the benchmark; its numbers are real-world and must never be mixed with the simulation's.
 
 In the browser, URL parameters on `simulator.html` give reproducible states (`index.html` forwards any link that carries
 one of them to the simulator): `?scenario=A&seed=2026&speed=90&mode=advanced&focus=legacy
@@ -133,8 +138,8 @@ vehicles, nodes, beams, particles }` in the console.
   `FLOW_DEFS`, …); `exportData()` writes them into the run JSON, so new tunables belong there. A few values are
   duplicated by hand and must change together: `RF.wifi.noiseFloor` / `wlan0.noiseFloor`, `RF.cell.sinrOffset` /
   `wwan0.sinrOffset`, `SWITCH_LOSS` / `FLEXIPATH_PARAMS.switchLoss`, the scenarios' `endX: 240` / `ROUTE_END_X`.
-- Provenance (README "Data provenance and claims"): every number is a MODEL PARAMETER or MEASURED · SIM; nothing is a
-  real-world measurement. The HUD labels interruptions as simulated, shows a `SIMULATION` badge and reports
+- Provenance (README "Data provenance and claims"): every published number is a MODEL PARAMETER or MEASURED · SIM;
+  nothing is a real-world measurement (the probe script's output, if ever quoted, is labelled real-world). The HUD labels interruptions as simulated, shows a `SIMULATION` badge and reports
   differences without a score or "winner". Use `tag('param' | 'measured' | 'sim')` from `src/ui/format.js` for
   provenance chips, and keep README and UI copy within these claims.
 

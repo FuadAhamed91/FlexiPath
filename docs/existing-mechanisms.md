@@ -132,14 +132,14 @@ Both baselines share the legacy stack's measurements, attach thresholds and inte
 
 The figures are from `npm run benchmark`: scenarios A–H, 5 seeds × 4 speeds (30–120 km/h), 20 paired runs per scenario, means. Each cell reads **Legacy · Reactive multipath · Always duplicate · FlexiPath**. G puts a radio shadow on the route that blocks Wi-Fi and 5G together (on FlexiPath's coverage map); in H the map is out of date.
 
-| Scenario | Flights that kept C2 (%) |
-|---|---|
-| A, B, C, E | 0 · 100 · 100 · 100 |
-| D · Multiple faults | 0 · 0 · 100 · 100 |
-| G · Radio shadow | 0 · 0 · 40 · 100 |
-| H · Stale map | 0 · 0 · 100 · 100 |
+| Scenario | Flights that kept C2 (%), piloted rule (300 ms) | Waypoint rule (1 s) |
+|---|---|---|
+| A, B, C, E | 0 · 100 · 100 · 100 | 0 · 100 · 100 · 100 |
+| D · Multiple faults | 0 · 0 · 100 · 100 | 0 · 100 · 100 · 100 |
+| G · Radio shadow | 0 · 0 · 40 · 100 | 0 · 100 · 100 · 100 |
+| H · Stale map | 0 · 0 · 100 · 100 | 0 · 100 · 100 · 100 |
 
-"Kept C2" counts the flights in which the C2 link was never silent long enough (> 300 ms) to force the fail-safe hover. F carries no C2.
+"Kept C2" counts the flights in which the C2 link was never silent long enough to force the fail-safe hover. The rule follows the control mode in 3GPP TS 22.125 (§7.2, Table 7.2-1). Direct stick steering sends a command every 40 ms with a 40 ms latency budget, up to 60 km/h; the default 300 ms rule is more lenient than that. Steering to waypoints allows 1 s, up to 300 km/h (`npm run benchmark -- --failsafe-ms 1000`). Under the waypoint rule every multipath stack keeps C2, and FlexiPath's advantage is its shorter gaps, its delivery and its power. F carries no C2.
 
 | Scenario | Interruption (s) | Critical delivered (%) | Voice MOS | Duplicate bytes, protected flows (%) | Mean radio power (W) | Radio energy (J) |
 |---|---|---|---|---|---|---|
@@ -186,21 +186,23 @@ again kept C2 on every flight. The README section *Held-out seeds* has the table
    - cuts bulk head-of-line peaks 3–5× in A–C and 1.4× in D;
    - acts 1.3–4.6 s **before** the failure instead of 0.3–0.5 s after.
 
-   It also shrinks the gap of the one unpredictable outage in D from 0.35 s to 0.16 s. That is inside the 300 ms fail-safe budget; the reactive stack's gap exceeds it, which triggers the fail-safe hover. The price is about 0.1 W (≈ 9 %) more radio power, for the warm probe and the 400 ms burst.
+   It also shrinks the gap of the one unpredictable outage in D from 0.35 s to 0.16 s. That is inside the 300 ms piloted-flight rule; the reactive stack's gap exceeds it, which triggers the fail-safe hover (under the 1 s waypoint rule neither hovers). The price is about 0.1 W (≈ 9 %) more radio power, for the warm probe and the 400 ms burst.
    The ablation (README, *Ablation: what each part contributes*) shows where this comes from: switching trend
    prediction off costs 10–30 critical packets per flight in A–E, while switching the 400 ms burst off changes nothing
    measurable in this model (it saves 0.02–0.04 W).
 3. **Permanent duplication is the most reliable, and the most expensive.** Always duplicate delivers 99.0–100 % with no gaps. It costs 2.65–3.39 W (2.1–2.6× FlexiPath) and duplicates 49–100 % of protected bytes, against FlexiPath's 0.9–1.4 %. FlexiPath keeps 98–99 % of protected packets at less than half of that power.
-4. **A shared dead zone defeats both existing designs (G).** When Wi-Fi and 5G die at the same place, reactive multipath (a 0.35 s gap) hovers on every flight, and always duplicate, whose two copies die together, on 12 of 20. FlexiPath's coverage map sees the zone 8 s ahead, so the satellite is warm and validated and the switch happens before the shadow: 0 s gap and C2 kept on all 20 flights. The cost is 7.5 Mbps less mean throughput than flying without the map. An out-of-date map (H) costs 21.8 Mbps for a needless move and does not help with a new shadow; fast failover still keeps C2 there.
+4. **A shared dead zone defeats both existing designs (G).** When Wi-Fi and 5G die at the same place, reactive multipath (a 0.35 s gap) hovers on every flight under the piloted rule, and always duplicate, whose two copies die together, on 12 of 20. Under the waypoint rule both keep C2, and FlexiPath's 0 s gap against their 0.39 s and 0.21 s (means) is what remains. FlexiPath's coverage map sees the zone 8 s ahead, so the satellite is warm and validated and the switch happens before the shadow: 0 s gap and C2 kept on all 20 flights. The cost is 7.5 Mbps less mean throughput than flying without the map. An out-of-date map (H) costs 21.8 Mbps for a needless move and does not help with a new shadow; fast failover still keeps C2 there.
 
 FlexiPath sits between the two existing designs: near-redundant reliability at near-reactive cost, and ahead of both where coverage fails in a known place.
+
+![Reliability vs radio power: critical packets delivered against mean radio power for always duplicate, FlexiPath and reactive multipath in scenarios A–D, G and H](../public/landing/tradeoff.svg)
 
 ## Limits of this comparison
 
 - The baselines are behavioural models of the mechanisms, not the protocols themselves. There is no packet-level MPTCP, PMF or UPF.
 - Their detection times are favourable assumptions.
 - Power is the same three-tier system model for every stack. It is not per-technology and not measured.
-- A measurement with real equipment (e.g. a laptop with Wi-Fi and a 5G dongle running Linux MPTCP) would validate the baseline parameters. The challenge welcomes this but does not require it.
+- A measurement with real equipment (e.g. a laptop with Wi-Fi and a 5G dongle running Linux MPTCP) would validate the baseline parameters. The challenge welcomes this but does not require it. `scripts/handover-probe.js` is a first step: it measures one break-before-make network change on a real laptop (README, *Real-world check*).
 - Always duplicate is modelled on its two best joinable paths. A variant that also kept the satellite transmitting (three networks on all the time) would survive scenario G too, at a still higher power cost.
 - The map scenarios are built to test the map: a 60 dB shadow with 5 m edges. How often real routes have such shared dead zones is a field question.
 
