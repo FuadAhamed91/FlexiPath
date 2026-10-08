@@ -11,17 +11,31 @@
  * duplication) in the same engine, so the "mechanisms" table compares all four on identical conditions.
  * They never change the FlexiPath / Legacy results: each agent has its own random streams.
  *
+ * Ablations (default on in the CLI) fly FlexiPath again with one part switched off — signal-trend
+ * prediction, the duplication burst, the coverage map — so each part's contribution is measured on the
+ * same pairs. Prediction quality (precision, recall, lead time) is pooled over all runs of a scenario.
+ *
+ * Seed blocks: `dev` (1000 + 7919·i) is the block FlexiPath was built and tuned on; `test`
+ * (900001 + 7919·i) is a held-out block, run once to check that the results carry over to new conditions.
+ *
  * Works in the browser (chunked, with progress) and in Node (scripts/benchmark.js).
  */
-import { SimulationEngine, VERSION, ANCHOR_IP, ENGINES, BASELINE_ENGINES } from './SimulationEngine.js';
+import { SimulationEngine, VERSION, ANCHOR_IP, ENGINES, BASELINE_ENGINES, ABLATION_ENGINES } from './SimulationEngine.js';
 import { RunningStats, round } from '../utils/Metrics.js';
 import { toCSV } from '../utils/Export.js';
 import { SCENARIOS, EXPERIMENT_SCENARIOS } from './Scenarios.js';
 
-export { SCENARIOS, EXPERIMENT_SCENARIOS, BASELINE_ENGINES };
+export { SCENARIOS, EXPERIMENT_SCENARIOS, BASELINE_ENGINES, ABLATION_ENGINES };
+
+/** Seed blocks: dev = the block used while building and tuning; test = held out, run once. */
+export const SEED_BLOCKS = {
+  dev: { base: 1000, label: 'development seeds (used while building and tuning FlexiPath)' },
+  test: { base: 900001, label: 'held-out test seeds (never used before this run)' },
+};
 
 /** Metrics shown in the paired comparison (Metric | Legacy | FlexiPath | Difference). */
 export const COMPARISON_METRICS = [
+  { key: 'c2KeptPct', label: 'Flights that kept the C2 link (no fail-safe hover)', unit: '%', digits: 0 },
   { key: 'interruptionS', label: 'Simulated interruption (total)', unit: 's', digits: 2 },
   { key: 'longestInterruptionS', label: 'Longest single interruption', unit: 's', digits: 2 },
   { key: 'meanRecoveryS', label: 'Recovery time per interruption', unit: 's', digits: 2, note: 'Only runs with at least one interruption' },
@@ -52,6 +66,7 @@ export const COMPARISON_METRICS = [
 
 /** Metrics compared across mechanisms: Legacy | Reactive multipath | Always duplicate | FlexiPath. */
 export const MECHANISM_METRICS = [
+  { key: 'c2KeptPct', label: 'Flights that kept the C2 link (no fail-safe hover)', unit: '%', digits: 0 },
   { key: 'interruptionS', label: 'Simulated interruption (total)', unit: 's', digits: 2 },
   { key: 'longestInterruptionS', label: 'Longest single interruption', unit: 's', digits: 2 },
   { key: 'criticalDeliveryPct', label: 'Critical packet delivery', unit: '%', digits: 2 },
@@ -66,6 +81,22 @@ export const MECHANISM_METRICS = [
   { key: 'bulkHolPeakMs', label: 'HoL stall · bulk (peak)', unit: 'ms', digits: 0 },
   { key: 'actionVsFailureS', label: 'Action time vs. path failure', unit: 's', digits: 2, note: 'Negative = acted before the path failed' },
   { key: 'journeyTimeS', label: 'Journey time', unit: 's', digits: 1 },
+];
+
+/** Metrics compared across ablations: FlexiPath | FlexiPath with one part off. */
+export const ABLATION_METRICS = [
+  { key: 'c2KeptPct', label: 'Flights that kept the C2 link (no fail-safe hover)', unit: '%', digits: 0 },
+  { key: 'interruptionS', label: 'Simulated interruption (total)', unit: 's', digits: 2 },
+  { key: 'criticalDeliveryPct', label: 'Critical packet delivery', unit: '%', digits: 2 },
+  { key: 'criticalLost', label: 'Critical packets lost per flight', unit: '', digits: 1 },
+  { key: 'meanMos', label: 'Voice QoE · mean MOS (G.107)', unit: '', digits: 2 },
+  { key: 'timeBelowMos36S', label: 'Time below MOS 3.6', unit: 's', digits: 1 },
+  { key: 'actionVsFailureS', label: 'Action time vs. path failure', unit: 's', digits: 2, note: 'Negative = acted before the path failed' },
+  { key: 'bulkHolPeakMs', label: 'HoL stall · bulk (peak)', unit: 'ms', digits: 0 },
+  { key: 'meanThroughputMbps', label: 'Mean throughput', unit: 'Mbps', digits: 1 },
+  { key: 'replicationOverheadPct', label: 'Duplicate bytes · protected flows', unit: '%', digits: 2 },
+  { key: 'meanPowerW', label: 'Mean radio power', unit: 'W', digits: 3 },
+  { key: 'seamlessHandovers', label: 'Path changes (seamless)', unit: '', digits: 1 },
 ];
 
 /** Engines present in a run summary, in display order (FlexiPath, Legacy, then any baselines). */
@@ -123,6 +154,12 @@ export const SUMMARY_METRICS = [
   'remoteIpChanges',
   'tunnelRebinds',
   'natRebinds',
+  // Added with the coverage map and the ablation study (appended so earlier columns keep their order).
+  'c2KeptPct',
+  'failSafeStops',
+  'abruptFailures',
+  'earlyActions',
+  'earlyActionsConfirmed',
 ];
 
 // Two-sided 95 % Student-t critical values, df = 1…30 (df > 30 → 1.96).
@@ -136,8 +173,8 @@ export const tCritical95 = (df) => (df < 1 ? NaN : df <= 30 ? T95[df - 1] : 1.96
 export const seedsFor = (n, base = 1000) => Array.from({ length: n }, (_, i) => base + i * 7919);
 
 /** Run one scenario to completion and return its summary. */
-export function runSingle({ seed, speedKmh = 60, scenario = 'mission', failSafe = true, maxSimSeconds = 900, baselines = [] }) {
-  const agents = ['flexipath', 'legacy', ...baselines];
+export function runSingle({ seed, speedKmh = 60, scenario = 'mission', failSafe = true, maxSimSeconds = 900, baselines = [], ablations = [] }) {
+  const agents = ['flexipath', 'legacy', ...baselines, ...ablations];
   const engine = new SimulationEngine({ seed, speedKmh, failSafe, scenario, recordHistory: false, maxSimSeconds, agents });
   while (!engine.completed) engine.step();
   const summary = engine.getSummary();
@@ -145,12 +182,22 @@ export function runSingle({ seed, speedKmh = 60, scenario = 'mission', failSafe 
 }
 
 export class ExperimentRunner {
-  constructor({ seeds = [1, 2, 3, 4, 5], speeds = [30, 60, 90, 120], scenarios = EXPERIMENT_SCENARIOS, failSafe = true, baselines = BASELINE_ENGINES } = {}) {
+  constructor({
+    seeds = [1, 2, 3, 4, 5],
+    speeds = [30, 60, 90, 120],
+    scenarios = EXPERIMENT_SCENARIOS,
+    failSafe = true,
+    baselines = BASELINE_ENGINES,
+    ablations = [],
+    seedBlock = null,
+  } = {}) {
     this.seeds = seeds;
     this.speeds = speeds;
     this.scenarios = scenarios;
     this.failSafe = failSafe;
     this.baselines = baselines.filter((id) => BASELINE_ENGINES.includes(id));
+    this.ablations = ablations.filter((id) => ABLATION_ENGINES.includes(id));
+    this.seedBlock = seedBlock;
   }
 
   get plan() {
@@ -169,7 +216,7 @@ export class ExperimentRunner {
     const started = Date.now();
     for (let i = 0; i < jobs.length; i++) {
       if (signal?.aborted) break;
-      const run = runSingle({ ...jobs[i], failSafe: this.failSafe, baselines: this.baselines });
+      const run = runSingle({ ...jobs[i], failSafe: this.failSafe, baselines: this.baselines, ablations: this.ablations });
       runs.push(run);
       onProgress?.(i + 1, jobs.length, run);
       if ((i + 1) % yieldEvery === 0) await new Promise((r) => setTimeout(r, 0));
@@ -188,6 +235,8 @@ export class ExperimentRunner {
         scenarios: this.scenarios.map((s) => SCENARIOS[s]),
         failSafe: this.failSafe,
         baselines: this.baselines.map((id) => ({ id, label: ENGINES[id].label, mechanism: ENGINES[id].mechanism })),
+        ablations: this.ablations.map((id) => ({ id, label: ENGINES[id].label, ablation: ENGINES[id].ablation })),
+        seedBlock: this.seedBlock,
         aborted: !!signal?.aborted,
       },
       aggregate: ExperimentRunner.aggregate(runs),
@@ -195,8 +244,104 @@ export class ExperimentRunner {
       mechanisms: this.baselines.length
         ? Object.fromEntries(this.scenarios.map((s) => [s, ExperimentRunner.mechanisms(runs.filter((r) => r.scenario === s), this.baselines)]))
         : null,
+      ablation: this.ablations.length
+        ? Object.fromEntries(this.scenarios.map((s) => [s, ExperimentRunner.ablation(runs.filter((r) => r.scenario === s), this.ablations)]))
+        : null,
+      prediction: Object.fromEntries(
+        this.scenarios.map((s) => [s, ExperimentRunner.prediction(runs.filter((r) => r.scenario === s), ['flexipath', ...this.ablations])]),
+      ),
       runs,
     };
+  }
+
+  /**
+   * Ablation study over matched runs: FlexiPath and each variant with one part off, and the paired
+   * difference FlexiPath − variant (what that part contributes) with its 95 % confidence interval.
+   */
+  static ablation(runs, ablations = ABLATION_ENGINES, metrics = ABLATION_METRICS) {
+    const engines = ['flexipath', ...ablations];
+    const num = (v) => typeof v === 'number' && Number.isFinite(v);
+    return metrics.map((m) => {
+      const stats = Object.fromEntries(engines.map((id) => [id, new RunningStats()]));
+      const diffs = Object.fromEntries(ablations.map((id) => [id, new RunningStats()]));
+      for (const r of runs) {
+        const fp = r.flexipath?.[m.key];
+        for (const id of engines) {
+          const v = r[id]?.[m.key];
+          if (num(v)) stats[id].push(v);
+          if (diffs[id] && num(v) && num(fp)) diffs[id].push(fp - v);
+        }
+      }
+      return {
+        ...m,
+        engines: Object.fromEntries(engines.map((id) => [id, stats[id].count ? { mean: stats[id].mean, sd: stats[id].std, n: stats[id].count } : null])),
+        diff: Object.fromEntries(
+          Object.entries(diffs).map(([id, d]) => {
+            const n = d.count;
+            return [id, n ? { mean: d.mean, sd: d.std, n, ci95: n > 1 ? tCritical95(n - 1) * (d.std / Math.sqrt(n)) : null } : null];
+          }),
+        ),
+      };
+    });
+  }
+
+  /**
+   * Prediction quality, pooled over every run of a scenario:
+   *   recall    = path failures acted on before they happened / all path failures (abrupt ones included)
+   *   precision = early moves the path's later failure confirmed / all early moves
+   *   lead time = mean time from the action to the failure, over failures acted on early
+   */
+  static prediction(runs, engines = ['flexipath']) {
+    const out = {};
+    for (const id of engines) {
+      const sum = { runs: 0, pathFailures: 0, predictedFailures: 0, abruptFailures: 0, earlyActions: 0, earlyActionsConfirmed: 0 };
+      const lead = new RunningStats();
+      for (const r of runs) {
+        const s = r[id];
+        if (!s) continue;
+        sum.runs++;
+        for (const k of ['pathFailures', 'predictedFailures', 'abruptFailures', 'earlyActions', 'earlyActionsConfirmed']) sum[k] += s[k] ?? 0;
+        if (typeof s.actionVsFailureS === 'number' && Number.isFinite(s.actionVsFailureS)) lead.push(-s.actionVsFailureS);
+      }
+      if (!sum.runs) continue;
+      out[id] = {
+        ...sum,
+        recall: sum.pathFailures ? sum.predictedFailures / sum.pathFailures : null,
+        precision: sum.earlyActions ? sum.earlyActionsConfirmed / sum.earlyActions : null,
+        meanLeadS: lead.count ? lead.mean : null,
+      };
+    }
+    return out;
+  }
+
+  /** Ablation study as flat CSV rows (one per scenario × metric). */
+  static ablationCSV(results) {
+    const rows = [];
+    for (const [scenario, table] of Object.entries(results.ablation ?? {})) {
+      for (const m of table) {
+        const row = { scenario, metric: m.key, label: m.label, unit: m.unit };
+        for (const [id, st] of Object.entries(m.engines)) {
+          row[`${id}_mean`] = st?.mean ?? null;
+          row[`${id}_sd`] = st?.sd ?? null;
+        }
+        for (const [id, d] of Object.entries(m.diff)) {
+          row[`fp_minus_${id}`] = d?.mean ?? null;
+          row[`fp_minus_${id}_ci95`] = d?.ci95 ?? null;
+        }
+        row.pairs = m.engines.flexipath?.n ?? 0;
+        rows.push(row);
+      }
+    }
+    return toCSV(rows);
+  }
+
+  /** Prediction quality as flat CSV rows (one per scenario × FlexiPath variant). */
+  static predictionCSV(results) {
+    const rows = [];
+    for (const [scenario, table] of Object.entries(results.prediction ?? {})) {
+      for (const [engine, p] of Object.entries(table)) rows.push({ scenario, engine, ...p });
+    }
+    return toCSV(rows);
   }
 
   /** Mean / std / min / max per scenario × engine. */

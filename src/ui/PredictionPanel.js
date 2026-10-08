@@ -9,7 +9,7 @@
 import { INTERFACE_SPECS } from '../simulation/LinkModel.js';
 import { FLEXIPATH_PARAMS } from '../simulation/FlexiPathController.js';
 import { POWER_PARAMS } from '../simulation/PowerModel.js';
-import { esc, fmtPct, fmtSignal, inkHex, linkChip, linkName, makeSetter, tag } from './format.js';
+import { esc, fmtPct, fmtSignal, inkHex, linkChip, linkName, makeSetter, mapAheadText, tag } from './format.js';
 
 const P = FLEXIPATH_PARAMS;
 const W = POWER_PARAMS.tierWatts;
@@ -117,7 +117,12 @@ export class PredictionPanel {
         : '<span class="text-slate-700">No failure predicted while docked</span>';
     } else {
       const level = `${pred.failLevel.toFixed(1)} ${spec.signalUnit}`;
-      if (pred.triggers.ttf && Number.isFinite(pred.ttf)) {
+      if (pred.mapAhead) {
+        const z = pred.mapAhead.zone;
+        predText = `<span class="${pred.triggers.map ? 'lvl-crit' : 'lvl-warn'}">Dead zone ahead (coverage map): ${esc(mapAheadText(pred.mapAhead))}</span>${
+          z.label ? ` <span class="num text-slate-600">(${esc(z.label.toLowerCase())})</span>` : ''
+        }`;
+      } else if (pred.triggers.ttf && Number.isFinite(pred.ttf)) {
         predText = `<span class="lvl-crit">Failure level in ≈ ${secs(pred.ttf)} s</span> <span class="num text-slate-600">(${level})</span>`;
       } else if (pred.triggers.rapidFade) {
         predText = `<span class="lvl-crit">Signal collapsing ${pred.signalSlope.toFixed(0)} dB/s</span>`;

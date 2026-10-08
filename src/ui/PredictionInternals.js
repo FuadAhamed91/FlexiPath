@@ -5,7 +5,7 @@
 import { FLEXIPATH_PARAMS } from '../simulation/FlexiPathController.js';
 import { INTERFACE_SPECS } from '../simulation/LinkModel.js';
 import { POWER_PARAMS, RADIO_STATES } from '../simulation/PowerModel.js';
-import { esc, linkName, makeSetter, tag } from './format.js';
+import { esc, linkName, makeSetter, mapAheadText, tag } from './format.js';
 
 const P = FLEXIPATH_PARAMS;
 const PW = POWER_PARAMS;
@@ -17,6 +17,7 @@ const ROWS = [
   ['ttf', 'Time-to-failure (1 s)', `< ${P.ttfTriggerS.toFixed(1)} s · within ${P.ttfMarginDb} dB · ${P.ttfConfirmTicks} ticks`],
   ['fade', 'Rapid fade', `< −${P.rapidFadeSlope} dB/s`],
   ['watch', 'Early warning (3 s trend)', `< ${P.watchHorizonS} s · within ${P.watchMarginDb} dB`],
+  ['map', 'Coverage map (dead zone)', `watch < ${P.mapHorizonS} s · act < ${P.ttfTriggerS.toFixed(1)} s`],
   ['ploss', 'Predicted loss (2 s)', `> ${(P.switchLoss * 100).toFixed(0)} % ⇒ imminent`],
   ['rt', 'Real-time budget', `> ${(P.realtimeLossBudget * 100).toFixed(0)} % or TTF < ${P.realtimeTtfS} s`],
   ['health', 'Primary health (wake)', `≤ ${PW.healthWakeScore} ⇒ wake a secondary`],
@@ -46,6 +47,7 @@ export class PredictionInternals {
         Score W = T<sup>a</sup> / (RTT<sup>b</sup> · (1 + ${P.alpha}·L²)); critical a = 0.4, b = 1.2 · bulk a = 1.5, b = 0.5.
         The predictor extrapolates EWMA-smoothed probe signal linearly towards the level where packet loss reaches ${(P.switchLoss * 100).toFixed(0)} %.
         Modems asleep in DRX report signal only (every ${PW.drxCycleS} s), so their scores are estimates until a wake reason fires.
+        The coverage map lists the dead zones earlier survey flights recorded on this route; it knows only persistent geography, never a passing fault.
       </p>`;
     this.refs = {};
     root.querySelectorAll('[data-ref]').forEach((n) => (this.refs[n.dataset.ref] = n));
@@ -82,6 +84,7 @@ export class PredictionInternals {
     this._row('ttf', Number.isFinite(p.ttf) ? `${secs(p.ttf)} s` : spec.tech === 'wired' ? 'n/a' : '∞', tr.ttf ? 'fire' : Number.isFinite(p.ttf) ? 'armed' : null);
     this._row('fade', spec.tech === 'wired' ? 'n/a' : `${p.signalSlope.toFixed(1)} dB/s`, tr.rapidFade ? 'fire' : null);
     this._row('watch', Number.isFinite(p.projectedTtf) ? `${secs(p.projectedTtf)} s` : '∞', d.watching ? 'armed' : null);
+    this._row('map', !d.mapActive ? 'no map for this route' : p.mapAhead ? mapAheadText(p.mapAhead) : 'route clear', tr.map ? 'fire' : p.mapAhead ? 'armed' : null);
     this._row('ploss', `${(p.predictedLoss * 100).toFixed(1)} %`, p.predictedLoss > P.switchLoss ? 'fire' : null);
     this._row('rt', `${(p.loss * 100).toFixed(2)} %`, d.replicate?.REALTIME ? 'fire' : d.protecting ? 'armed' : null);
     const wired = spec.tech === 'wired';

@@ -56,7 +56,7 @@ const EXISTING = [
   [
     'FlexiPath (adapted)',
     'Anchored session + predicted, time-boxed, class-selective duplication',
-    `Keeps the anchored session. The standby radio sleeps and wakes only when failure is predicted. Critical traffic is duplicated only for a ~${BURST_MS} ms burst; voice joins when it needs to, and bulk never does.`,
+    `Keeps the anchored session. The standby radio sleeps and wakes only when failure is predicted, from the signal trend or from the coverage map of the flight plan. Critical traffic is duplicated only for a ~${BURST_MS} ms burst; voice joins when it needs to, and bulk never does.`,
   ],
 ];
 
@@ -69,10 +69,15 @@ const GUIDELINES = [
   'Detect a dead path faster than the application can tolerate.',
   'Hold still unless moving clearly pays.',
   'Measure what users feel, on matched pairs.',
+  'Use what you know about the route: prepare before known dead zones.',
 ];
 
 const WHY = [
-  ['01', 'Predictive', 'Acts before the current path becomes unusable: a measured signal trend projects when the path will reach its failure level.'],
+  [
+    '01',
+    'Predictive',
+    'Acts before the current path becomes unusable: a measured signal trend projects when the path will reach its failure level, and a coverage map of the flight plan flags known dead zones 8 s ahead.',
+  ],
   ['02', 'Traffic-aware', 'Different traffic receives different protection: critical, real-time and bulk flows are handled by their own rules.'],
   ['03', 'Selective replication', 'Critical flows can be protected without duplicating everything: copies are sent only during a risk window, only for the classes that need them.'],
   ['04', 'Explainable', 'Every major connectivity decision has a visible reason, built from the values the controller measured when it acted.'],
@@ -119,7 +124,7 @@ export function infoHTML() {
         <div class="hud-label mt-4 mb-2">The loop</div>
         <ol class="space-y-1.5 text-[12px] leading-relaxed text-slate-700">
           <li><b class="text-[#0E7490]">Detect.</b> The primary is measured at 10 Hz (loss, RTT, throughput, signal; EWMA-smoothed probes). Other modems sleep in DRX (${W[0]} W) and report signal only.</li>
-          <li><b class="text-[#B45309]">Predict.</b> A 3 s trend of the signal is extrapolated to the level where loss reaches ${(P.switchLoss * 100).toFixed(0)} %. Within ${P.watchHorizonS} s, the path is watched.</li>
+          <li><b class="text-[#B45309]">Predict.</b> A 3 s trend of the signal is extrapolated to the level where loss reaches ${(P.switchLoss * 100).toFixed(0)} %. Within ${P.watchHorizonS} s, the path is watched. The coverage map of the flight plan (dead zones recorded by earlier survey flights) flags a known shadow ${P.mapHorizonS} s ahead, so the path that survives it is woken in time.</li>
           <li><b class="text-[#2563EB]">Prepare.</b> The best alternate is woken to Warm Probe (${W[1]} W); after ${PW.warmValidateS} s of heartbeats (loss ≤ ${(P.candidateMaxLoss * 100).toFixed(0)} %, best critical score) it is validated.</li>
           <li><b class="text-repl">Replicate.</b> When time-to-failure &lt; ${P.ttfTriggerS} s (or loss, RTT drift, rapid fade), critical packets go on both paths for a ${BURST_MS} ms burst (${W[2]} W); real-time joins above ${(P.realtimeLossBudget * 100).toFixed(0)} % loss; bulk never.</li>
           <li><b class="text-slate-900">Switch.</b> At the end of the burst the validated path becomes primary and the old radio returns to DRX. An abrupt loss is a failover: ${P.failoverDetectMs} ms detection + ${PW.wakeLatencyS * 1000} ms DRX wake.</li>
