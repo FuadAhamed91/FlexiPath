@@ -20,7 +20,7 @@
  *
  * Works in the browser (chunked, with progress) and in Node (scripts/benchmark.js).
  */
-import { SimulationEngine, VERSION, ANCHOR_IP, ENGINES, BASELINE_ENGINES, ABLATION_ENGINES } from './SimulationEngine.js';
+import { SimulationEngine, VERSION, ANCHOR_IP, ENGINES, BASELINE_ENGINES, ABLATION_ENGINES, FAILSAFE_OUTAGE_S } from './SimulationEngine.js';
 import { RunningStats, round } from '../utils/Metrics.js';
 import { toCSV } from '../utils/Export.js';
 import { SCENARIOS, EXPERIMENT_SCENARIOS } from './Scenarios.js';
@@ -173,9 +173,9 @@ export const tCritical95 = (df) => (df < 1 ? NaN : df <= 30 ? T95[df - 1] : 1.96
 export const seedsFor = (n, base = 1000) => Array.from({ length: n }, (_, i) => base + i * 7919);
 
 /** Run one scenario to completion and return its summary. */
-export function runSingle({ seed, speedKmh = 60, scenario = 'mission', failSafe = true, maxSimSeconds = 900, baselines = [], ablations = [] }) {
+export function runSingle({ seed, speedKmh = 60, scenario = 'mission', failSafe = true, failSafeS = FAILSAFE_OUTAGE_S, maxSimSeconds = 900, baselines = [], ablations = [] }) {
   const agents = ['flexipath', 'legacy', ...baselines, ...ablations];
-  const engine = new SimulationEngine({ seed, speedKmh, failSafe, scenario, recordHistory: false, maxSimSeconds, agents });
+  const engine = new SimulationEngine({ seed, speedKmh, failSafe, failSafeS, scenario, recordHistory: false, maxSimSeconds, agents });
   while (!engine.completed) engine.step();
   const summary = engine.getSummary();
   return { seed: engine.config.seed, speedKmh, scenario, failSafe, simTimeS: round(engine.t, 1), ...summary };
@@ -187,6 +187,7 @@ export class ExperimentRunner {
     speeds = [30, 60, 90, 120],
     scenarios = EXPERIMENT_SCENARIOS,
     failSafe = true,
+    failSafeS = FAILSAFE_OUTAGE_S,
     baselines = BASELINE_ENGINES,
     ablations = [],
     seedBlock = null,
@@ -195,6 +196,7 @@ export class ExperimentRunner {
     this.speeds = speeds;
     this.scenarios = scenarios;
     this.failSafe = failSafe;
+    this.failSafeS = failSafeS;
     this.baselines = baselines.filter((id) => BASELINE_ENGINES.includes(id));
     this.ablations = ablations.filter((id) => ABLATION_ENGINES.includes(id));
     this.seedBlock = seedBlock;
@@ -216,7 +218,7 @@ export class ExperimentRunner {
     const started = Date.now();
     for (let i = 0; i < jobs.length; i++) {
       if (signal?.aborted) break;
-      const run = runSingle({ ...jobs[i], failSafe: this.failSafe, baselines: this.baselines, ablations: this.ablations });
+      const run = runSingle({ ...jobs[i], failSafe: this.failSafe, failSafeS: this.failSafeS, baselines: this.baselines, ablations: this.ablations });
       runs.push(run);
       onProgress?.(i + 1, jobs.length, run);
       if ((i + 1) % yieldEvery === 0) await new Promise((r) => setTimeout(r, 0));
@@ -234,6 +236,7 @@ export class ExperimentRunner {
         speeds: this.speeds,
         scenarios: this.scenarios.map((s) => SCENARIOS[s]),
         failSafe: this.failSafe,
+        failSafeS: this.failSafeS,
         baselines: this.baselines.map((id) => ({ id, label: ENGINES[id].label, mechanism: ENGINES[id].mechanism })),
         ablations: this.ablations.map((id) => ({ id, label: ENGINES[id].label, ablation: ENGINES[id].ablation })),
         seedBlock: this.seedBlock,

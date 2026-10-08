@@ -116,11 +116,12 @@ The relay should learn the outer address from the authenticated tunnel packets t
 **Rule.** Some failures cannot be predicted, such as an abrupt cell outage. For those, the gap is detection plus waking the fallback, and that sum must stay inside the application's deadline.
 
 **Evidence:** in scenario D's unpredictable 5G outage:
-- FlexiPath's gap is **160 ms** (3 missed 20 ms probes = 60 ms, plus a 100 ms DRX wake). That is inside the 300 ms telemetry fail-safe budget.
-- A retransmission-timeout detector (250 ms + 100 ms = **350 ms**) exceeds the budget, and the reactive drone hovers.
+- FlexiPath's gap is **160 ms** (3 missed 20 ms probes = 60 ms, plus a 100 ms DRX wake). That is inside the 300 ms telemetry fail-safe budget (the piloted-flight hover rule).
+- A retransmission-timeout detector (250 ms + 100 ms = **350 ms**) exceeds the budget, and the reactive drone hovers. Under the 1 s waypoint-flight rule it would not.
 - The legacy stack is offline for 3.8 s.
 
 **How:**
+- Take the deadline from the control mode. 3GPP TS 22.125 (§7.2, Table 7.2-1) gives 40 ms per C2 command for direct stick steering (up to 60 km/h) and 1 s for steering to waypoints (up to 300 km/h). A 160 ms gap meets the waypoint budget but not the stick-steering one.
 - Probe the active path at a rate that matches the most demanding flow's deadline.
 - Budget explicitly: detection + wake + one RTT < deadline.
 - For the strictest flows, accept a warm spare (+0.6 W while warm) or permanent duplication where a 160 ms gap is still too long.

@@ -9,6 +9,7 @@
  *   npm run benchmark -- --baselines none               (no existing-mechanism baselines)
  *   npm run benchmark -- --ablations none               (no FlexiPath ablations)
  *   npm run benchmark -- --seed-block test              (held-out seeds, never used while tuning)
+ *   npm run benchmark -- --failsafe-ms 1000             (waypoint-flight hover rule instead of the default 300 ms)
  *
  * Writes results/benchmark_<stamp>.json, .csv (per-run rows, every engine side by side),
  * _comparison.csv (Metric | Legacy | FlexiPath | Difference with 95 % CI), _prediction.csv (precision,
@@ -21,7 +22,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ExperimentRunner, EXPERIMENT_SCENARIOS, SCENARIOS, BASELINE_ENGINES, ABLATION_ENGINES, SEED_BLOCKS, seedsFor } from '../src/simulation/ExperimentRunner.js';
-import { ENGINES } from '../src/simulation/SimulationEngine.js';
+import { ENGINES, FAILSAFE_OUTAGE_S } from '../src/simulation/SimulationEngine.js';
 import { toJSON, timestampedName } from '../src/utils/Export.js';
 
 const args = process.argv.slice(2);
@@ -44,6 +45,15 @@ if (unknown.length) {
   process.exit(1);
 }
 const failSafe = !args.includes('--no-failsafe');
+// Hover rule: C2 silent longer than this. 300 ms (default) suits a piloted drone; 1000 ms suits waypoint flight.
+const failSafeMs = Number(opt('failsafe-ms', FAILSAFE_OUTAGE_S * 1000));
+if (!(failSafeMs > 0)) {
+  console.error(`--failsafe-ms needs a positive number of milliseconds`);
+  process.exit(1);
+}
+const failSafeS = failSafeMs / 1000;
+// Non-default thresholds get their own file names, so their CSVs are never mistaken for the published ones.
+const fsTag = failSafeS === FAILSAFE_OUTAGE_S ? '' : `_failsafe${failSafeMs}ms`;
 const outDir = resolve(dirname(fileURLToPath(import.meta.url)), '..', opt('out', 'results'));
 const baselineArg = opt('baselines', BASELINE_ENGINES.join(','));
 const baselines = baselineArg === 'none' ? [] : baselineArg.split(',');
@@ -60,10 +70,11 @@ if (badAblation.length) {
   process.exit(1);
 }
 
-const runner = new ExperimentRunner({ seeds, speeds, scenarios, failSafe, baselines, ablations, seedBlock });
+const runner = new ExperimentRunner({ seeds, speeds, scenarios, failSafe, failSafeS, baselines, ablations, seedBlock });
 const total = runner.plan.length;
 console.log(`FlexiPath experiments · ${total} paired runs (${seeds.length} seeds × ${speeds.length} speeds × ${scenarios.length} scenarios)`);
 console.log(`Seeds: ${SEED_BLOCKS[seedBlock].label} · ${seeds.join(', ')}`);
+console.log(failSafe ? `Fail-safe: hover when C2 is silent > ${failSafeMs} ms` : 'Fail-safe: off');
 console.log('All values are measured SIMULATION results (model, not hardware).');
 
 const results = await runner.run({
@@ -138,22 +149,22 @@ for (const scenario of scenarios) {
 console.table(predRows);
 
 mkdirSync(outDir, { recursive: true });
-const jsonPath = resolve(outDir, timestampedName('benchmark', 'json'));
-const csvPath = resolve(outDir, timestampedName('benchmark', 'csv'));
-const cmpPath = resolve(outDir, timestampedName('benchmark_comparison', 'csv'));
-const predPath = resolve(outDir, timestampedName('benchmark_prediction', 'csv'));
+const jsonPath = resolve(outDir, timestampedName(`benchmark${fsTag}`, 'json'));
+const csvPath = resolve(outDir, timestampedName(`benchmark${fsTag}`, 'csv'));
+const cmpPath = resolve(outDir, timestampedName(`benchmark${fsTag}_comparison`, 'csv'));
+const predPath = resolve(outDir, timestampedName(`benchmark${fsTag}_prediction`, 'csv'));
 writeFileSync(jsonPath, toJSON(results));
 writeFileSync(csvPath, ExperimentRunner.toCSV(results));
 writeFileSync(cmpPath, ExperimentRunner.comparisonCSV(results));
 writeFileSync(predPath, ExperimentRunner.predictionCSV(results));
 const written = [jsonPath, csvPath, cmpPath, predPath];
 if (results.mechanisms) {
-  const mechPath = resolve(outDir, timestampedName('benchmark_mechanisms', 'csv'));
+  const mechPath = resolve(outDir, timestampedName(`benchmark${fsTag}_mechanisms`, 'csv'));
   writeFileSync(mechPath, ExperimentRunner.mechanismsCSV(results));
   written.push(mechPath);
 }
 if (results.ablation) {
-  const ablPath = resolve(outDir, timestampedName('benchmark_ablations', 'csv'));
+  const ablPath = resolve(outDir, timestampedName(`benchmark${fsTag}_ablations`, 'csv'));
   writeFileSync(ablPath, ExperimentRunner.ablationCSV(results));
   written.push(ablPath);
 }
