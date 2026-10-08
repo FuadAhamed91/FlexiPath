@@ -1,43 +1,696 @@
 <!doctype html>
-<html lang="en" class="h-full">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      // Links made for the simulator before it moved (?scenario=…, ?demo=1, …) still open it directly.
+      (function () {
+        var q = new URLSearchParams(location.search);
+        var keys = ['scenario', 'seed', 'speed', 'mode', 'focus', 'camera', 'intro', 'paused', 'demo', 'models', 'look'];
+        if (keys.some(function (k) { return q.has(k); })) location.replace('simulator.html' + location.search + location.hash);
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="light" />
-    <meta name="theme-color" content="#edf1f6" />
-    <title>FlexiPath · Predictive Connectivity Engine</title>
+    <meta name="theme-color" content="#ffffff" />
+    <title>FlexiPath · Predictive connectivity for drones</title>
     <meta
       name="description"
-      content="FlexiPath simulation prototype: a predictive, traffic-aware connectivity engine that predicts path degradation, prepares the next path and selectively protects critical traffic across wired, Wi-Fi 6, 5G SA and LEO satellite links."
+      content="FlexiPath keeps a drone's command-and-control link alive between Wi-Fi, 5G and LEO satellite: it predicts the failing path, prepares the next one and protects critical traffic through the handover. A simulation prototype for the ATRC EDGE Challenge."
     />
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Orbitron:wght@600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&family=Orbitron:wght@700;800&display=swap"
       rel="stylesheet"
     />
+    <script type="module" src="/src/landing/landing.js"></script>
   </head>
-  <body class="h-full overflow-hidden font-sans text-slate-800 antialiased">
-    <div id="app" class="h-full"></div>
+  <body class="font-sans antialiased">
+    <a href="#main" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:rounded-lg focus:bg-white focus:px-3 focus:py-2 focus:shadow">Skip to content</a>
 
-    <div id="boot-splash" class="boot-splash" role="status" aria-live="polite">
-      <div class="boot-core">
-        <svg viewBox="0 0 64 64" class="boot-glyph" aria-hidden="true">
-          <path d="M6 44 C 20 44, 22 20, 32 20 S 44 44, 58 44" fill="none" stroke="#0891B2" stroke-width="3" stroke-linecap="round" />
-          <path d="M6 44 C 20 44, 24 32, 32 32 S 44 44, 58 44" fill="none" stroke="#7C3AED" stroke-width="3" stroke-linecap="round" opacity=".85" />
-          <circle cx="6" cy="44" r="4" fill="#0891B2" />
-          <circle cx="58" cy="44" r="4" fill="#10B981" />
-        </svg>
-        <div class="boot-title">FLEXIPATH</div>
-        <div class="boot-sub" id="boot-status">Initialising simulation…</div>
-        <div class="boot-bar"><span></span></div>
+    <!-- ── Navigation ─────────────────────────────────────────────────────── -->
+    <header class="lp-nav" data-nav>
+      <div class="lp-wrap flex h-16 items-center gap-3 sm:gap-6">
+        <a href="#top" class="flex shrink-0 items-center gap-2.5" aria-label="FlexiPath, back to top">
+          <svg viewBox="0 0 64 64" class="size-8" aria-hidden="true">
+            <path d="M6 44 C 20 44, 22 18, 32 18 S 44 44, 58 44" fill="none" stroke="#0891B2" stroke-width="5" stroke-linecap="round" />
+            <path d="M6 44 C 20 44, 24 31, 32 31 S 44 44, 58 44" fill="none" stroke="#7C3AED" stroke-width="5" stroke-linecap="round" />
+            <circle cx="6" cy="44" r="5" fill="#0891B2" /><circle cx="58" cy="44" r="5" fill="#10B981" />
+          </svg>
+          <span class="lp-wordmark max-sm:text-[13px]!">FLEXIPATH</span>
+        </a>
+        <nav class="ml-auto hidden items-center gap-7 lg:flex" aria-label="Sections">
+          <a class="lp-link" href="#problem">Problem</a>
+          <a class="lp-link" href="#how">How it works</a>
+          <a class="lp-link" href="#solutions">Solutions</a>
+          <a class="lp-link" href="#results">Results</a>
+          <a class="lp-link" href="#simulator">Simulator</a>
+          <a class="lp-link" href="#roadmap">Roadmap</a>
+        </nav>
+        <a href="./simulator.html" class="lp-btn lp-btn-primary lp-btn-sm ml-auto lg:ml-0"><i data-lucide="play" class="max-sm:hidden"></i><span class="sm:hidden">Simulator</span><span class="hidden sm:inline">Launch the simulator</span></a>
       </div>
-    </div>
+    </header>
 
-    <noscript>
-      <p style="padding: 2rem; font-family: sans-serif">FlexiPath needs JavaScript and WebGL to run.</p>
-    </noscript>
-    <script type="module" src="/src/main.js"></script>
+    <main id="main">
+      <!-- ── Hero ─────────────────────────────────────────────────────────── -->
+      <section class="lp-hero" id="top">
+        <div class="lp-wrap relative pt-14 pb-16 sm:pt-20 lg:pt-24 lg:pb-24">
+          <div class="mx-auto max-w-[880px] text-center">
+            <span class="lp-eyebrow"><span class="dot"></span><span class="hidden sm:inline">ATRC Advanced Technology Pioneers 2026</span><span class="sm:hidden">ATRC ATP 2026</span> · EDGE Challenge</span>
+            <h1 class="lp-h1 mt-6">Don’t wait for the link to <span class="lp-grad">fail</span>.</h1>
+            <p class="lp-lead mx-auto max-w-[720px] text-[17px]! sm:text-[19px]!">
+              FlexiPath keeps a drone’s command-and-control link alive as it flies between Wi-Fi, 5G and LEO satellite. It
+              sees the current path degrading, wakes and checks the next one, protects critical traffic through the
+              handover, and switches before the old link breaks, without resetting a session.
+            </p>
+            <div class="mt-8 flex flex-wrap items-center justify-center gap-3">
+              <a href="./simulator.html" class="lp-btn lp-btn-primary"><i data-lucide="play"></i>Launch the simulator</a>
+              <a href="./simulator.html?demo=1" class="lp-btn"><i data-lucide="presentation"></i>Watch the guided demo</a>
+            </div>
+            <p class="mt-5 font-mono text-[12px] text-slate-500">Simulation prototype · every number here is a simulated measurement or a model parameter</p>
+          </div>
+
+          <div class="relative mx-auto mt-14 max-w-[1120px] sm:mt-16">
+            <figure class="lp-shot">
+              <div class="lp-shot-bar" aria-hidden="true"><i></i><i></i><i></i><span class="ml-2">FlexiPath simulator · Mission view</span></div>
+              <img
+                src="./landing/simulator-mission-1200.webp"
+                srcset="./landing/simulator-mission-1200.webp 1200w, ./landing/simulator-mission-2400.webp 2400w"
+                sizes="(min-width: 1180px) 1104px, calc(100vw - 48px)"
+                width="2400"
+                height="1350"
+                alt="The FlexiPath simulator: two drones over a night city, the decision loop at the Replicate stage, and panels explaining the decision"
+                fetchpriority="high"
+              />
+              <figcaption class="sr-only">The moment of a handover: FlexiPath sends its critical traffic on Wi-Fi and 5G for 400 ms.</figcaption>
+            </figure>
+            <div class="lp-float relative mt-4 w-full p-4 sm:absolute sm:-bottom-8 sm:-left-4 sm:mt-0 sm:w-[300px] lg:-left-10">
+              <span class="font-mono text-[10.5px] font-bold tracking-[0.14em] whitespace-nowrap text-slate-500">SCENARIO A · WI-FI → 5G</span>
+              <div class="mt-3 grid grid-cols-2 gap-3">
+                <div>
+                  <div class="text-[12px] font-semibold text-fp">FlexiPath</div>
+                  <div class="font-mono text-[28px] font-bold tracking-tight text-slate-900">0.00 s</div>
+                </div>
+                <div>
+                  <div class="text-[12px] font-semibold text-legacy">Legacy OS</div>
+                  <div class="font-mono text-[28px] font-bold tracking-tight text-slate-900">3.80 s</div>
+                </div>
+              </div>
+              <p class="mt-2 text-[12px] leading-snug text-slate-500">Simulated interruption per journey, mean of 20 paired runs.</p>
+              <span class="lp-tag lp-tag-measured mt-3">MEASURED · SIM</span>
+            </div>
+            <div class="lp-float absolute -top-5 -right-3 hidden items-center gap-2.5 px-3.5 py-2.5 md:flex lg:-right-8">
+              <span class="size-2.5 rounded-full bg-repl"></span>
+              <span class="text-[13px] font-semibold text-slate-800">400 ms burst · C2 on Wi-Fi + 5G</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Numbers ──────────────────────────────────────────────────────── -->
+      <section class="border-y border-slate-200 bg-[#f6f8fb]" aria-label="Key results">
+        <div class="lp-wrap py-12 sm:py-14">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <p class="text-[14px] text-slate-600">Scenarios A–D, 20 paired runs each, FlexiPath and Legacy OS on the same seeds, route and radio field.</p>
+            <span class="lp-tag lp-tag-measured">MEASURED · SIM</span>
+          </div>
+          <div class="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="lp-card lp-stat lp-reveal p-5">
+              <div class="v">0.00 s</div>
+              <p class="mt-3 text-[14.5px] leading-snug text-slate-700">simulated interruption in every predictable handover</p>
+              <p class="mt-2 font-mono text-[12px] text-legacy">Legacy OS: 3.7–7.5 s</p>
+            </div>
+            <div class="lp-card lp-stat lp-reveal p-5">
+              <div class="v">98–99 %</div>
+              <p class="mt-3 text-[14.5px] leading-snug text-slate-700">of critical C2 packets delivered</p>
+              <p class="mt-2 font-mono text-[12px] text-legacy">Legacy OS: 77–85 %</p>
+            </div>
+            <div class="lp-card lp-stat lp-reveal p-5">
+              <div class="v">≈ 1 %</div>
+              <p class="mt-3 text-[14.5px] leading-snug text-slate-700">extra bytes to protect the critical traffic</p>
+              <p class="mt-2 font-mono text-[12px] text-slate-500">Always-duplicate: 49–100 %</p>
+            </div>
+            <div class="lp-card lp-stat lp-reveal p-5">
+              <div class="v">1.3–4.6 s</div>
+              <p class="mt-3 text-[14.5px] leading-snug text-slate-700">before the path fails, FlexiPath has already acted</p>
+              <p class="mt-2 font-mono text-[12px] text-legacy">Legacy OS acts 1.0–2.3 s after</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Problem ──────────────────────────────────────────────────────── -->
+      <section id="problem" class="py-20 sm:py-24">
+        <div class="lp-wrap grid gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
+          <div class="lp-reveal">
+            <p class="lp-kicker">The problem</p>
+            <h2 class="lp-h2">Today’s devices change networks only after they lose one.</h2>
+            <p class="lp-lead">
+              A drone crossing a city, a 5G corridor and a rural zone changes networks several times per flight. A standard
+              operating system stays on the current link until it is gone, then detects the loss, scans for another
+              network, gets a new address and rebuilds every connection.
+            </p>
+            <p class="lp-lead">
+              For a drone, that silence on the C2 link is not an inconvenience. A drone that loses its C2 link falls
+              back to a fail-safe: here, telemetry silent for more than 300 ms makes it stop and hover until the link
+              returns, and the mission waits.
+            </p>
+          </div>
+
+          <div class="lp-card lp-reveal self-start p-5 sm:p-7">
+            <div class="flex flex-wrap items-baseline justify-between gap-2">
+              <h3 class="text-[16px] font-bold text-slate-900">One handover, two stacks</h3>
+              <span class="font-mono text-[11.5px] text-slate-500">time relative to the moment Wi-Fi fails</span>
+            </div>
+
+            <div class="lp-tl mt-7">
+              <div class="lp-tl-row">
+                <div class="mb-2 flex items-baseline justify-between gap-3">
+                  <span class="text-[13px] font-bold tracking-wide text-legacy">LEGACY OS · break-before-make</span>
+                  <span class="font-mono text-[15px] font-bold whitespace-nowrap text-slate-900">3.8 s cut off</span>
+                </div>
+                <div class="track" role="img" aria-label="Legacy OS: stays on Wi-Fi with no warning, then 3.8 seconds with every flow cut off after Wi-Fi fails">
+                  <div class="lp-tl-seg text-slate-600!" style="left: 0.5%; width: 54.6%; background: #e2e8f0">on Wi-Fi · no warning</div>
+                  <div class="lp-tl-seg" style="left: 55.56%; width: 11.11%; background: #fda4af" title="Link-loss detection 1.0 s"></div>
+                  <div class="lp-tl-seg" style="left: 66.67%; width: 8.89%; background: #fb7185" title="Scan + attach 0.8 s"></div>
+                  <div class="lp-tl-seg" style="left: 75.56%; width: 5.55%; background: #f43f5e" title="New address + routes 0.5 s"></div>
+                  <div class="lp-tl-seg" style="left: 81.11%; width: 16.67%; background: #be123c" title="TCP reset, TLS, re-login 1.5 s"></div>
+                  <div class="lp-tl-fail" style="left: 55.56%" aria-hidden="true"></div>
+                </div>
+                <ul class="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[11.5px] text-slate-600">
+                  <li><span class="mr-1.5 inline-block size-2.5 rounded-sm align-[-1px]" style="background: #fda4af"></span>detect loss 1.0 s</li>
+                  <li><span class="mr-1.5 inline-block size-2.5 rounded-sm align-[-1px]" style="background: #fb7185"></span>scan + attach 0.8 s</li>
+                  <li><span class="mr-1.5 inline-block size-2.5 rounded-sm align-[-1px]" style="background: #f43f5e"></span>new address 0.5 s</li>
+                  <li><span class="mr-1.5 inline-block size-2.5 rounded-sm align-[-1px]" style="background: #be123c"></span>TCP reset · TLS · re-login 1.5 s</li>
+                </ul>
+              </div>
+
+              <div class="lp-tl-row">
+                <div class="mb-2 flex items-baseline justify-between gap-3">
+                  <span class="text-[13px] font-bold tracking-wide text-fp">FLEXIPATH · make-before-break</span>
+                  <span class="font-mono text-[15px] font-bold whitespace-nowrap text-slate-900">0.00 s cut off</span>
+                </div>
+                <div class="track" role="img" aria-label="FlexiPath: predicts and prepares, sends critical traffic on both paths for 400 milliseconds 3.4 seconds before Wi-Fi fails, then continues on 5G with no interruption">
+                  <div class="lp-tl-seg" style="left: 0.5%; width: 17.28%; background: #60a5fa">predict</div>
+                  <div class="lp-tl-seg" style="left: 17.78%; width: 4.44%; background: #7c3aed" title="400 ms burst on both paths"></div>
+                  <div class="lp-tl-seg" style="left: 22.22%; width: 77.28%; justify-content: flex-end; padding-right: 12px; background: #0891b2">on 5G · sessions continue</div>
+                  <div class="lp-tl-fail" style="left: 55.56%" aria-hidden="true"></div>
+                </div>
+                <ul class="mt-2.5 flex flex-wrap gap-x-4 gap-y-1 font-mono text-[11.5px] text-slate-600">
+                  <li><span class="mr-1.5 inline-block size-2.5 rounded-sm align-[-1px]" style="background: #60a5fa"></span>predict · wake · validate 5G</li>
+                  <li><span class="mr-1.5 inline-block size-2.5 rounded-sm align-[-1px]" style="background: #7c3aed"></span>400 ms burst on both paths</li>
+                  <li><span class="mr-1.5 inline-block size-2.5 rounded-sm align-[-1px]" style="background: #0891b2"></span>new path, same sessions</li>
+                </ul>
+              </div>
+
+              <div class="lp-tl-axis" aria-hidden="true">
+                <span style="left: 0%; transform: none">−5 s</span>
+                <span style="left: 22.22%">−3 s</span>
+                <span style="left: 55.56%" class="font-semibold text-slate-900">Wi-Fi fails</span>
+                <span style="left: 77.78%">+2 s</span>
+                <span style="right: 0; left: auto; transform: none">+4 s</span>
+              </div>
+            </div>
+
+            <p class="mt-6 border-t border-slate-200 pt-4 text-[12.5px] leading-relaxed text-slate-500">
+              <span class="lp-tag lp-tag-param mr-1.5 align-[1px]">MODEL PARAMETER</span>Legacy recovery phases.
+              <span class="lp-tag lp-tag-measured mr-1.5 ml-2 align-[1px]">MEASURED · SIM</span>FlexiPath acts 3.4 s before the
+              failure and loses 0.00 s, mean of 20 paired runs in scenario A.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── How it works ─────────────────────────────────────────────────── -->
+      <section id="how" class="border-y border-slate-200 bg-[#f6f8fb] py-20 sm:py-24">
+        <div class="lp-wrap">
+          <div class="lp-reveal max-w-[760px]">
+            <p class="lp-kicker">How it works</p>
+            <h2 class="lp-h2">One decision loop, running ten times a second.</h2>
+            <p class="lp-lead">
+              Every 100 ms FlexiPath measures the active path and asks one question: is it about to fail? If it is, the
+              loop prepares the next path, protects what matters for a moment, and moves.
+            </p>
+          </div>
+
+          <ol class="lp-loop mt-12" data-loop>
+            <li class="lp-step" style="--sc: #0891b2">
+              <span class="n">01</span>
+              <div class="name">DETECT</div>
+              <p>Measure the active path 10 times a second. Spare modems sleep and report signal only.</p>
+              <span class="param">10 Hz · standby 1.2 W</span>
+            </li>
+            <li class="lp-step" style="--sc: #b45309">
+              <span class="n">02</span>
+              <div class="name">PREDICT</div>
+              <p>A 3-second signal trend projects when the path will reach its failure level.</p>
+              <span class="param">8 s look-ahead</span>
+            </li>
+            <li class="lp-step" style="--sc: #2563eb">
+              <span class="n">03</span>
+              <div class="name">PREPARE</div>
+              <p>Wake the best spare modem and validate it with heartbeats before trusting it.</p>
+              <span class="param">warm probe 1.8 W</span>
+            </li>
+            <li class="lp-step" style="--sc: #7c3aed">
+              <span class="n">04</span>
+              <div class="name">REPLICATE</div>
+              <p>Send critical traffic on both paths for a moment. The first copy to arrive wins.</p>
+              <span class="param">400 ms burst · 3.4 W</span>
+            </li>
+            <li class="lp-step" style="--sc: #334155">
+              <span class="n">05</span>
+              <div class="name">SWITCH</div>
+              <p>Make the prepared path primary. The old radio goes back to sleep.</p>
+              <span class="param">no gap</span>
+            </li>
+            <li class="lp-step" style="--sc: #15803d">
+              <span class="n">06</span>
+              <div class="name">CONTINUE</div>
+              <p>Sessions ride a tunnel to a fixed anchor relay, so no connection is reset.</p>
+              <span class="param">one address</span>
+            </li>
+          </ol>
+          <p class="mt-6 font-mono text-[12px] text-slate-500"><span class="lp-tag lp-tag-param mr-2 align-[1px]">MODEL PARAMETER</span>Rates, thresholds and radio power tiers are set in the model.</p>
+        </div>
+      </section>
+
+      <!-- ── Solutions ────────────────────────────────────────────────────── -->
+      <section id="solutions" class="py-20 sm:py-24">
+        <div class="lp-wrap">
+          <div class="lp-reveal max-w-[760px]">
+            <p class="lp-kicker">Our solutions</p>
+            <h2 class="lp-h2">Six ideas that make the handover invisible.</h2>
+            <p class="lp-lead">
+              FlexiPath adapts what already exists, multipath anchoring from MPTCP and 3GPP ATSSS and packet duplication,
+              and adds prediction, sleeping standby radios and protection that lasts only as long as the risk.
+            </p>
+          </div>
+
+          <div class="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <article class="lp-card lp-reveal p-6">
+              <span class="lp-icon" style="--c: #b45309"><i data-lucide="activity"></i></span>
+              <h3 class="mt-5 text-[18px] font-bold text-slate-900">Predict the failure</h3>
+              <p class="mt-2 text-[15px] leading-relaxed text-slate-600">
+                The signal’s trend projects when the path will fail, so FlexiPath acts 1.3–4.6 s before the failure. The
+                legacy stack acts after it.
+              </p>
+              <span class="lp-tag lp-tag-measured mt-4">MEASURED · SIM</span>
+            </article>
+            <article class="lp-card lp-reveal p-6">
+              <span class="lp-icon" style="--c: #2563eb"><i data-lucide="moon"></i></span>
+              <h3 class="mt-5 text-[18px] font-bold text-slate-900">Spare radios sleep until needed</h3>
+              <p class="mt-2 text-[15px] leading-relaxed text-slate-600">
+                Standby modems stay in low-power DRX and wake only when a degradation is predicted. Mean radio power stays
+                at 1.25–1.32 W, against 2.65–3.39 W for always-on duplication.
+              </p>
+              <span class="lp-tag lp-tag-measured mt-4">MEASURED · SIM</span>
+            </article>
+            <article class="lp-card lp-reveal p-6">
+              <span class="lp-icon" style="--c: #7c3aed"><i data-lucide="copy"></i></span>
+              <h3 class="mt-5 text-[18px] font-bold text-slate-900">Protect only what matters</h3>
+              <p class="mt-2 text-[15px] leading-relaxed text-slate-600">
+                The C2 link is copied onto both paths only during a 400 ms burst around the handover. Voice joins above
+                its 2 % loss budget. Camera and survey uploads are never duplicated.
+              </p>
+              <span class="lp-tag lp-tag-param mt-4">MODEL PARAMETER</span>
+            </article>
+            <article class="lp-card lp-reveal p-6">
+              <span class="lp-icon" style="--c: #0891b2"><i data-lucide="lock"></i></span>
+              <h3 class="mt-5 text-[18px] font-bold text-slate-900">One address for the whole flight</h3>
+              <p class="mt-2 text-[15px] leading-relaxed text-slate-600">
+                Every flow rides a UDP tunnel to a static anchor relay. Ground services see one IP across Wi-Fi, 5G and
+                satellite, through carrier NAT: 0 remote-visible address changes.
+              </p>
+              <span class="lp-tag lp-tag-measured mt-4">MEASURED · SIM</span>
+            </article>
+            <article class="lp-card lp-reveal p-6">
+              <span class="lp-icon" style="--c: #15803d"><i data-lucide="list-ordered"></i></span>
+              <h3 class="mt-5 text-[18px] font-bold text-slate-900">No waiting for order</h3>
+              <p class="mt-2 text-[15px] leading-relaxed text-slate-600">
+                Each critical packet carries a sequence number. The receiver keeps the first copy and drops the late one,
+                so C2 and voice never wait in line: 0 ms head-of-line delay in every run.
+              </p>
+              <span class="lp-tag lp-tag-measured mt-4">MEASURED · SIM</span>
+            </article>
+            <article class="lp-card lp-reveal p-6">
+              <span class="lp-icon" style="--c: #334155"><i data-lucide="message-square-text"></i></span>
+              <h3 class="mt-5 text-[18px] font-bold text-slate-900">Every decision explained</h3>
+              <p class="mt-2 text-[15px] leading-relaxed text-slate-600">
+                Each switch comes with its reason: the values FlexiPath measured and the thresholds they crossed, shown live
+                beside the rule the legacy stack follows.
+              </p>
+              <span class="lp-tag lp-tag-sim mt-4">SIMULATED</span>
+            </article>
+          </div>
+
+          <!-- System diagram -->
+          <div class="lp-card lp-reveal mt-6 overflow-hidden">
+            <div class="grid gap-0 lg:grid-cols-[minmax(0,4fr)_minmax(0,8fr)]">
+              <div class="border-b border-slate-200 bg-[#f6f8fb] p-6 sm:p-8 lg:border-r lg:border-b-0">
+                <span class="lp-icon"><i data-lucide="layers"></i></span>
+                <h3 class="mt-5 text-[20px] font-bold tracking-tight text-slate-900">Designed to sit under any C2 application</h3>
+                <p class="mt-3 text-[15px] leading-relaxed text-slate-600">
+                  FlexiPath works below the application. The C2 software keeps its connection; FlexiPath moves the path
+                  underneath it, across every radio the drone carries.
+                </p>
+              </div>
+              <div class="p-6 sm:p-8">
+                <div class="grid items-center gap-5 md:grid-cols-[minmax(0,1fr)_minmax(0,1.15fr)_minmax(0,1fr)]">
+                  <div class="rounded-xl border border-slate-200 p-3">
+                    <div class="flex items-center gap-2 font-mono text-[11px] font-bold tracking-[0.12em] text-slate-500"><i data-lucide="drone" class="size-4"></i>ON THE DRONE</div>
+                    <div class="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-700">C2 · voice · camera apps <span class="text-slate-400">(unchanged)</span></div>
+                    <div class="mt-2 rounded-lg border border-cyan-200 bg-cyan-50 px-3 py-2 text-[13px] font-semibold text-cyan-800">FlexiPath engine</div>
+                    <div class="mt-2 grid grid-cols-4 gap-1.5 font-mono text-[10.5px] text-slate-600">
+                      <span class="rounded-md border border-slate-200 px-1 py-1 text-center">eth</span>
+                      <span class="rounded-md border border-slate-200 px-1 py-1 text-center">Wi-Fi</span>
+                      <span class="rounded-md border border-slate-200 px-1 py-1 text-center">5G</span>
+                      <span class="rounded-md border border-slate-200 px-1 py-1 text-center">LEO</span>
+                    </div>
+                  </div>
+                  <div class="flex flex-col gap-1 px-1" role="img" aria-label="Tunnels over Wi-Fi and 5G during a handover; LEO satellite and the wired dock asleep">
+                    <div class="lp-sys-link" style="--c: #06b6d4"><span class="w-12 shrink-0">Wi-Fi</span><span class="wire"></span></div>
+                    <div class="lp-sys-link" style="--c: #10b981"><span class="w-12 shrink-0">5G</span><span class="wire"></span></div>
+                    <div class="lp-sys-link is-off"><span class="w-12 shrink-0 text-slate-400">LEO</span><span class="wire"></span></div>
+                    <div class="lp-sys-link is-off"><span class="w-12 shrink-0 text-slate-400">wired</span><span class="wire"></span></div>
+                    <p class="mt-1 font-mono text-[11px] leading-snug text-slate-500">tunnels over every network · spare radios asleep</p>
+                  </div>
+                  <div class="rounded-xl border border-slate-200 p-3">
+                    <div class="flex items-center gap-2 font-mono text-[11px] font-bold tracking-[0.12em] text-slate-500"><i data-lucide="server" class="size-4"></i>ANCHOR RELAY</div>
+                    <div class="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 font-mono text-[13px] text-slate-800">198.51.100.24</div>
+                    <p class="mt-2 text-[12.5px] leading-snug text-slate-600">Static address. Learns the drone’s new route from the tunnel itself.</p>
+                    <div class="mt-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] text-slate-700">C2 ground station sees <b class="text-slate-900">one IP</b></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Results ──────────────────────────────────────────────────────── -->
+      <section id="results" class="border-y border-slate-200 bg-[#f6f8fb] py-20 sm:py-24">
+        <div class="lp-wrap">
+          <div class="lp-reveal max-w-[800px]">
+            <p class="lp-kicker">Results</p>
+            <h2 class="lp-h2">Compared with what exists today.</h2>
+            <p class="lp-lead">
+              Four stacks fly the same corridor on the same seeds: the legacy OS, two existing multipath designs, and
+              FlexiPath. Ranges are the means of scenarios A–D, 20 paired runs each.
+            </p>
+          </div>
+
+          <div class="lp-card lp-reveal mt-10 overflow-x-auto">
+            <table class="lp-table">
+              <caption class="sr-only">Legacy OS, reactive multipath, always duplicate and FlexiPath compared on the same simulated runs</caption>
+              <colgroup><col style="width: 19%" /><col style="width: 17%" /><col style="width: 22%" /><col style="width: 21%" /><col style="width: 21%" /></colgroup>
+              <thead>
+                <tr>
+                  <th scope="col"><span class="lp-tag lp-tag-measured">MEASURED · SIM</span></th>
+                  <th scope="col">Legacy OS<small>break-before-make</small></th>
+                  <th scope="col">Reactive multipath<small>MPTCP backup subflow · ATSSS active-standby</small></th>
+                  <th scope="col">Always duplicate<small>MPTCP redundant · PDCP duplication</small></th>
+                  <th scope="col" class="is-fp">FlexiPath<small>predictive · selective</small></th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th scope="row">Interruption per journey</th>
+                  <td class="num">3.7–16.4 s</td>
+                  <td class="num">0–0.7 s</td>
+                  <td class="num">0 s</td>
+                  <td class="num is-fp">0–0.16 s</td>
+                </tr>
+                <tr>
+                  <th scope="row">Critical packets delivered</th>
+                  <td class="num">77–85 %</td>
+                  <td class="num">97.0–98.3 %</td>
+                  <td class="num">99.0–100 %</td>
+                  <td class="num is-fp">98.2–99.0 %</td>
+                </tr>
+                <tr>
+                  <th scope="row">Duplicate bytes on protected flows</th>
+                  <td class="num">0 %</td>
+                  <td class="num">0 %</td>
+                  <td class="num">49–100 %</td>
+                  <td class="num is-fp">0.9–1.4 %</td>
+                </tr>
+                <tr>
+                  <th scope="row">Mean radio power</th>
+                  <td class="num">1.22 W</td>
+                  <td class="num">1.20 W</td>
+                  <td class="num">2.65–3.39 W</td>
+                  <td class="num is-fp">1.25–1.32 W</td>
+                </tr>
+                <tr>
+                  <th scope="row">Use it when…</th>
+                  <td class="text-slate-500">(baseline)</td>
+                  <td class="text-slate-600">power matters most and a few lost packets are acceptable</td>
+                  <td class="text-slate-600">every packet matters and power is no object</td>
+                  <td class="is-fp text-slate-700">critical traffic must survive without paying for two radios all the time</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="mt-6 grid gap-4 lg:grid-cols-2">
+            <div class="lp-card lp-reveal p-5 sm:p-6" data-range data-min="75" data-max="100" data-unit="%">
+              <div class="flex items-baseline justify-between gap-3">
+                <h3 class="text-[15px] font-bold text-slate-900">Critical packets delivered</h3>
+                <span class="font-mono text-[11.5px] text-slate-500">75 → 100 %</span>
+              </div>
+              <dl class="mt-5 grid grid-cols-[96px_minmax(0,1fr)_100px] items-center gap-x-3 gap-y-3.5 text-[13px] sm:grid-cols-[150px_minmax(0,1fr)_92px]">
+                <dt class="text-slate-600">Legacy OS</dt><dd class="lp-range" style="--c: #e11d48"><span data-lo="77.3" data-hi="84.9"></span></dd><dd class="text-right font-mono whitespace-nowrap text-slate-700">77–85 %</dd>
+                <dt class="text-slate-600">Reactive multipath</dt><dd class="lp-range" style="--c: #94a3b8"><span data-lo="97.0" data-hi="98.3"></span></dd><dd class="text-right font-mono whitespace-nowrap text-slate-700">97.0–98.3 %</dd>
+                <dt class="text-slate-600">Always duplicate</dt><dd class="lp-range" style="--c: #64748b"><span data-lo="99.0" data-hi="100"></span></dd><dd class="text-right font-mono whitespace-nowrap text-slate-700">99.0–100 %</dd>
+                <dt class="font-semibold text-fp">FlexiPath</dt><dd class="lp-range" style="--c: #0891b2"><span data-lo="98.2" data-hi="99.0"></span></dd><dd class="text-right font-mono whitespace-nowrap font-semibold text-slate-900">98.2–99.0 %</dd>
+              </dl>
+            </div>
+            <div class="lp-card lp-reveal p-5 sm:p-6" data-range data-min="0" data-max="3.5" data-unit="W">
+              <div class="flex items-baseline justify-between gap-3">
+                <h3 class="text-[15px] font-bold text-slate-900">Mean radio power</h3>
+                <span class="font-mono text-[11.5px] text-slate-500">0 → 3.5 W</span>
+              </div>
+              <dl class="mt-5 grid grid-cols-[96px_minmax(0,1fr)_100px] items-center gap-x-3 gap-y-3.5 text-[13px] sm:grid-cols-[150px_minmax(0,1fr)_92px]">
+                <dt class="text-slate-600">Legacy OS</dt><dd class="lp-range" style="--c: #e11d48"><span data-lo="1.22" data-hi="1.22"></span></dd><dd class="text-right font-mono whitespace-nowrap text-slate-700">1.22 W</dd>
+                <dt class="text-slate-600">Reactive multipath</dt><dd class="lp-range" style="--c: #94a3b8"><span data-lo="1.20" data-hi="1.20"></span></dd><dd class="text-right font-mono whitespace-nowrap text-slate-700">1.20 W</dd>
+                <dt class="text-slate-600">Always duplicate</dt><dd class="lp-range" style="--c: #64748b"><span data-lo="2.65" data-hi="3.39"></span></dd><dd class="text-right font-mono whitespace-nowrap text-slate-700">2.65–3.39 W</dd>
+                <dt class="font-semibold text-fp">FlexiPath</dt><dd class="lp-range" style="--c: #0891b2"><span data-lo="1.25" data-hi="1.32"></span></dd><dd class="text-right font-mono whitespace-nowrap font-semibold text-slate-900">1.25–1.32 W</dd>
+              </dl>
+            </div>
+          </div>
+
+          <div class="mt-6 grid gap-4 md:grid-cols-2">
+            <div class="lp-reveal rounded-2xl border border-slate-200 bg-white p-6">
+              <h3 class="text-[15px] font-bold text-slate-900">Against reactive multipath</h3>
+              <p class="mt-2 text-[14.5px] leading-relaxed text-slate-600">
+                FlexiPath loses 25–40 % fewer critical packets, raises voice quality (MOS) by 0.07–0.10 and acts 1.3–4.6 s
+                before the failure instead of 0.3–0.5 s after, for about 0.1 W more radio power.
+              </p>
+            </div>
+            <div class="lp-reveal rounded-2xl border border-slate-200 bg-white p-6">
+              <h3 class="text-[15px] font-bold text-slate-900">Against always duplicate</h3>
+              <p class="mt-2 text-[14.5px] leading-relaxed text-slate-600">
+                Permanent duplication delivers the most critical packets, 99–100 %, but draws 2.1–2.6× FlexiPath’s radio
+                power and copies 49–100 % of protected bytes, against FlexiPath’s ≈ 1 %.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Simulator ────────────────────────────────────────────────────── -->
+      <section id="simulator" class="py-20 sm:py-24">
+        <div class="lp-wrap grid items-start gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-14">
+          <div class="lp-reveal lg:sticky lg:top-24">
+            <p class="lp-kicker">The simulator</p>
+            <h2 class="lp-h2">Watch both drones fly the same mission.</h2>
+            <p class="lp-lead">
+              A deterministic network simulation drives a 3D digital twin: two identical drones, one route, one radio
+              field, the same faults. One runs FlexiPath, the other the legacy stack.
+            </p>
+            <ul class="mt-6 grid gap-3 text-[15px] text-slate-700">
+              <li class="flex gap-3"><i data-lucide="circle-check" class="mt-0.5 size-5 shrink-0 text-fp"></i>A guided demo that captions each real decision as it happens</li>
+              <li class="flex gap-3"><i data-lucide="circle-check" class="mt-0.5 size-5 shrink-0 text-fp"></i>Inject a Wi-Fi fade or a 5G outage and watch both stacks react</li>
+              <li class="flex gap-3"><i data-lucide="circle-check" class="mt-0.5 size-5 shrink-0 text-fp"></i>Paired experiments in the browser, against both existing designs</li>
+              <li class="flex gap-3"><i data-lucide="circle-check" class="mt-0.5 size-5 shrink-0 text-fp"></i>The same seed reproduces the same run, every time</li>
+            </ul>
+            <div class="mt-8 flex flex-wrap gap-3">
+              <a href="./simulator.html" class="lp-btn lp-btn-primary"><i data-lucide="play"></i>Launch the simulator</a>
+              <a href="./simulator.html?demo=1" class="lp-btn"><i data-lucide="presentation"></i>Guided demo</a>
+            </div>
+          </div>
+
+          <div class="lp-reveal">
+            <div class="lp-seg" role="group" aria-label="Simulator screenshots" data-views>
+              <button type="button" aria-pressed="true" data-view="advanced">Advanced view</button>
+              <button type="button" aria-pressed="false" data-view="mission">Mission view</button>
+              <button type="button" aria-pressed="false" data-view="drones">Close-up</button>
+            </div>
+            <figure class="lp-shot mt-4">
+              <img
+                data-view-img
+                src="./landing/simulator-advanced-1200.webp"
+                srcset="./landing/simulator-advanced-1200.webp 1200w, ./landing/simulator-advanced-2400.webp 2400w"
+                sizes="(min-width: 1180px) 650px, calc(100vw - 48px)"
+                width="2400"
+                height="1350"
+                loading="lazy"
+                alt="The Advanced view: prediction, interface health, the full decision record and six live charts around the 3D twin"
+              />
+              <figcaption class="px-1.5 pt-3 pb-1 text-[13px] text-slate-500" data-view-caption>
+                Advanced view: live prediction, every decision with its reason, and six 60-second charts.
+              </figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Guidelines ───────────────────────────────────────────────────── -->
+      <section id="guidelines" class="border-y border-slate-200 bg-[#f6f8fb] py-20 sm:py-24">
+        <div class="lp-wrap">
+          <div class="lp-reveal max-w-[760px]">
+            <p class="lp-kicker">QoS / QoE guidelines</p>
+            <h2 class="lp-h2">Eight rules for connectivity that never makes users wait.</h2>
+            <p class="lp-lead">Each one is backed by the same 120 paired simulation runs.</p>
+          </div>
+          <ol class="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <li class="lp-card lp-reveal p-5">
+              <span class="font-mono text-[13px] font-bold text-fp">01</span>
+              <h3 class="mt-2 text-[16px] leading-snug font-bold text-slate-900">Anchor the session, not the interface</h3>
+              <p class="mt-2 text-[14px] leading-relaxed text-slate-600">A path change should never reset a connection.</p>
+            </li>
+            <li class="lp-card lp-reveal p-5">
+              <span class="font-mono text-[13px] font-bold text-fp">02</span>
+              <h3 class="mt-2 text-[16px] leading-snug font-bold text-slate-900">Act on the trend, not on the failure</h3>
+              <p class="mt-2 text-[14px] leading-relaxed text-slate-600">Forecast the failure and start moving before it happens.</p>
+            </li>
+            <li class="lp-card lp-reveal p-5">
+              <span class="font-mono text-[13px] font-bold text-fp">03</span>
+              <h3 class="mt-2 text-[16px] leading-snug font-bold text-slate-900">Prepare the next path just in time</h3>
+              <p class="mt-2 text-[14px] leading-relaxed text-slate-600">Let spare radios sleep; wake and validate one only when needed.</p>
+            </li>
+            <li class="lp-card lp-reveal p-5">
+              <span class="font-mono text-[13px] font-bold text-fp">04</span>
+              <h3 class="mt-2 text-[16px] leading-snug font-bold text-slate-900">Duplicate only what needs it</h3>
+              <p class="mt-2 text-[14px] leading-relaxed text-slate-600">Protection per traffic class, and only around the handover.</p>
+            </li>
+            <li class="lp-card lp-reveal p-5">
+              <span class="font-mono text-[13px] font-bold text-fp">05</span>
+              <h3 class="mt-2 text-[16px] leading-snug font-bold text-slate-900">Deliver the first copy</h3>
+              <p class="mt-2 text-[14px] leading-relaxed text-slate-600">Never make real-time traffic wait to be put in order.</p>
+            </li>
+            <li class="lp-card lp-reveal p-5">
+              <span class="font-mono text-[13px] font-bold text-fp">06</span>
+              <h3 class="mt-2 text-[16px] leading-snug font-bold text-slate-900">Detect faster than the app can tolerate</h3>
+              <p class="mt-2 text-[14px] leading-relaxed text-slate-600">For outages no trend predicts, detection plus wake-up must fit the deadline.</p>
+            </li>
+            <li class="lp-card lp-reveal p-5">
+              <span class="font-mono text-[13px] font-bold text-fp">07</span>
+              <h3 class="mt-2 text-[16px] leading-snug font-bold text-slate-900">Hold still unless moving clearly pays</h3>
+              <p class="mt-2 text-[14px] leading-relaxed text-slate-600">Hysteresis and dwell times stop ping-pong handovers.</p>
+            </li>
+            <li class="lp-card lp-reveal p-5">
+              <span class="font-mono text-[13px] font-bold text-fp">08</span>
+              <h3 class="mt-2 text-[16px] leading-snug font-bold text-slate-900">Measure what users feel, on matched pairs</h3>
+              <p class="mt-2 text-[14px] leading-relaxed text-slate-600">Judge experience and cost under identical conditions, not throughput alone.</p>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <!-- ── Roadmap ──────────────────────────────────────────────────────── -->
+      <section id="roadmap" class="py-20 sm:py-24">
+        <div class="lp-wrap">
+          <div class="lp-reveal max-w-[760px]">
+            <p class="lp-kicker">From simulation to the field</p>
+            <h2 class="lp-h2">The real-life plan.</h2>
+            <p class="lp-lead">The prototype proves the idea on matched simulated runs. The next steps take the same controller onto real radios, then into the air.</p>
+          </div>
+          <ol class="mt-12 grid gap-8 lg:grid-cols-4 lg:gap-6">
+            <li class="lp-phase lp-reveal" style="--c: #15803d">
+              <span class="pin" aria-hidden="true"></span>
+              <span class="lp-status">Done</span>
+              <h3 class="mt-3 text-[18px] font-bold text-slate-900">Simulation prototype</h3>
+              <p class="mt-2 text-[14.5px] leading-relaxed text-slate-600">Deterministic network simulation, 3D digital twin, comparison with two existing designs over 120 paired runs, and QoS/QoE guidelines.</p>
+            </li>
+            <li class="lp-phase lp-reveal" style="--c: #2563eb">
+              <span class="pin" aria-hidden="true"></span>
+              <span class="lp-status">Next</span>
+              <h3 class="mt-3 text-[18px] font-bold text-slate-900">Hardware in the loop</h3>
+              <p class="mt-2 text-[14.5px] leading-relaxed text-slate-600">Run the same controller on a companion computer with Wi-Fi, 5G and satellite modems, replay recorded signal traces, and measure real handover gaps and radio power.</p>
+            </li>
+            <li class="lp-phase lp-reveal" style="--c: #7c3aed">
+              <span class="pin" aria-hidden="true"></span>
+              <span class="lp-status">Proposed</span>
+              <h3 class="mt-3 text-[18px] font-bold text-slate-900">Field trials</h3>
+              <p class="mt-2 text-[14.5px] leading-relaxed text-slate-600">Instrumented flights on a test corridor: FlexiPath against the stock stack on matched routes, measuring C2 continuity, delivered packets and energy.</p>
+            </li>
+            <li class="lp-phase lp-reveal" style="--c: #64748b">
+              <span class="pin" aria-hidden="true"></span>
+              <span class="lp-status">Proposed</span>
+              <h3 class="mt-3 text-[18px] font-bold text-slate-900">Deployment</h3>
+              <p class="mt-2 text-[14.5px] leading-relaxed text-slate-600">A network layer designed to sit under the operator’s C2 application, with the anchor relay at the ground station or the network edge.</p>
+            </li>
+          </ol>
+
+          <div class="lp-card lp-reveal mt-14 p-6 sm:p-8">
+            <div class="flex items-center gap-3">
+              <span class="lp-icon" style="--c: #b45309"><i data-lucide="triangle-alert"></i></span>
+              <h3 class="text-[18px] font-bold text-slate-900">What this prototype is, and isn’t</h3>
+            </div>
+            <ul class="mt-5 grid gap-x-10 gap-y-3 text-[14.5px] leading-relaxed text-slate-600 md:grid-cols-2">
+              <li class="flex gap-3"><span class="mt-2 size-1.5 shrink-0 rounded-full bg-slate-400"></span>A simulation: the radio, satellite and power models are stylised, and nothing here is a field measurement.</li>
+              <li class="flex gap-3"><span class="mt-2 size-1.5 shrink-0 rounded-full bg-slate-400"></span>Packets are still lost: about 1–2 % of critical packets in the runs.</li>
+              <li class="flex gap-3"><span class="mt-2 size-1.5 shrink-0 rounded-full bg-slate-400"></span>An outage no trend can predict still costs a detection gap: 0.16 s in scenario D.</li>
+              <li class="flex gap-3"><span class="mt-2 size-1.5 shrink-0 rounded-full bg-slate-400"></span>FlexiPath uses about 8 % more radio power than a single-radio stack.</li>
+              <li class="flex gap-3"><span class="mt-2 size-1.5 shrink-0 rounded-full bg-slate-400"></span>Drone altitude is visual only; the radio model is evaluated at ground level.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ── Closing call to action ───────────────────────────────────────── -->
+      <section class="pb-20 sm:pb-24" aria-label="Try it">
+        <div class="lp-wrap">
+          <div class="lp-cta lp-reveal">
+            <img src="./landing/drones-handover-1200.webp" srcset="./landing/drones-handover-1200.webp 1200w, ./landing/drones-handover-2400.webp 2400w" sizes="(min-width: 1200px) 1152px, 100vw" width="2400" height="1350" loading="lazy" alt="" />
+            <div class="body px-6 py-14 sm:px-12 sm:py-20">
+              <h2 class="max-w-[560px] text-[clamp(28px,3.6vw,44px)] leading-[1.1] font-extrabold tracking-[-0.025em]">See the handover for yourself.</h2>
+              <p class="mt-4 max-w-[520px] text-[17px] leading-relaxed text-slate-300">
+                Two drones, one corridor, the same radio conditions. Watch FlexiPath switch before the link fails while the
+                legacy drone stops and hovers.
+              </p>
+              <div class="mt-8 flex flex-wrap gap-3">
+                <a href="./simulator.html" class="lp-btn lp-btn-primary"><i data-lucide="play"></i>Launch the simulator</a>
+                <a href="./simulator.html?demo=1" class="lp-btn lp-btn-light"><i data-lucide="presentation"></i>Start the guided demo</a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="border-t border-slate-200">
+      <div class="lp-wrap flex flex-col gap-6 py-10 md:flex-row md:items-start md:justify-between">
+        <div class="max-w-[640px]">
+          <div class="flex items-center gap-2.5">
+            <span class="lp-wordmark text-[13px]!">FLEXIPATH</span>
+            <span class="text-[13px] text-slate-500">Predictive, traffic-aware connectivity engine</span>
+          </div>
+          <p class="mt-3 text-[13px] leading-relaxed text-slate-500">
+            A simulation prototype for the ATRC Advanced Technology Pioneers 2026 EDGE Challenge. Every number on this page
+            is a simulated measurement or a model parameter; none is a real-world measurement.
+          </p>
+        </div>
+        <nav class="flex flex-wrap gap-x-6 gap-y-2 text-[14px] font-medium text-slate-600" aria-label="Footer">
+          <a class="hover:text-slate-900" href="./simulator.html">Simulator</a>
+          <a class="hover:text-slate-900" href="./simulator.html?demo=1">Guided demo</a>
+          <a class="hover:text-slate-900" href="#top">Back to top</a>
+        </nav>
+      </div>
+    </footer>
   </body>
 </html>
