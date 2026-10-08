@@ -189,6 +189,15 @@ body {
   width: 14px;
   height: 14px;
 }
+.btn-icon {
+  width: 32px;
+  padding: 0;
+}
+.btn[aria-pressed='true'] {
+  border-color: color-mix(in srgb, var(--fp) 55%, white);
+  background: color-mix(in srgb, var(--fp) 10%, white);
+  color: var(--fp-ink);
+}
 .btn-fault {
   justify-content: flex-start;
   width: 100%;
@@ -256,7 +265,8 @@ body {
 .seg button:hover {
   color: var(--ui-text);
 }
-.seg button[aria-pressed='true'] {
+.seg button[aria-pressed='true'],
+.seg button[aria-selected='true'] {
   color: var(--fp-ink);
   background: color-mix(in srgb, var(--fp) 13%, white);
   box-shadow:
@@ -948,20 +958,20 @@ body {
   color: #ffffff;
 }
 
-/* ── Decision loop strip ───────────────────────────────────────────────── */
+/* ── Decision loop strip: a one-line stepper; only the active stage shows its caption and time ── */
 .loop-stages {
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 6px;
+  display: flex;
+  gap: 12px;
 }
 .loop-stage {
   --sc: var(--fp);
   position: relative;
   display: flex;
-  align-items: flex-start;
+  flex: 0 0 auto;
+  align-items: center;
   gap: 8px;
   min-width: 0;
-  padding: 7px 9px 7px 8px;
+  padding: 5px 10px 5px 6px;
   border-radius: 9px;
   border: 1px solid var(--ui-line);
   background: var(--ui-inset);
@@ -974,9 +984,9 @@ body {
 .loop-stage:not(:last-child)::after {
   content: '';
   position: absolute;
-  right: -7px;
+  right: -13px;
   top: 50%;
-  width: 7px;
+  width: 13px;
   height: 2px;
   background: var(--ui-line-strong);
 }
@@ -1001,21 +1011,21 @@ body {
   color: var(--ui-muted);
 }
 .loop-stage .cap {
-  margin-top: 4px;
-  min-height: 25px;
-  font: 500 10px/1.25 var(--font-mono);
-  color: var(--ui-faint);
+  display: none;
+  margin-top: 3px;
+  font: 500 11px/1.25 var(--font-mono);
+  color: var(--ui-text-2);
   overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
 }
 .loop-stage .time {
+  display: none;
   position: absolute;
   top: 6px;
   right: 7px;
   font: 600 8.5px/1 var(--font-mono);
-  color: var(--ui-faint);
+  color: var(--sc);
 }
 .loop-stage[data-state='reached'] {
   border-color: color-mix(in srgb, var(--sc) 35%, white);
@@ -1027,10 +1037,8 @@ body {
 .loop-stage[data-state='reached'] .name {
   color: var(--ui-text-2);
 }
-.loop-stage[data-state='reached'] .cap {
-  color: var(--ui-muted);
-}
 .loop-stage[data-state='active'] {
+  flex: 1 1 0;
   border-color: var(--sc);
   background: color-mix(in srgb, var(--sc) 9%, white);
   box-shadow: 0 6px 16px -12px var(--sc);
@@ -1044,10 +1052,10 @@ body {
   color: color-mix(in srgb, var(--sc) 85%, var(--ink));
 }
 .loop-stage[data-state='active'] .cap {
-  color: var(--ui-text-2);
+  display: -webkit-box;
 }
 .loop-stage[data-state='active'] .time {
-  color: var(--sc);
+  display: block;
 }
 .loop-stage[data-state='skipped'] {
   border-style: dashed;
@@ -1057,24 +1065,20 @@ body {
   text-decoration: line-through;
   text-decoration-color: var(--ui-faint);
 }
-.loop-stage[data-state='skipped'] .cap {
-  color: var(--ui-muted);
-  font-style: italic;
-}
-@media (max-width: 1023px) {
+/* Phones: inactive stages shrink to their number. */
+@media (max-width: 640px) {
   .loop-stages {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
   }
-  .loop-stage:nth-child(3)::after {
+  .loop-stage:not([data-state='active']) {
+    padding-right: 6px;
+  }
+  .loop-stage:not([data-state='active']) .body {
     display: none;
   }
-}
-@media (max-width: 520px) {
-  .loop-stages {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .loop-stage::after {
-    display: none;
+  .loop-stage:not(:last-child)::after {
+    right: -9px;
+    width: 9px;
   }
 }
 
@@ -1649,8 +1653,9 @@ body {
 .fp-shell[data-demo='1'] .fp-camctl {
   display: none;
 }
-/* Mission view: the 3D twin and one short column beside it; the left deck only holds Advanced panels. */
-.fp-shell[data-mode='mission'] [data-ref='leftDeck'] {
+/* Advanced view: the side column shows one tab's panels (Dashboard.setPanelTab); the charts open on demand. */
+.fp-shell[data-mode='advanced'] [data-tab-panel].is-tab-off,
+.fp-shell:not([data-charts='1']) [data-ref='chartsRow'] {
   display: none !important;
 }
 .decision-panel.is-compact .dp-more,
@@ -1672,60 +1677,6 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-/*
- * Mission view, debloated: the 3D twin first, a one-line story around it. Everything removed here is still in
- * the Advanced view (M) or one click away (Show details · Show steps · legend).
- */
-.fp-shell[data-mode='mission'] > header {
-  padding-top: 6px;
-  padding-bottom: 6px;
-}
-.fp-shell[data-mode='mission'] .tb-text {
-  display: none;
-}
-.fp-shell[data-mode='mission'] .fp-toolbar .btn:has(.tb-text) {
-  width: 32px;
-  justify-content: center;
-  padding-left: 0 !important;
-  padding-right: 0 !important;
-}
-.fp-shell[data-mode='mission'] .fp-loop {
-  padding: 6px 8px !important;
-}
-.fp-shell[data-mode='mission'] .loop-head {
-  display: none;
-}
-.fp-shell[data-mode='mission'] .loop-stages {
-  display: flex;
-  gap: 12px;
-}
-.fp-shell[data-mode='mission'] .loop-stage {
-  flex: 0 0 auto;
-  align-items: center;
-  padding: 5px 10px 5px 6px;
-}
-.fp-shell[data-mode='mission'] .loop-stage:not(:last-child)::after {
-  right: -13px;
-  width: 13px;
-}
-.fp-shell[data-mode='mission'] .loop-stage .cap,
-.fp-shell[data-mode='mission'] .loop-stage .time {
-  display: none;
-}
-.fp-shell[data-mode='mission'] .loop-stage[data-state='active'] {
-  flex: 1 1 0;
-  min-width: 0;
-}
-.fp-shell[data-mode='mission'] .loop-stage[data-state='active'] .cap {
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  min-height: 0;
-  margin-top: 3px;
-  font-size: 11px;
-}
-.fp-shell[data-mode='mission'] .loop-stage[data-state='active'] .time {
-  display: block;
-}
 .decision-panel.is-compact .dp-sub,
 .decision-panel.is-compact .dp-legacy {
   display: none !important;
@@ -1738,24 +1689,11 @@ body {
 .fp-shell[data-mode='mission'] [data-ref='lanes']:not(.is-open) .lanes-body {
   display: none;
 }
-.fp-shell[data-mode='mission']:not([data-legend='1']) .fp-legend {
+.fp-shell:not([data-legend='1']) .fp-legend {
   display: none !important;
 }
-/* Phones: inactive loop stages shrink to their number, and the camera buttons to their icons. */
+/* Phones: the camera buttons shrink to their icons. */
 @media (max-width: 640px) {
-  .fp-shell[data-mode='mission'] .loop-stages {
-    gap: 8px;
-  }
-  .fp-shell[data-mode='mission'] .loop-stage:not([data-state='active']) {
-    padding-right: 6px;
-  }
-  .fp-shell[data-mode='mission'] .loop-stage:not([data-state='active']) .body {
-    display: none;
-  }
-  .fp-shell[data-mode='mission'] .loop-stage:not(:last-child)::after {
-    right: -9px;
-    width: 9px;
-  }
   .fp-camctl .seg button {
     gap: 0;
     font-size: 0;
@@ -1767,7 +1705,7 @@ body {
     grid-template-columns: minmax(0, 1fr) 312px;
   }
   .fp-shell[data-mode='advanced'] .fp-main {
-    grid-template-columns: 292px minmax(0, 1fr) 328px;
+    grid-template-columns: minmax(0, 1fr) 372px;
   }
   .fp-shell[data-theatre='1'] .fp-main {
     grid-template-columns: minmax(0, 1fr);

@@ -30,7 +30,6 @@ import {
   FileSpreadsheet,
   FlaskConical,
   Lock,
-  MapPin,
   Timer,
   Crosshair,
   Video,
@@ -49,6 +48,7 @@ import {
   Presentation,
   Info,
   SkipForward,
+  ChartLine,
 } from 'lucide';
 import { TelemetryPanel } from './TelemetryPanel.js';
 import { FlowInspector } from './FlowInspector.js';
@@ -73,13 +73,11 @@ import { PacketLossChart } from '../charts/PacketLossChart.js';
 import { QoEChart } from '../charts/QoEChart.js';
 import { PowerChart } from '../charts/PowerChart.js';
 import { HolChart } from '../charts/HolChart.js';
-import { POWER_TIERS } from '../simulation/PowerModel.js';
 import { SERIES_COLORS } from '../charts/BaseTimeSeriesChart.js';
 import { ANCHOR_IP, DT, VERSION } from '../simulation/SimulationEngine.js';
 import { ZONES } from '../simulation/NetworkEnvironment.js';
 import { ROUTE_END_X } from '../simulation/MobilityModel.js';
 import { INTERFACE_SPECS } from '../simulation/LinkModel.js';
-import { TRAFFIC_PROFILES } from '../simulation/TrafficManager.js';
 import { LIVE_SCENARIOS, SCENARIOS } from '../simulation/Scenarios.js';
 import { downloadText, timestampedName, toCSV, toJSON } from '../utils/Export.js';
 
@@ -102,7 +100,6 @@ const ICONS = {
   FileSpreadsheet,
   FlaskConical,
   Lock,
-  MapPin,
   Timer,
   Crosshair,
   Video,
@@ -121,6 +118,7 @@ const ICONS = {
   Presentation,
   Info,
   SkipForward,
+  ChartLine,
 };
 
 export function renderIcons(root = document) {
@@ -135,7 +133,7 @@ const LOGO = `
   </svg>`;
 
 const chartCard = (key, title, unit) => `
-  <article class="hud-panel chart-card flex min-h-[172px] flex-col px-3 pt-2.5 pb-1.5">
+  <article class="hud-panel chart-card flex min-h-[148px] flex-col px-3 pt-2 pb-1">
     <header class="flex items-center justify-between gap-2">
       <h3 class="hud-title truncate">${title} <span class="font-mono text-[9px] tracking-normal text-slate-400 normal-case">${unit}</span></h3>
       <div class="num flex shrink-0 gap-2.5 text-[10.5px] font-semibold">
@@ -144,6 +142,18 @@ const chartCard = (key, title, unit) => `
     </header>
     <div class="relative mt-1 min-h-0 flex-1"><canvas data-chart="${key}" aria-label="${title} chart" role="img"></canvas></div>
   </article>`;
+
+// Advanced view: the side column shows one group of panels at a time ([id, label, tooltip]).
+const PANEL_TABS = [
+  ['decision', 'Decision', 'Why did FlexiPath do that? The latest decision and its history'],
+  ['prediction', 'Prediction', 'Prediction · live and its internals'],
+  ['links', 'Links', 'Interface health: signal, loss, RTT and radio state per modem'],
+  ['traffic', 'Traffic', 'Traffic-aware protection and the flow inspector'],
+  ['session', 'Session', 'Battery, packet ordering and the relay tunnel'],
+  ['controls', 'Controls', 'Simulation controls, fault injection and exports'],
+  ['log', 'Log', 'Event log'],
+];
+const ADVANCED_KEY = 'flexipath.advanced';
 
 const fmtClock = (t) => {
   const m = Math.floor(t / 60);
@@ -212,6 +222,7 @@ export class Dashboard {
 
     renderIcons(this.root);
     this._bindOverlay();
+    this._bindPanelTabs();
     this._bindToolbar();
     this._bindKeyboard();
     this._subscribe();
@@ -236,12 +247,11 @@ export class Dashboard {
 
     this.root.innerHTML = `
     <div class="fp-shell hud-scroll flex h-full flex-col overflow-y-auto" data-ref="shell" data-mode="mission">
-      <header class="relative z-10 flex shrink-0 flex-wrap items-center gap-x-5 gap-y-2 border-b border-slate-200 bg-white/90 px-4 py-2.5 backdrop-blur">
+      <header class="relative z-10 flex shrink-0 flex-wrap items-center gap-x-5 gap-y-2 border-b border-slate-200 bg-white/90 px-4 py-1.5 backdrop-blur">
         <div class="flex min-w-0 shrink-0 items-center gap-3 max-sm:w-full max-sm:shrink">
           <a href="./" class="shrink-0 rounded-md" title="FlexiPath home page" aria-label="FlexiPath home page">${LOGO}</a>
           <div class="min-w-0">
             <h1 class="font-display text-[12px] font-extrabold tracking-[0.12em] text-slate-900 sm:text-[14px] sm:tracking-[0.22em]">FLEXIPATH <span class="text-fp">CONNECTIVITY ENGINE</span></h1>
-            <p class="truncate font-mono text-[9px] tracking-[0.12em] text-slate-500" data-view="advanced">PREDICTIVE · TRAFFIC-AWARE · HETEROGENEOUS NETWORKS<span class="hidden 2xl:inline"> · ATRC EDGE 2026</span></p>
           </div>
         </div>
         <div class="flex min-w-0 flex-1 items-center justify-center gap-2 overflow-hidden max-xl:order-last max-xl:basis-full max-xl:justify-start">
@@ -249,16 +259,12 @@ export class Dashboard {
             <span class="dot shrink-0"></span><span class="shrink-0" data-ref="pillText">INITIALISING</span>
             <span class="truncate font-mono text-[10px] font-semibold tracking-[0.04em] opacity-75" data-ref="pillDetail"></span>
           </div>
-          <span class="chip hidden shrink-0 2xl:inline-flex" data-ref="pill2" data-view="advanced"></span>
         </div>
         <div class="flex min-w-0 flex-wrap items-center gap-2">
           <span class="chip sim-badge" title="Everything on this screen is produced by the FlexiPath simulation model (seeded, deterministic). No real-world measurements are shown."><span class="dot"></span>SIMULATION · v${VERSION}</span>
           <span class="chip border-fp/30!" data-view="advanced" title="Static anchor relay: FlexiPath tunnels every flow (userspace UDP) to this address, so remote services only ever see it and no socket is reset by a path change">
             <i data-lucide="lock" class="text-fp"></i>ANCHOR RELAY <b class="text-slate-900">${ANCHOR_IP}</b>
           </span>
-          <span class="chip hidden min-[1700px]:inline-flex" data-ref="clientIp" data-view="advanced" title="FlexiPath's current physical (outer) address — changes with the network; remote services never see it">CLIENT IP —</span>
-          <span class="chip hidden min-[1440px]:inline-flex" data-ref="radioChip" data-view="advanced" title="FlexiPath radio power (three-tier sleep model)">RADIO 1.2 W</span>
-          <span class="chip hidden 2xl:inline-flex" data-view="advanced"><i data-lucide="map-pin"></i><span data-ref="zone">ZONE 1</span></span>
           <span class="chip"><i data-lucide="timer"></i><span class="text-slate-900" data-ref="clock">T+00:00.0</span></span>
         </div>
       </header>
@@ -268,32 +274,21 @@ export class Dashboard {
           <button type="button" class="h-[26px]! px-3!" data-mode="mission" aria-pressed="true" title="Mission view (M)"><i data-lucide="layout-dashboard"></i>Mission</button>
           <button type="button" class="h-[26px]! px-3!" data-mode="advanced" aria-pressed="false" title="Advanced view (M)"><i data-lucide="sliders-horizontal"></i>Advanced</button>
         </div>
-        <label class="flex min-w-0 items-center gap-2">
-          <span class="hud-label hidden sm:inline" data-view="advanced">Scenario</span>
-          <select class="toolbar-select" data-ref="scenario" aria-label="Scenario">${scenarioOptions}</select>
-        </label>
-        <span class="chip hidden lg:inline-flex" data-ref="trafficChip" data-view="advanced" title="Traffic mix of this scenario"></span>
+        <select class="toolbar-select" data-ref="scenario" aria-label="Scenario">${scenarioOptions}</select>
         <div class="ml-auto flex flex-wrap items-center gap-2">
-          <button type="button" class="btn btn-fault-sm" data-fault="wifi-fade" data-view="mission" title="Inject a rapid Wi-Fi fade (F)"><i data-lucide="wifi-off"></i><span class="tb-text">Wi-Fi fade</span></button>
-          <button type="button" class="btn btn-fault-sm" data-fault="cell-outage" data-view="mission" title="Inject an abrupt 5G cell outage (G)"><i data-lucide="tower-control"></i><span class="tb-text">5G outage</span></button>
-          <button type="button" class="btn" data-ref="resetBtn" data-view="mission" title="Reset scenario, same seed (R)"><i data-lucide="rotate-ccw"></i><span class="tb-text">Reset</span></button>
+          <button type="button" class="btn btn-icon btn-fault-sm" data-fault="wifi-fade" data-view="mission" title="Inject a rapid Wi-Fi fade (F)" aria-label="Inject a Wi-Fi fade"><i data-lucide="wifi-off"></i></button>
+          <button type="button" class="btn btn-icon btn-fault-sm" data-fault="cell-outage" data-view="mission" title="Inject an abrupt 5G cell outage (G)" aria-label="Inject a 5G outage"><i data-lucide="tower-control"></i></button>
+          <button type="button" class="btn btn-icon" data-ref="resetBtn" data-view="mission" title="Reset scenario, same seed (R)" aria-label="Reset the scenario"><i data-lucide="rotate-ccw"></i></button>
+          <button type="button" class="btn" data-ref="chartsBtn" data-view="advanced" aria-pressed="false" title="Show or hide the six live charts"><i data-lucide="chart-line"></i>Charts</button>
           <button type="button" class="btn btn-demo" data-ref="demoBtn" title="Guided demo (D)"><i data-lucide="presentation"></i>Guided demo</button>
-          <button type="button" class="btn btn-primary" data-ref="expBtn" title="Paired experiments (X)"><i data-lucide="flask-conical"></i><span class="tb-text">Experiments</span></button>
-          <button type="button" class="btn" data-ref="infoBtn" title="Why FlexiPath? (I)"><i data-lucide="info"></i><span class="tb-text">Why FlexiPath?</span></button>
+          <button type="button" class="btn btn-icon btn-primary" data-ref="expBtn" title="Paired experiments (X)" aria-label="Paired experiments"><i data-lucide="flask-conical"></i></button>
+          <button type="button" class="btn btn-icon" data-ref="infoBtn" title="Why FlexiPath? (I)" aria-label="Why FlexiPath?"><i data-lucide="info"></i></button>
         </div>
       </nav>
 
-      <section class="fp-loop hud-panel mx-2 mt-2 shrink-0 px-3 pt-2 pb-2.5" data-ref="loop" aria-label="Decision loop"></section>
+      <section class="fp-loop hud-panel mx-2 mt-2 shrink-0 px-2 py-1.5" data-ref="loop" aria-label="Decision loop"></section>
 
       <div class="fp-main grid shrink-0 grid-cols-1 gap-2 p-2 xl:min-h-[500px] xl:flex-1" data-ref="mainGrid">
-        <aside class="fp-deck hud-scroll flex min-h-0 flex-col gap-2 xl:overflow-y-auto" aria-label="Left deck" data-ref="leftDeck">
-          <section class="hud-panel shrink-0" data-ref="prediction" data-view="advanced"></section>
-          <section class="hud-panel" data-ref="telemetry" data-view="advanced"></section>
-          <section class="hud-panel" data-ref="internals" data-view="advanced"></section>
-          <section class="hud-panel" data-ref="flows" data-view="advanced"></section>
-          <section class="hud-panel" data-ref="tunnel" data-view="advanced"></section>
-        </aside>
-
         <main class="viewport hud-panel relative order-first h-[62vh] min-h-[380px] overflow-hidden xl:order-none xl:h-auto" data-ref="viewport">
           <div class="absolute inset-0 isolate" data-ref="canvasHost"></div>
           <div class="viewport-vignette"></div>
@@ -375,26 +370,31 @@ export class Dashboard {
               ${[0.5, 1, 2, 4].map((r) => `<button type="button" class="h-[24px]! px-2.5! font-mono" data-rate="${r}" aria-pressed="${r === 1}">${r}×</button>`).join('')}
             </div>
             <span class="num hidden px-1 text-[11px] text-slate-600 sm:inline" data-ref="simInfo">10 Hz</span>
-            <button type="button" class="btn h-[26px]! w-[30px] justify-center px-0!" data-ref="legendBtn" data-view="mission" aria-pressed="false" aria-label="Show the beam legend" title="Beam legend"><i data-lucide="list"></i></button>
-          </div>
-
-          <div class="pointer-events-none absolute right-3 bottom-3 hidden flex-col items-end gap-1.5 sm:flex" data-view="advanced">
-            <span class="chip" data-ref="assets"><i data-lucide="box"></i>MODELS · LOADING</span>
+            <button type="button" class="btn h-[26px]! w-[30px] justify-center px-0!" data-ref="legendBtn" aria-pressed="false" aria-label="Show the beam legend" title="Beam legend"><i data-lucide="list"></i></button>
           </div>
         </main>
 
-        <aside class="fp-deck hud-scroll flex min-h-0 flex-col gap-2 xl:overflow-y-auto" aria-label="Right deck" data-ref="rightDeck">
-          <section class="hud-panel shrink-0" data-ref="decision"></section>
+        <aside class="fp-deck hud-scroll flex min-h-0 flex-col gap-2 xl:overflow-y-auto" aria-label="Panels" data-ref="deck">
+          <div class="seg shrink-0 p-[2px]!" role="tablist" aria-label="Panels" data-view="advanced" data-ref="tabBar">
+            ${PANEL_TABS.map(([id, label, title], i) => `<button type="button" role="tab" class="h-[26px]!" data-tab="${id}" aria-selected="${i === 0}" title="${title}">${label}</button>`).join('')}
+          </div>
+          <section class="hud-panel shrink-0" data-ref="decision" data-tab-panel="decision"></section>
           <section class="hud-panel shrink-0" data-ref="glance" data-view="mission"></section>
-          <section class="hud-panel shrink-0" data-ref="traffic" data-view="advanced"></section>
-          <section class="hud-panel shrink-0" data-ref="engineering" data-view="advanced"></section>
-          <section class="hud-panel shrink-0" data-ref="controls" data-view="advanced"></section>
-          <section class="hud-panel flex min-h-[230px] flex-1 flex-col" data-ref="log" data-view="advanced"></section>
+          <section class="hud-panel shrink-0" data-ref="prediction" data-view="advanced" data-tab-panel="prediction"></section>
+          <section class="hud-panel shrink-0" data-ref="internals" data-view="advanced" data-tab-panel="prediction"></section>
+          <section class="hud-panel shrink-0" data-ref="telemetry" data-view="advanced" data-tab-panel="links"></section>
+          <section class="hud-panel shrink-0" data-ref="traffic" data-view="advanced" data-tab-panel="traffic"></section>
+          <section class="hud-panel shrink-0" data-ref="flows" data-view="advanced" data-tab-panel="traffic"></section>
+          <section class="hud-panel shrink-0" data-ref="engineering" data-view="advanced" data-tab-panel="session"></section>
+          <section class="hud-panel shrink-0" data-ref="tunnel" data-view="advanced" data-tab-panel="session"></section>
+          <section class="hud-panel shrink-0" data-ref="controls" data-view="advanced" data-tab-panel="controls"></section>
+          <span class="chip shrink-0 self-start" data-ref="assets" data-view="advanced" data-tab-panel="controls" title="Where the 3D models came from"><i data-lucide="box"></i>MODELS · LOADING</span>
+          <section class="hud-panel flex min-h-[230px] flex-1 flex-col" data-ref="log" data-view="advanced" data-tab-panel="log"></section>
         </aside>
       </div>
 
       <section class="fp-bottom hud-panel mx-2 mb-2 shrink-0" data-ref="lanes" data-view="mission" aria-label="Legacy vs FlexiPath"></section>
-      <section class="fp-bottom grid shrink-0 grid-cols-1 gap-2 px-2 pb-2 sm:grid-cols-2 lg:grid-cols-3 xl:h-[200px] xl:grid-cols-6" aria-label="Real-time graphs" data-ref="chartsRow" data-view="advanced">
+      <section class="fp-bottom grid shrink-0 grid-cols-1 gap-2 px-2 pb-2 sm:grid-cols-2 lg:grid-cols-3 xl:h-[164px] xl:grid-cols-6" aria-label="Real-time graphs" data-ref="chartsRow" data-view="advanced">
         ${chartCard('thr', 'Aggregated Throughput', 'Mbps')}
         ${chartCard('rtt', 'Critical-Flow Latency', 'ms · log')}
         ${chartCard('loss', 'Packet Loss', '% · crit + RT · 1 s')}
@@ -411,6 +411,44 @@ export class Dashboard {
     this.refs = {};
     this.root.querySelectorAll('[data-ref]').forEach((n) => (this.refs[n.dataset.ref] = n));
     this.viewportEl = this.refs.canvasHost;
+  }
+
+  _bindPanelTabs() {
+    this.tabButtons = [...this.refs.tabBar.querySelectorAll('[data-tab]')];
+    for (const b of this.tabButtons) b.addEventListener('click', () => this.setPanelTab(b.dataset.tab));
+    this.refs.chartsBtn.addEventListener('click', () => this.setCharts(!this.view.charts));
+    let saved = {};
+    try {
+      saved = JSON.parse(localStorage.getItem(ADVANCED_KEY) ?? '{}') ?? {};
+    } catch {}
+    this.setPanelTab(saved.tab, { save: false });
+    this.setCharts(saved.charts === true, { save: false });
+  }
+
+  /** Advanced view: show one group of panels in the side column. */
+  setPanelTab(tab, { save = true } = {}) {
+    if (!PANEL_TABS.some(([id]) => id === tab)) tab = PANEL_TABS[0][0];
+    for (const b of this.tabButtons) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
+    for (const p of this.refs.deck.querySelectorAll('[data-tab-panel]')) p.classList.toggle('is-tab-off', p.dataset.tabPanel !== tab);
+    this.refs.deck.scrollTop = 0;
+    this.view.tab = tab;
+    this.dirty = true;
+    if (save) this._saveAdvanced();
+  }
+
+  /** Advanced view: the six live charts are shown on demand (they keep recording while hidden). */
+  setCharts(on, { save = true } = {}) {
+    this.view.charts = on;
+    this.refs.shell.dataset.charts = on ? '1' : '0';
+    this.refs.chartsBtn.setAttribute('aria-pressed', String(on));
+    this._chartDirty = true;
+    if (save) this._saveAdvanced();
+  }
+
+  _saveAdvanced() {
+    try {
+      localStorage.setItem(ADVANCED_KEY, JSON.stringify({ tab: this.view.tab, charts: this.view.charts }));
+    } catch {}
   }
 
   _bindOverlay() {
@@ -549,7 +587,6 @@ export class Dashboard {
     for (const o of [...sel.options]) if (o.dataset.extra && o.value !== sc.id) o.remove();
     sel.value = sc.id;
     sel.title = sc.description;
-    this.refs.trafficChip.textContent = `TRAFFIC · ${TRAFFIC_PROFILES[sc.traffic].label.toUpperCase()}`;
   }
 
   // ── Per-tick data flow ──────────────────────────────────────────────────
@@ -588,7 +625,7 @@ export class Dashboard {
       this.dirty = false;
       this._updatePanels(snap);
     }
-    const chartsVisible = this.view.mode === 'advanced' && !this.view.theatre;
+    const chartsVisible = this.view.mode === 'advanced' && !this.view.theatre && this.view.charts;
     if (chartsVisible && this._chartDirty && now - this._lastChart > 180) {
       this._lastChart = now;
       this._renderCharts(snap.t);
@@ -684,7 +721,6 @@ export class Dashboard {
 
   _updateHeader(snap) {
     const focus = this.view.focus;
-    const other = focus === 'flexipath' ? 'legacy' : 'flexipath';
     const pill = this._pillFor(snap.agents[focus], focus, snap.t);
     const key = `${pill.text}|${pill.detail}`;
     if (this._pillKey !== key) {
@@ -694,44 +730,7 @@ export class Dashboard {
       this.refs.pill.style.setProperty('--pill-c', pill.color);
       this.refs.pill.classList.toggle('is-pulsing', pill.pulse);
     }
-    const od = snap.agents[other].decision;
-    let short;
-    let color;
-    if (other === 'legacy') {
-      short = od.stalled ? `LEGACY · INTERRUPTED ${od.stall?.remaining.toFixed(1) ?? ''}s` : `LEGACY · ROUTE ${od.primary ?? '—'}`;
-      color = od.stalled ? '#DC2626' : '#E11D48';
-    } else {
-      short = od.replicationActive ? 'FLEXIPATH · REPLICATING' : `FLEXIPATH · PRIMARY ${od.primary ?? '—'}`;
-      color = od.replicationActive ? '#7C3AED' : '#0E7490';
-    }
-    if (this._pill2Key !== short) {
-      this._pill2Key = short;
-      this.refs.pill2.textContent = short;
-      this.refs.pill2.style.color = color;
-      this.refs.pill2.style.borderColor = `${color}55`;
-    }
-    const zone = ZONES.find((z) => z.id === snap.agents[focus].vehicle.zone) ?? ZONES[0];
-    if (this._zoneKey !== zone.id) {
-      this._zoneKey = zone.id;
-      this.refs.zone.textContent = `ZONE ${zone.id}`;
-      this.refs.zone.title = zone.name;
-      this.refs.zone.style.color = ink(zone.color);
-    }
     this.refs.clock.textContent = fmtClock(snap.t);
-    const fpa = snap.agents.flexipath;
-    const ip = fpa.tunnel?.clientIp ? `CLIENT IP ${fpa.tunnel.clientIp} · ${fpa.tunnel.clientIface}` : 'CLIENT IP —';
-    if (this._ipKey !== ip) {
-      this._ipKey = ip;
-      this.refs.clientIp.textContent = ip;
-    }
-    const tier = POWER_TIERS[fpa.power?.tier ?? 0];
-    const rk = `${fpa.power?.watts}|${tier.key}`;
-    if (this._radioKey !== rk) {
-      this._radioKey = rk;
-      this.refs.radioChip.textContent = `RADIO ${(fpa.power?.watts ?? 0).toFixed(1)} W · ${tier.key}`;
-      this.refs.radioChip.style.color = ink(tier.color);
-      this.refs.radioChip.style.borderColor = `${tier.color}66`;
-    }
   }
 
   // ── Actions ─────────────────────────────────────────────────────────────
