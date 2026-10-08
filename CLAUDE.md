@@ -160,8 +160,14 @@ vehicles, nodes, beams, particles }` in the console.
 - Two worlds around the same network layer (drones, beams, packets, coverage rings, labels): `real` (default, a
   moonlit city and desert) and `twin` (the original neon digital twin). `L`, the Real / Twin button and `?look=twin`
   switch them; `Dashboard.setLook` → `hooks.onLook` (wired in `main.js`) → `setLook` on `SceneManager` (lights, fog,
-  bloom), `EnvironmentManager` (sky colours; shows `this.real` or `this.twin`) and `NetworkNodeManager` (steel colours
-  and `REAL_EMISSIVE` glow, both kept per material so switching back is exact).
+  bloom), `EnvironmentManager` (sky colours; shows `this.real` or `this.twin`), `NetworkNodeManager` (steel colours
+  and `REAL_EMISSIVE` glow, both kept per material so switching back is exact) and `VehicleManager`:
+  - painted drones: FlexiPath white with cyan, Legacy graphite with red;
+  - motor LEDs;
+  - pale rotor discs.
+
+  The paint is picked per mesh by part name (`PAINT_PARTS`). Keep the Blender object names and the procedural
+  `buildDrone()` mesh names in step.
 - `RealWorld.js` builds the realistic world once, procedurally (canvas textures, merged or instanced geometry, no
   image files), from the route, the twin city's plots (`EnvironmentManager.cityBoxes`) and the dock pad frames. It
   uses its own `Random('flexipath-real')`. `RealCity.js` turns the plots (plus low-rise plots on the camera side) into
