@@ -40,6 +40,7 @@ import {
   Repeat,
   Box,
   Building2,
+  List,
   CircleHelp,
   Maximize2,
   Minimize2,
@@ -111,6 +112,7 @@ const ICONS = {
   Repeat,
   Box,
   Building2,
+  List,
   CircleHelp,
   Maximize2,
   Minimize2,
@@ -239,7 +241,7 @@ export class Dashboard {
           ${LOGO}
           <div class="min-w-0">
             <h1 class="font-display text-[12px] font-extrabold tracking-[0.12em] text-slate-100 sm:text-[14px] sm:tracking-[0.22em]">FLEXIPATH <span class="text-fp">CONNECTIVITY ENGINE</span></h1>
-            <p class="truncate font-mono text-[9px] tracking-[0.12em] text-slate-500">PREDICTIVE · TRAFFIC-AWARE · HETEROGENEOUS NETWORKS<span class="hidden 2xl:inline"> · ATRC EDGE 2026</span></p>
+            <p class="truncate font-mono text-[9px] tracking-[0.12em] text-slate-500" data-view="advanced">PREDICTIVE · TRAFFIC-AWARE · HETEROGENEOUS NETWORKS<span class="hidden 2xl:inline"> · ATRC EDGE 2026</span></p>
           </div>
         </div>
         <div class="flex min-w-0 flex-1 items-center justify-center gap-2 overflow-hidden max-xl:order-last max-xl:basis-full max-xl:justify-start">
@@ -247,11 +249,11 @@ export class Dashboard {
             <span class="dot shrink-0"></span><span class="shrink-0" data-ref="pillText">INITIALISING</span>
             <span class="truncate font-mono text-[10px] font-semibold tracking-[0.04em] opacity-75" data-ref="pillDetail"></span>
           </div>
-          <span class="chip hidden shrink-0 2xl:inline-flex" data-ref="pill2"></span>
+          <span class="chip hidden shrink-0 2xl:inline-flex" data-ref="pill2" data-view="advanced"></span>
         </div>
         <div class="flex min-w-0 flex-wrap items-center gap-2">
           <span class="chip sim-badge" title="Everything on this screen is produced by the FlexiPath simulation model (seeded, deterministic). No real-world measurements are shown."><span class="dot"></span>SIMULATION · v${VERSION}</span>
-          <span class="chip border-fp/30!" title="Static anchor relay: FlexiPath tunnels every flow (userspace UDP) to this address, so remote services only ever see it and no socket is reset by a path change">
+          <span class="chip border-fp/30!" data-view="advanced" title="Static anchor relay: FlexiPath tunnels every flow (userspace UDP) to this address, so remote services only ever see it and no socket is reset by a path change">
             <i data-lucide="lock" class="text-fp"></i>ANCHOR RELAY <b class="text-slate-100">${ANCHOR_IP}</b>
           </span>
           <span class="chip hidden min-[1700px]:inline-flex" data-ref="clientIp" data-view="advanced" title="FlexiPath's current physical (outer) address — changes with the network; remote services never see it">CLIENT IP —</span>
@@ -267,17 +269,17 @@ export class Dashboard {
           <button type="button" class="h-[26px]! px-3!" data-mode="advanced" aria-pressed="false" title="Advanced view (M)"><i data-lucide="sliders-horizontal"></i>Advanced</button>
         </div>
         <label class="flex min-w-0 items-center gap-2">
-          <span class="hud-label hidden sm:inline">Scenario</span>
+          <span class="hud-label hidden sm:inline" data-view="advanced">Scenario</span>
           <select class="toolbar-select" data-ref="scenario" aria-label="Scenario">${scenarioOptions}</select>
         </label>
         <span class="chip hidden lg:inline-flex" data-ref="trafficChip" data-view="advanced" title="Traffic mix of this scenario"></span>
         <div class="ml-auto flex flex-wrap items-center gap-2">
-          <button type="button" class="btn btn-fault-sm" data-fault="wifi-fade" data-view="mission" title="Inject a rapid Wi-Fi fade (F)"><i data-lucide="wifi-off"></i>Wi-Fi fade</button>
-          <button type="button" class="btn btn-fault-sm" data-fault="cell-outage" data-view="mission" title="Inject an abrupt 5G cell outage (G)"><i data-lucide="tower-control"></i>5G outage</button>
-          <button type="button" class="btn" data-ref="resetBtn" data-view="mission" title="Reset scenario, same seed (R)"><i data-lucide="rotate-ccw"></i>Reset</button>
+          <button type="button" class="btn btn-fault-sm" data-fault="wifi-fade" data-view="mission" title="Inject a rapid Wi-Fi fade (F)"><i data-lucide="wifi-off"></i><span class="tb-text">Wi-Fi fade</span></button>
+          <button type="button" class="btn btn-fault-sm" data-fault="cell-outage" data-view="mission" title="Inject an abrupt 5G cell outage (G)"><i data-lucide="tower-control"></i><span class="tb-text">5G outage</span></button>
+          <button type="button" class="btn" data-ref="resetBtn" data-view="mission" title="Reset scenario, same seed (R)"><i data-lucide="rotate-ccw"></i><span class="tb-text">Reset</span></button>
           <button type="button" class="btn btn-demo" data-ref="demoBtn" title="Guided demo (D)"><i data-lucide="presentation"></i>Guided demo</button>
-          <button type="button" class="btn btn-primary" data-ref="expBtn" title="Paired experiments (X)"><i data-lucide="flask-conical"></i>Experiments</button>
-          <button type="button" class="btn" data-ref="infoBtn" title="Why FlexiPath? (I)"><i data-lucide="info"></i>Why FlexiPath?</button>
+          <button type="button" class="btn btn-primary" data-ref="expBtn" title="Paired experiments (X)"><i data-lucide="flask-conical"></i><span class="tb-text">Experiments</span></button>
+          <button type="button" class="btn" data-ref="infoBtn" title="Why FlexiPath? (I)"><i data-lucide="info"></i><span class="tb-text">Why FlexiPath?</span></button>
         </div>
       </nav>
 
@@ -354,7 +356,7 @@ export class Dashboard {
             </div>
           </div>
 
-          <div class="overlay-glass pointer-events-none absolute bottom-3 left-3 hidden flex-col gap-1 px-2.5 py-2 md:flex" aria-label="Beam legend">
+          <div class="fp-legend overlay-glass pointer-events-none absolute bottom-3 left-3 hidden flex-col gap-1 px-2.5 py-2 md:flex" aria-label="Beam legend">
             ${[
               ['Wired', INTERFACE_SPECS.eth0.color],
               ['Wi-Fi 6', INTERFACE_SPECS.wlan0.color],
@@ -374,6 +376,7 @@ export class Dashboard {
               ${[0.5, 1, 2, 4].map((r) => `<button type="button" class="h-[24px]! px-2.5! font-mono" data-rate="${r}" aria-pressed="${r === 1}">${r}×</button>`).join('')}
             </div>
             <span class="num hidden px-1 text-[11px] text-slate-400 sm:inline" data-ref="simInfo">10 Hz</span>
+            <button type="button" class="btn h-[26px]! w-[30px] justify-center px-0!" data-ref="legendBtn" data-view="mission" aria-pressed="false" aria-label="Show the beam legend" title="Beam legend"><i data-lucide="list"></i></button>
           </div>
 
           <div class="pointer-events-none absolute right-3 bottom-3 hidden flex-col items-end gap-1.5 sm:flex" data-view="advanced">
@@ -419,6 +422,11 @@ export class Dashboard {
     this.refs.play.addEventListener('click', () => this.togglePause());
     this.refs.help.addEventListener('click', () => this.openInfo());
     this.refs.theatre.addEventListener('click', () => this.setTheatre(!this.view.theatre));
+    this.refs.legendBtn.addEventListener('click', () => {
+      const on = this.refs.shell.dataset.legend !== '1';
+      this.refs.shell.dataset.legend = on ? '1' : '0';
+      this.refs.legendBtn.setAttribute('aria-pressed', String(on));
+    });
     this.refs.look.addEventListener('click', () => this.setLook(this.view.look === 'real' ? 'twin' : 'real'));
     this.refs.modal.addEventListener('click', (e) => {
       if (e.target === this.refs.modal) this.closeModal();

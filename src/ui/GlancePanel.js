@@ -33,7 +33,7 @@ export class GlancePanel {
         <span class="glance-label" title="Client address changes that remote services saw. FlexiPath tunnels every flow to the anchor relay ${RELAY_PARAMS.anchorIp}; each legacy change resets its TCP sessions.">IP changes seen</span>
         <b class="glance-v text-fp" data-ref="fpIp">—</b><b class="glance-v text-legacy" data-ref="lgIp">—</b>
       </div>
-      <div class="flow-meta truncate border-t border-slate-800/80 px-3 py-2" data-ref="note">—</div>`;
+      <div class="glance-note flow-meta truncate border-t border-slate-800/80 px-3 py-2" data-ref="note">—</div>`;
     this.refs = {};
     root.querySelectorAll('[data-ref]').forEach((n) => (this.refs[n.dataset.ref] = n));
     this.refs.details.addEventListener('click', () => onDetails?.());

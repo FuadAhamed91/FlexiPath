@@ -36,7 +36,7 @@ Both are modelled as baselines and run on the same seeds as FlexiPath and Legacy
 
 ## What the demo shows
 
-Open the app and you get the **Mission view**, kept to the story — the 3D twin with one short column beside it:
+Open the app and you get the **Mission view**, kept to the story. The 3D twin takes most of the screen, with one short column beside it. The header and toolbar are one line each; the decision loop is a one-line stepper where only the active stage shows its text. Fault injection, reset, Experiments and "Why FlexiPath?" are icon buttons with tooltips. The beam legend sits behind a button in the playback bar.
 
 | Area | What it answers |
 | --- | --- |
@@ -44,7 +44,7 @@ Open the app and you get the **Mission view**, kept to the story — the 3D twin
 | **3D twin** | A moonlit night over a real city and desert (press `L` for the original neon digital twin). Two drones on the same corridor; the camera keeps both in frame and an edge marker points to the other drone if it falls out of view. The legacy drone's label shows the distance it has lost. Sleeping modems draw no probe beams (a faint blink marks each DRX signal sample); a warm modem shows dashed heartbeat beams; both beams pulse purple during the burst. |
 | **Why did FlexiPath do that?** | The latest decision as a short card — headline, action and reason, beside the rule the legacy stack follows. **Show details** opens the full record (current path, status, alternate, traffic, **radio power tier**) and the decision history. |
 | **At a glance** | Which traffic is protected right now (critical, voice, bulk), and FlexiPath vs Legacy on radio power, the longest data stall and client IP changes seen by remote services. **Details** opens the Advanced view. |
-| **Legacy vs FlexiPath** | Both drones' latest transition step by step, timed relative to the moment the path *actually* failed, with the simulated interruption, critical packets lost and failures acted on before they happened. |
+| **Legacy vs FlexiPath** | One line of headline numbers. **Show steps** opens both drones' latest transition step by step, timed relative to the moment the path *actually* failed, with the simulated interruption, critical packets lost and failures acted on before they happened. |
 
 The header carries the status, the `SIMULATION` badge, the static **anchor relay** address and the clock.
 

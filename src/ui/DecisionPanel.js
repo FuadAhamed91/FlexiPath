@@ -72,7 +72,7 @@ export class DecisionPanel {
       <div class="flex items-start justify-between gap-2 px-3 pt-3 pb-1">
         <div>
           <h2 class="hud-title text-slate-200!">Why did FlexiPath do that?</h2>
-          <div class="mt-1 font-mono text-[9.5px] text-slate-500" data-ref="sub">Decision engine · waiting for the first decision</div>
+          <div class="dp-sub mt-1 font-mono text-[9.5px] text-slate-500" data-ref="sub">Decision engine · waiting for the first decision</div>
         </div>
         <span class="decision-kind" data-ref="kind" hidden></span>
       </div>
@@ -90,7 +90,7 @@ export class DecisionPanel {
         <div class="dp-more mt-2.5 flex flex-wrap items-center gap-1.5 text-[9.5px] text-slate-500">
           ${tag('measured')}<span>values at decision time</span>${tag('param')}<span>thresholds</span>
         </div>
-        <div class="legacy-rule dp-line1 mt-2.5" data-ref="legacy">Legacy OS · —</div>
+        <div class="legacy-rule dp-legacy dp-line1 mt-2.5" data-ref="legacy">Legacy OS · —</div>
         <div class="dp-more mt-3 flex items-center justify-between">
           <span class="hud-label">Decision history</span>
           <button type="button" class="btn h-[22px]! px-2! text-[10px]!" data-ref="follow" hidden>Follow latest</button>
