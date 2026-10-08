@@ -29,12 +29,12 @@ export class Controls {
           <div class="rounded-lg border border-fp/25 bg-fp/5 px-2.5 py-2">
             <div class="flex items-center gap-1.5 text-[9px] font-bold tracking-[0.18em] text-fp"><span class="legend-dot bg-fp"></span>FLEXIPATH</div>
             <div class="stall-value mt-1.5 text-fp" data-ref="fpStall">0.00<span class="text-[13px] text-slate-500"> s</span></div>
-            <div class="num mt-1 text-[9.5px] text-slate-400" data-ref="fpSub">0 hot-swaps · 0 lost</div>
+            <div class="num mt-1 text-[9.5px] text-slate-600" data-ref="fpSub">0 hot-swaps · 0 lost</div>
           </div>
           <div class="rounded-lg border border-legacy/30 bg-legacy/5 px-2.5 py-2">
             <div class="flex items-center gap-1.5 text-[9px] font-bold tracking-[0.18em] text-legacy"><span class="legend-dot bg-legacy"></span>LEGACY OS</div>
             <div class="stall-value stall-lg mt-1.5 text-legacy" data-ref="lgStall">0.00<span class="text-[13px] text-slate-500"> s</span></div>
-            <div class="num mt-1 text-[9.5px] text-slate-400" data-ref="lgSub">0 stalls · 0 TCP RST</div>
+            <div class="num mt-1 text-[9.5px] text-slate-600" data-ref="lgSub">0 stalls · 0 TCP RST</div>
           </div>
         </div>
       </section>
@@ -46,11 +46,11 @@ export class Controls {
           <button type="button" data-value="legacy" data-engine="legacy" aria-pressed="false"><i data-lucide="history"></i>Legacy OS Mode</button>
         </div>
         <div class="mt-2 flex flex-col gap-1.5">
-          <label class="flex cursor-pointer items-center justify-between gap-2 text-[11px] text-slate-300">
+          <label class="flex cursor-pointer items-center justify-between gap-2 text-[11px] text-slate-700">
             <span class="flex items-center gap-1.5"><i data-lucide="ghost" class="size-3.5 text-slate-500"></i>Side-by-side ghost drone</span>
             <button type="button" class="toggle" role="switch" aria-checked="true" data-ref="ghost" aria-label="Show comparison drone"></button>
           </label>
-          <label class="flex cursor-pointer items-center justify-between gap-2 text-[11px] text-slate-300">
+          <label class="flex cursor-pointer items-center justify-between gap-2 text-[11px] text-slate-700">
             <span class="flex items-center gap-1.5"><i data-lucide="siren" class="size-3.5 text-slate-500"></i>Fail-safe hover on C2-link loss</span>
             <button type="button" class="toggle" role="switch" aria-checked="true" data-ref="failsafe" aria-label="Fail-safe hover"></button>
           </label>
@@ -60,10 +60,10 @@ export class Controls {
       <section class="mt-3 px-3" aria-label="Drone speed">
         <div class="flex items-baseline justify-between">
           <label class="hud-label" for="speed-range">Drone speed</label>
-          <span class="num text-[15px] font-bold text-slate-100"><span data-ref="speedVal">60</span><span class="text-[10px] text-slate-500"> km/h</span></span>
+          <span class="num text-[15px] font-bold text-slate-900"><span data-ref="speedVal">60</span><span class="text-[10px] text-slate-500"> km/h</span></span>
         </div>
         <input id="speed-range" class="speed-range mt-1" type="range" min="0" max="120" step="1" value="60" data-ref="speed" />
-        <div class="num flex justify-between px-0.5 text-[8.5px] text-slate-600">${SPEED_TICKS.map((v) => `<span>${v}</span>`).join('')}</div>
+        <div class="num flex justify-between px-0.5 text-[8.5px] text-slate-400">${SPEED_TICKS.map((v) => `<span>${v}</span>`).join('')}</div>
       </section>
 
       <section class="mt-2.5 px-3" aria-label="Random seed">
@@ -80,7 +80,7 @@ export class Controls {
         <div class="flex flex-col gap-1.5">
           <button type="button" class="btn btn-fault" data-fault="wifi-fade"><i data-lucide="wifi-off"></i>Simulate Rapid Wi-Fi Fade<span class="kbd">F</span></button>
           <button type="button" class="btn btn-fault" data-fault="cell-outage"><i data-lucide="tower-control"></i>Simulate 5G Cell Outage<span class="kbd">G</span></button>
-          <button type="button" class="btn btn-fault" data-ref="reset" style="border-color:rgba(148,163,184,.25);background:rgba(15,23,42,.6);color:#cbd5e1"><i data-lucide="rotate-ccw"></i>Reset Scenario<span class="kbd">R</span></button>
+          <button type="button" class="btn btn-fault" data-ref="reset" style="border-color:#cbd5e1;background:#ffffff;color:#334155"><i data-lucide="rotate-ccw"></i>Reset Scenario<span class="kbd">R</span></button>
         </div>
       </section>
 

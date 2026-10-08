@@ -10,17 +10,17 @@ import { POWER_TIERS } from '../simulation/PowerModel.js';
 import { esc, fmtPct, fmtT, linkChip, makeSetter, tag } from './format.js';
 
 export const KIND_META = {
-  ATTACH: { label: 'ATTACH', color: '#94a3b8' },
-  PREDICT: { label: 'PREDICT', color: '#facc15' },
-  PREPARE: { label: 'PREPARE', color: '#60a5fa' },
-  PROTECT: { label: 'PROTECT', color: '#c084fc' },
-  PROTECT_RT: { label: 'PROTECT · RT', color: '#c084fc' },
-  UPGRADE: { label: 'UPGRADE', color: '#22d3ee' },
-  RETARGET: { label: 'RETARGET', color: '#60a5fa' },
-  SWITCH: { label: 'SWITCH', color: '#4ade80' },
-  FAILOVER: { label: 'FAILOVER', color: '#fb923c' },
-  STAND_DOWN: { label: 'STAND DOWN', color: '#94a3b8' },
-  NO_PATH: { label: 'NO PATH', color: '#f87171' },
+  ATTACH: { label: 'ATTACH', color: '#64748b' },
+  PREDICT: { label: 'PREDICT', color: '#b45309' },
+  PREPARE: { label: 'PREPARE', color: '#2563eb' },
+  PROTECT: { label: 'PROTECT', color: '#7c3aed' },
+  PROTECT_RT: { label: 'PROTECT · RT', color: '#7c3aed' },
+  UPGRADE: { label: 'UPGRADE', color: '#0e7490' },
+  RETARGET: { label: 'RETARGET', color: '#2563eb' },
+  SWITCH: { label: 'SWITCH', color: '#15803d' },
+  FAILOVER: { label: 'FAILOVER', color: '#c2410c' },
+  STAND_DOWN: { label: 'STAND DOWN', color: '#64748b' },
+  NO_PATH: { label: 'NO PATH', color: '#dc2626' },
 };
 
 const secs = (v) => (v < 1 ? v.toFixed(2) : v.toFixed(1));
@@ -30,7 +30,7 @@ const RADIO_WHAT = ['secondary modems asleep in DRX', 'one secondary modem awake
 function radioText(p) {
   if (!p) return '<span class="text-slate-500">—</span>';
   const tier = POWER_TIERS[p.tier] ?? POWER_TIERS[0];
-  return `<span class="tier-badge" style="--c:${tier.color}">${esc(p.label ?? tier.label)}</span> <span class="num font-semibold text-slate-200">${p.watts.toFixed(1)} W</span> <span class="text-slate-500">· ${esc(RADIO_WHAT[p.tier] ?? '')}</span>`;
+  return `<span class="tier-badge" style="--c:${tier.color}">${esc(p.label ?? tier.label)}</span> <span class="num font-semibold text-slate-800">${p.watts.toFixed(1)} W</span> <span class="text-slate-500">· ${esc(RADIO_WHAT[p.tier] ?? '')}</span>`;
 }
 
 function currentText(c) {
@@ -39,7 +39,7 @@ function currentText(c) {
   if (c.signalText) bits.push(c.signalText);
   if (Number.isFinite(c.loss)) bits.push(`loss ${fmtPct(c.loss)}`);
   if (Number.isFinite(c.rttMs)) bits.push(`RTT ${c.rttMs.toFixed(0)} ms`);
-  return `${linkChip(c.link, c.name)} <span class="num text-slate-400">${esc(bits.join(' · '))}</span>`;
+  return `${linkChip(c.link, c.name)} <span class="num text-slate-600">${esc(bits.join(' · '))}</span>`;
 }
 
 function statusText(c) {
@@ -50,19 +50,19 @@ function statusText(c) {
   if (Number.isFinite(c.ttf)) bits.push(`TTF ${secs(c.ttf)} s`);
   else if (Number.isFinite(c.projectedTtf)) bits.push(`projected failure ${secs(c.projectedTtf)} s`);
   if (Number.isFinite(c.marginDb)) bits.push(`${c.marginDb.toFixed(1)} dB margin`);
-  return `<span class="font-semibold ${lvl}">${esc(c.status)}</span>${bits.length ? ` <span class="num text-slate-400">· ${esc(bits.join(' · '))}</span>` : ''}`;
+  return `<span class="font-semibold ${lvl}">${esc(c.status)}</span>${bits.length ? ` <span class="num text-slate-600">· ${esc(bits.join(' · '))}</span>` : ''}`;
 }
 
 function altText(a) {
   if (!a) return '<span class="text-slate-500">none</span>';
   if (a.estimated) {
     // Asleep in DRX (or just woken): only its signal has been sampled — no RTT / loss measured yet.
-    return `${linkChip(a.link, a.name)} <span class="num text-slate-400">est. score ${a.score.toFixed(0)} · from its DRX signal, RTT / loss not measured yet</span>`;
+    return `${linkChip(a.link, a.name)} <span class="num text-slate-600">est. score ${a.score.toFixed(0)} · from its DRX signal, RTT / loss not measured yet</span>`;
   }
   const bits = [`score ${a.score.toFixed(0)}`];
   if (Number.isFinite(a.loss)) bits.push(`loss ${fmtPct(a.loss)}`);
   if (Number.isFinite(a.rttMs)) bits.push(`RTT ${a.rttMs.toFixed(0)} ms`);
-  return `${linkChip(a.link, a.name)} <span class="num text-slate-400">${esc(bits.join(' · '))}</span>`;
+  return `${linkChip(a.link, a.name)} <span class="num text-slate-600">${esc(bits.join(' · '))}</span>`;
 }
 
 export class DecisionPanel {
@@ -71,7 +71,7 @@ export class DecisionPanel {
     root.innerHTML = `
       <div class="flex items-start justify-between gap-2 px-3 pt-3 pb-1">
         <div>
-          <h2 class="hud-title text-slate-200!">Why did FlexiPath do that?</h2>
+          <h2 class="hud-title text-slate-800!">Why did FlexiPath do that?</h2>
           <div class="dp-sub mt-1 font-mono text-[9.5px] text-slate-500" data-ref="sub">Decision engine · waiting for the first decision</div>
         </div>
         <span class="decision-kind" data-ref="kind" hidden></span>
@@ -168,7 +168,7 @@ export class DecisionPanel {
     const r = this.current;
     const R = this.refs;
     if (!r) return;
-    const meta = KIND_META[r.kind] ?? { label: r.kind, color: '#94a3b8' };
+    const meta = KIND_META[r.kind] ?? { label: r.kind, color: '#64748b' };
     R.kind.hidden = false;
     R.kind.textContent = meta.label;
     R.kind.style.color = meta.color;
@@ -188,7 +188,7 @@ export class DecisionPanel {
     const rows = [];
     for (let i = this.records.length - 1; i >= start; i--) {
       const rec = this.records[i];
-      const m = KIND_META[rec.kind] ?? { label: rec.kind, color: '#94a3b8' };
+      const m = KIND_META[rec.kind] ?? { label: rec.kind, color: '#64748b' };
       const current = rec === r;
       rows.push(
         `<button type="button" data-idx="${i}" aria-current="${current}"><span>${fmtT(rec.t)}</span><span style="color:${m.color}">${esc(m.label)}</span><span>${esc(rec.headline)}</span></button>`,

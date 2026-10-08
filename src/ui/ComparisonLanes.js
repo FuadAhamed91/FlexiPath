@@ -11,14 +11,14 @@ import { POWER_PARAMS } from '../simulation/PowerModel.js';
 const BURST = `${Math.round(POWER_PARAMS.burstWindowS * 1000)} ms · ${POWER_PARAMS.tierWatts[2]} W`;
 
 const C = {
-  predict: '#facc15',
-  prepare: '#60a5fa',
-  repl: '#a855f7',
-  fail: '#ef4444',
-  switch: '#e2e8f0',
-  ok: '#22c55e',
-  degrade: '#facc15',
-  neutral: '#94a3b8',
+  predict: '#b45309',
+  prepare: '#2563eb',
+  repl: '#7c3aed',
+  fail: '#dc2626',
+  switch: '#334155',
+  ok: '#15803d',
+  degrade: '#b45309',
+  neutral: '#64748b',
 };
 
 const at = (t, ref) => {
@@ -33,7 +33,7 @@ export class ComparisonLanes {
     root.innerHTML = `
       <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 pt-2.5 pb-2">
         <div class="flex min-w-0 items-baseline gap-2.5">
-          <h2 class="hud-title text-slate-200!">Legacy vs FlexiPath</h2>
+          <h2 class="hud-title text-slate-800!">Legacy vs FlexiPath</h2>
           <span class="lanes-sub truncate font-mono text-[9.5px] text-slate-500">same route · same seed · same RF conditions · times vs. the moment the path actually failed</span>
         </div>
         <div class="flex flex-wrap items-center gap-2">
@@ -56,11 +56,11 @@ export class ComparisonLanes {
         </div>
       </div>
       <div class="lanes-body flex flex-col gap-2 px-3 pb-3">
-        <div class="lane" style="--lc:#00F0FF">
+        <div class="lane" style="--lc:#0E7490">
           <div class="lane-head"><span class="who">FLEXIPATH</span><span class="what" data-ref="fpWhat">monitoring</span></div>
           <div class="lane-steps" data-ref="fpSteps"></div>
         </div>
-        <div class="lane" style="--lc:#F43F5E">
+        <div class="lane" style="--lc:#E11D48">
           <div class="lane-head"><span class="who">LEGACY OS</span><span class="what" data-ref="lgWhat">connected</span></div>
           <div class="lane-steps" data-ref="lgSteps"></div>
         </div>

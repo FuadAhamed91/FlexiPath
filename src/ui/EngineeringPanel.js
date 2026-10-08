@@ -21,7 +21,7 @@ export class EngineeringPanel {
     root.innerHTML = `
       <div class="flex items-start justify-between gap-2 px-3 pt-3 pb-1">
         <div>
-          <h2 class="hud-title text-slate-200!">Battery · ordering · session</h2>
+          <h2 class="hud-title text-slate-800!">Battery · ordering · session</h2>
           <div class="mt-1 font-mono text-[9.5px] text-slate-500">The three engineering objections, measured</div>
         </div>
         ${tag('measured')}
@@ -41,14 +41,14 @@ export class EngineeringPanel {
         </section>
         <section class="eng-row">
           <span class="hud-label">Head-of-line blocking</span>
-          <div class="mt-1.5 text-[11px] leading-snug text-slate-300" data-ref="crit">—</div>
-          <div class="mt-1 text-[11px] leading-snug text-slate-300" data-ref="bulk">—</div>
+          <div class="mt-1.5 text-[11px] leading-snug text-slate-700" data-ref="crit">—</div>
+          <div class="mt-1 text-[11px] leading-snug text-slate-700" data-ref="bulk">—</div>
           <div class="flow-meta mt-1" data-ref="holNow">—</div>
         </section>
         <section class="eng-row">
           <span class="hud-label">Session · relay tunnel</span>
-          <div class="mt-1.5 flex flex-wrap items-center gap-1 text-[11px] text-slate-300" data-ref="path">—</div>
-          <div class="mt-1 text-[11px] text-slate-300" data-ref="ipStats">—</div>
+          <div class="mt-1.5 flex flex-wrap items-center gap-1 text-[11px] text-slate-700" data-ref="path">—</div>
+          <div class="mt-1 text-[11px] text-slate-700" data-ref="ipStats">—</div>
           <div class="flow-meta mt-1" data-ref="legacyIp">—</div>
         </section>
       </div>`;
@@ -93,7 +93,7 @@ export class EngineeringPanel {
       R.crit,
       'crit',
       fp.hasCritical || fp.hasVoice
-        ? `<b class="text-slate-100">Critical + real-time: ${st.packetHolMaxMs.toFixed(0)} ms</b> stall · <b class="text-repl">${fmtInt(st.duplicatesDiscarded)}</b> late duplicates discarded <span class="text-slate-500">(32-bit sequence, first copy delivered; in-order would have added up to ${st.inOrderWaitMaxMs.toFixed(0)} ms)</span>`
+        ? `<b class="text-slate-900">Critical + real-time: ${st.packetHolMaxMs.toFixed(0)} ms</b> stall · <b class="text-repl">${fmtInt(st.duplicatesDiscarded)}</b> late duplicates discarded <span class="text-slate-500">(32-bit sequence, first copy delivered; in-order would have added up to ${st.inOrderWaitMaxMs.toFixed(0)} ms)</span>`
         : '<span class="text-slate-500">No critical or real-time flows in this scenario</span>',
     );
     S.html(
@@ -101,7 +101,7 @@ export class EngineeringPanel {
       'bulk',
       st.bulkHolMeanMs === null
         ? '<span class="text-slate-500">No bulk flows in this scenario</span>'
-        : `<b class="text-slate-100">Bulk:</b> <span class="text-fp">FP ${st.bulkHolMeanMs.toFixed(1)} ms</span> mean · peak ${st.bulkHolPeakMs.toFixed(0)} ms &nbsp;<span class="text-legacy">LG ${sl.bulkHolMeanMs.toFixed(1)} ms</span> · peak ${sl.bulkHolPeakMs.toFixed(0)} ms · ${sl.bulkRtoEvents} TCP timeout stall${sl.bulkRtoEvents === 1 ? '' : 's'}`,
+        : `<b class="text-slate-900">Bulk:</b> <span class="text-fp">FP ${st.bulkHolMeanMs.toFixed(1)} ms</span> mean · peak ${st.bulkHolPeakMs.toFixed(0)} ms &nbsp;<span class="text-legacy">LG ${sl.bulkHolMeanMs.toFixed(1)} ms</span> · peak ${sl.bulkHolPeakMs.toFixed(0)} ms · ${sl.bulkRtoEvents} TCP timeout stall${sl.bulkRtoEvents === 1 ? '' : 's'}`,
     );
     let now;
     if (hf.pacing) now = `Now: delay-compensated pacing — ${linkName(hf.pacing.slowPath)} sends offset ${hf.pacing.offsetMs.toFixed(0)} ms ahead of ${linkName(hf.pacing.fastPath)} (ΔRTT ${(hf.pacing.offsetMs * 2).toFixed(0)} ms)`;
@@ -115,12 +115,12 @@ export class EngineeringPanel {
     S.html(
       R.path,
       'path',
-      `${client}<b class="text-slate-500">→</b><span class="path-chip" style="--c:#00F0FF">relay ${esc(tu.anchorIp)}</span><b class="text-slate-500">→</b><span class="text-slate-400">remote sees</span> <b class="text-fp">${esc(tu.remoteIp ?? '—')}</b>`,
+      `${client}<b class="text-slate-500">→</b><span class="path-chip" style="--c:#0891B2">relay ${esc(tu.anchorIp)}</span><b class="text-slate-500">→</b><span class="text-slate-600">remote sees</span> <b class="text-fp">${esc(tu.remoteIp ?? '—')}</b>`,
     );
     S.html(
       R.ipStats,
       'ipStats',
-      `Physical IP changes <b class="text-slate-100">${tu.physicalIpChanges}</b> · seen by remote services <b class="text-fp">${tu.remoteIpChanges}</b> · socket resets <b class="text-fp">${fp.stats.tcpResets}</b>${tu.natRebinds ? ` · NAT rebinds ${tu.natRebinds}` : ''}`,
+      `Physical IP changes <b class="text-slate-900">${tu.physicalIpChanges}</b> · seen by remote services <b class="text-fp">${tu.remoteIpChanges}</b> · socket resets <b class="text-fp">${fp.stats.tcpResets}</b>${tu.natRebinds ? ` · NAT rebinds ${tu.natRebinds}` : ''}`,
     );
     const lt = lg.tunnel;
     S.text(

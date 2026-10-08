@@ -31,7 +31,7 @@ function diffCell(diff, m) {
   const v = diff.mean;
   const sign = v > 0 ? '+' : v < 0 ? '−' : '±';
   const ci = Number.isFinite(diff.ci95) ? `± ${fmtV(diff.ci95, m.digits)}${esc(diffUnitOf(m))}` : 'n < 2';
-  return `<td class="font-semibold">${sign}${fmtV(Math.abs(v), m.digits)}${esc(diffUnitOf(m))}</td><td class="sd">${ci} <span class="text-slate-600">(n=${diff.n})</span></td>`;
+  return `<td class="font-semibold">${sign}${fmtV(Math.abs(v), m.digits)}${esc(diffUnitOf(m))}</td><td class="sd">${ci} <span class="text-slate-400">(n=${diff.n})</span></td>`;
 }
 
 export function comparisonTable(table) {
@@ -39,7 +39,7 @@ export function comparisonTable(table) {
     .filter((m) => m.legacy || m.flexipath)
     .map(
       (m) => `<tr>
-        <td>${esc(m.label)}${m.note ? ` <span class="text-slate-600" title="${esc(m.note)}">ⓘ</span>` : ''}</td>
+        <td>${esc(m.label)}${m.note ? ` <span class="text-slate-400" title="${esc(m.note)}">ⓘ</span>` : ''}</td>
         ${cell(m.legacy, m)}${cell(m.flexipath, m)}${diffCell(m.diff, m)}
       </tr>`,
     )
@@ -84,7 +84,7 @@ export function mechanismsTable(table, baselines) {
 function mechanismsNote() {
   const q = MULTIPATH_PARAMS;
   return `
-    <p class="mt-2 text-[11px] leading-relaxed text-slate-400">
+    <p class="mt-2 text-[11px] leading-relaxed text-slate-600">
       ${tag('param')} Baselines modelled on existing mechanisms, with the legacy stack's path preference and thresholds and detection in their favour:
       reactive multipath moves traffic once the active path has lost &gt; ${(q.failLoss * 100).toFixed(0)} % for one ${Math.round(q.rtoS * 1000)} ms retransmission timeout (or dropped), after a ${Math.round(q.wakeLatencyS * 1000)} ms standby-radio wake;
       always-duplicate sends every critical and real-time packet on two paths with both radios transmitting. Sessions stay anchored for both (no socket resets). See docs/existing-mechanisms.md.
@@ -94,8 +94,8 @@ function mechanismsNote() {
 function provenance(meta) {
   const p = FLEXIPATH_PARAMS;
   return `
-    <div class="mt-3 rounded-lg border border-slate-800 bg-slate-950/50 p-3 text-[11px] leading-relaxed text-slate-400">
-      <div class="mb-1.5 flex flex-wrap items-center gap-1.5">${tag('measured')}<span class="font-semibold text-slate-300">Measured simulation results, not real-world measurements.</span></div>
+    <div class="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-600">
+      <div class="mb-1.5 flex flex-wrap items-center gap-1.5">${tag('measured')}<span class="font-semibold text-slate-700">Measured simulation results, not real-world measurements.</span></div>
       Each trial runs FlexiPath and Legacy together on the same seed, route, RF field and fault timing, so every row compares matched pairs.
       Seeds: ${esc(meta.seeds.join(', '))} · speed ${esc(meta.speeds.join(', '))} km/h · fail-safe hover ${meta.failSafe ? 'on' : 'off'}.
       <div class="mt-1.5 flex flex-wrap items-center gap-1.5">${tag('param')}<span>Values that come straight from the model:</span></div>
@@ -116,8 +116,8 @@ function matrix(results) {
       const ov = pick(t, 'replicationOverheadPct');
       const ova = pick(t, 'replicationOverheadTotalPct');
       const avf = pick(t, 'actionVsFailureS');
-      return `<tr data-scn="${sc.id}" class="cursor-pointer hover:bg-slate-900/60">
-        <td><b class="text-slate-200">${esc(sc.code)}</b> · ${esc(sc.label)}</td>
+      return `<tr data-scn="${sc.id}" class="cursor-pointer hover:bg-slate-100">
+        <td><b class="text-slate-800">${esc(sc.code)}</b> · ${esc(sc.label)}</td>
         <td>${f(it.legacy, 2)} / ${f(it.flexipath, 2)}</td>
         <td>${f(cd.legacy, 1)} / ${f(cd.flexipath, 1)}</td>
         <td>${f(mos.legacy, 2)} / ${f(mos.flexipath, 2)}</td>
@@ -162,11 +162,11 @@ export function openExperiments(dash, { scenario = 'A', trials = 10, speed = nul
         <label class="block"><div class="hud-label mb-1.5">Speed</div>
           <select class="toolbar-select w-full max-w-none!" name="speed">${speeds.map((s) => `<option value="${s}" ${s === nearest ? 'selected' : ''}>${s} km/h</option>`).join('')}</select></label>
       </div>
-      <p class="mt-2 text-[11.5px] leading-relaxed text-slate-400" data-ref="desc"></p>
+      <p class="mt-2 text-[11.5px] leading-relaxed text-slate-600" data-ref="desc"></p>
       <div class="mt-3 flex items-center gap-3">
         <button type="button" class="btn btn-primary" data-act="run"><i data-lucide="flask-conical"></i>Run paired trials</button>
-        <div class="meter flex-1" style="--c:#00F0FF"><span data-ref="bar"></span></div>
-        <span class="num w-28 text-right text-[11px] text-slate-400" data-ref="status">idle</span>
+        <div class="meter flex-1" style="--c:#0891B2"><span data-ref="bar"></span></div>
+        <span class="num w-28 text-right text-[11px] text-slate-600" data-ref="status">idle</span>
       </div>
       <div class="mt-4" data-ref="results"></div>
     </div>`,
@@ -200,14 +200,14 @@ export function openExperiments(dash, { scenario = 'A', trials = 10, speed = nul
     out.innerHTML = `
       ${multi ? `${matrix(res)}<div class="mt-4"></div>` : ''}
       <div class="mb-2 flex flex-wrap items-baseline justify-between gap-2">
-        <h3 class="font-display text-[11px] font-bold tracking-[0.18em] text-slate-200">${esc(sc.code)} · ${esc(sc.label.toUpperCase())}</h3>
+        <h3 class="font-display text-[11px] font-bold tracking-[0.18em] text-slate-800">${esc(sc.code)} · ${esc(sc.label.toUpperCase())}</h3>
         <span class="font-mono text-[10px] text-slate-500">${res.meta.seeds.length} paired trials · ${res.meta.speeds.join(', ')} km/h · ${(res.meta.wallTimeMs / 1000).toFixed(1)} s compute</span>
       </div>
       ${comparisonTable(res.comparison[show])}
       ${
         res.mechanisms?.[show]
           ? `<div class="mt-5 mb-2 flex flex-wrap items-baseline justify-between gap-2">
-              <h3 class="font-display text-[11px] font-bold tracking-[0.18em] text-slate-200">EXISTING MECHANISMS · SAME SEEDS</h3>
+              <h3 class="font-display text-[11px] font-bold tracking-[0.18em] text-slate-800">EXISTING MECHANISMS · SAME SEEDS</h3>
               <span class="font-mono text-[10px] text-slate-500">legacy · ${esc(res.meta.baselines.map((b) => b.label.toLowerCase()).join(' · '))} · FlexiPath</span>
             </div>
             ${mechanismsTable(res.mechanisms[show], res.meta.baselines)}

@@ -16,7 +16,7 @@ export class TunnelPanel {
         <span class="chip" data-ref="session">SESSION —</span>
       </div>
       <div class="px-3 pb-3">
-        <div class="font-mono text-[10px] leading-relaxed text-slate-400">
+        <div class="font-mono text-[10px] leading-relaxed text-slate-600">
           Anchor relay <b class="text-fp">${RELAY_PARAMS.anchorIp}:${RELAY_PARAMS.relayPort}</b> · ${esc(RELAY_PARAMS.encapsulation)}
         </div>
         <div class="mt-2 flex flex-wrap items-center gap-1 text-[11px]" data-ref="outer">—</div>
@@ -25,7 +25,7 @@ export class TunnelPanel {
           <tbody data-ref="leases"></tbody>
         </table>
         <div class="hud-label mt-2.5 mb-1">Recent rebinds (remote side unchanged)</div>
-        <div class="flex flex-col gap-0.5 font-mono text-[10px] text-slate-400" data-ref="history">—</div>
+        <div class="flex flex-col gap-0.5 font-mono text-[10px] text-slate-600" data-ref="history">—</div>
         <div class="legacy-rule mt-2.5" data-ref="legacy">Legacy OS · —</div>
       </div>`;
     this.refs = {};
