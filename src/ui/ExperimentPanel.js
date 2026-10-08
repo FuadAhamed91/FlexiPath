@@ -55,7 +55,7 @@ export function comparisonTable(table) {
     ${notes.length ? `<p class="mt-2 font-mono text-[10px] leading-relaxed text-slate-500">${esc(notes.join(' '))}</p>` : ''}`;
 }
 
-const MECHANISM_ROWS = ['interruptionS', 'longestInterruptionS', 'criticalDeliveryPct', 'meanMos', 'replicationOverheadPct', 'meanPowerW', 'energyJ', 'tcpResets', 'remoteIpChanges', 'actionVsFailureS'];
+const MECHANISM_ROWS = ['c2KeptPct', 'interruptionS', 'longestInterruptionS', 'criticalDeliveryPct', 'meanMos', 'replicationOverheadPct', 'meanPowerW', 'energyJ', 'tcpResets', 'remoteIpChanges', 'actionVsFailureS'];
 
 /** Legacy | existing multipath mechanisms | FlexiPath, means over the same paired runs. */
 export function mechanismsTable(table, baselines) {
@@ -110,6 +110,7 @@ function matrix(results) {
   const rows = results.meta.scenarios
     .map((sc) => {
       const t = results.comparison[sc.id];
+      const c2 = pick(t, 'c2KeptPct');
       const it = pick(t, 'interruptionS');
       const cd = pick(t, 'criticalDeliveryPct');
       const mos = pick(t, 'meanMos');
@@ -118,6 +119,7 @@ function matrix(results) {
       const avf = pick(t, 'actionVsFailureS');
       return `<tr data-scn="${sc.id}" class="cursor-pointer hover:bg-slate-100">
         <td><b class="text-slate-800">${esc(sc.code)}</b> · ${esc(sc.label)}</td>
+        <td>${f(c2.legacy, 0)} / ${f(c2.flexipath, 0)}</td>
         <td>${f(it.legacy, 2)} / ${f(it.flexipath, 2)}</td>
         <td>${f(cd.legacy, 1)} / ${f(cd.flexipath, 1)}</td>
         <td>${f(mos.legacy, 2)} / ${f(mos.flexipath, 2)}</td>
@@ -129,11 +131,11 @@ function matrix(results) {
   return `
     <div class="hud-scroll overflow-x-auto">
       <table class="exp-table">
-        <thead><tr><th>Scenario</th><th>Interruption s · LG / FP</th><th>Critical delivered % · LG / FP</th><th>MOS · LG / FP</th><th>FP overhead · protected / all</th><th>Action vs failure s · LG / FP</th></tr></thead>
+        <thead><tr><th>Scenario</th><th>Kept C2 % · LG / FP</th><th>Interruption s · LG / FP</th><th>Critical delivered % · LG / FP</th><th>MOS · LG / FP</th><th>FP overhead · protected / all</th><th>Action vs failure s · LG / FP</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>
-    <p class="mt-1.5 font-mono text-[10px] text-slate-500">Means over paired trials. Click a scenario for its full table. Negative action time = acted before the path failed.</p>`;
+    <p class="mt-1.5 font-mono text-[10px] text-slate-500">Means over paired trials. Kept C2 = flights with no fail-safe hover (C2 never silent > 300 ms). Click a scenario for its full table. Negative action time = acted before the path failed.</p>`;
 }
 
 /**
@@ -143,7 +145,7 @@ function matrix(results) {
 export function openExperiments(dash, { scenario = 'A', trials = 10, speed = null, autoRun = false, title } = {}) {
   const speedNow = speed ?? dash.engine.config.speedKmh;
   const scnOpts = [
-    `<option value="__all__">All controlled scenarios (A–F)</option>`,
+    `<option value="__all__">All controlled scenarios (A–H)</option>`,
     ...EXPERIMENT_SCENARIOS.map((id) => `<option value="${id}" ${id === scenario ? 'selected' : ''}>${esc(`${id} · ${SCENARIOS[id].label}`)}</option>`),
     `<option value="mission" ${scenario === 'mission' ? 'selected' : ''}>Full mission · dock → LEO</option>`,
     ...['baseline', 'wifi-fade', 'cell-outage'].map((id) => `<option value="${id}" ${id === scenario ? 'selected' : ''}>${esc(`Original matrix · ${SCENARIOS[id].label}`)}</option>`),
@@ -183,7 +185,7 @@ export function openExperiments(dash, { scenario = 'A', trials = 10, speed = nul
   const describe = () => {
     const id = scnSel.value;
     if (id === '__all__') {
-      desc.textContent = 'Runs A–F with the same seeds: gradual, rapid and abrupt degradations, and critical-only vs bulk-only traffic.';
+      desc.textContent = 'Runs A–H with the same seeds: gradual, rapid and abrupt degradations, critical-only vs bulk-only traffic, and a radio shadow with an up-to-date and an out-of-date coverage map.';
       return;
     }
     const sc = SCENARIOS[id];

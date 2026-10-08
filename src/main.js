@@ -81,10 +81,13 @@ async function boot() {
   dashboard.hooks.onBeforeReset = () => particles.clear();
   dashboard.setCamera(params.camera);
 
-  // A scenario may start anywhere on the route: snap the chase camera to the drones on reset.
+  // A scenario may start anywhere on the route: snap the chase camera to the drones on reset, and show
+  // the scenario's radio shadows (and what the coverage map believes about them).
   let snapCamera = true;
+  environment.setScenario(engine.scenario);
   engine.on('reset', () => {
     snapCamera = true;
+    environment.setScenario(engine.scenario);
   });
 
   const focusPos = new THREE.Vector3();

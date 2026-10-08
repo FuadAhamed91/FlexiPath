@@ -10,7 +10,7 @@
 import { LOOP_STAGES } from '../simulation/DecisionTrace.js';
 import { INTERFACE_IDS } from '../simulation/LinkModel.js';
 import { POWER_PARAMS } from '../simulation/PowerModel.js';
-import { esc, fmtT, linkName } from './format.js';
+import { esc, fmtT, linkName, mapAheadText } from './format.js';
 
 const W = POWER_PARAMS.tierWatts;
 const BURST_MS = Math.round(POWER_PARAMS.burstWindowS * 1000);
@@ -64,6 +64,7 @@ export class SystemLoop {
         if (!pred) return ep?.notes.PREDICT ?? '';
         const proj = Number.isFinite(pred.projectedTtf) ? pred.projectedTtf : pred.ttf;
         if (pred.triggers?.context) return `${linkName(d.primary)} ends at dock release`;
+        if (pred.mapAhead) return `coverage map: ${mapAheadText(pred.mapAhead)}`;
         return Number.isFinite(proj) ? `${linkName(d.primary)} failure in ≈ ${secs(proj)} s` : `${linkName(d.primary)} degrading`;
       }
       case 'PREPARE': {

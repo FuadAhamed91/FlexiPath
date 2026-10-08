@@ -101,6 +101,7 @@ FlexiPath is an adaptation of these mechanisms, not a new protocol:
 | MPTCP backup subflow / ATSSS Active-Standby | A second path held in reserve | The standby radio **sleeps in DRX** and is **woken only when degradation is predicted**, then validated with heartbeats before it is trusted |
 | Redundant scheduler / PDCP duplication | Duplicate packets, first copy delivered, late copy discarded | Duplication is **time-boxed to a ~400 ms burst** around the handover and **class-selective**: critical always, voice only above its 2 % loss budget, bulk never |
 | Handover prediction (e.g. arXiv:1907.10493) | Act on a forecast, not on the failure | A 3 s signal trend projects a time to failure. The forecast drives the whole loop (prepare → burst → switch), and every decision is explained |
+| Connectivity forecasting along a known route (e.g. BreadCrumbs) | Location tells you where coverage ends | A drone's route is planned, so a **coverage map of the flight plan** (dead zones from earlier survey flights) is read 8 s ahead. It drives the same prepare → burst → switch loop, and never wakes or upgrades onto a path the map says is about to die. It covers what a trend cannot: abrupt shadows, and places where the primary and its usual backup die together |
 
 ## How the baselines are modelled
 
@@ -129,7 +130,16 @@ Both baselines share the legacy stack's measurements, attach thresholds and inte
 
 ## Results (criterion 04)
 
-The figures are from `npm run benchmark`: scenarios A–F, 5 seeds × 4 speeds (30–120 km/h), 20 paired runs per scenario, means. Each cell reads **Legacy · Reactive multipath · Always duplicate · FlexiPath**.
+The figures are from `npm run benchmark`: scenarios A–H, 5 seeds × 4 speeds (30–120 km/h), 20 paired runs per scenario, means. Each cell reads **Legacy · Reactive multipath · Always duplicate · FlexiPath**. G puts a radio shadow on the route that blocks Wi-Fi and 5G together (on FlexiPath's coverage map); in H the map is out of date.
+
+| Scenario | Flights that kept C2 (%) |
+|---|---|
+| A, B, C, E | 0 · 100 · 100 · 100 |
+| D · Multiple faults | 0 · 0 · 100 · 100 |
+| G · Radio shadow | 0 · 0 · 40 · 100 |
+| H · Stale map | 0 · 0 · 100 · 100 |
+
+"Kept C2" counts the flights in which the C2 link was never silent long enough (> 300 ms) to force the fail-safe hover. F carries no C2.
 
 | Scenario | Interruption (s) | Critical delivered (%) | Voice MOS | Duplicate bytes, protected flows (%) | Mean radio power (W) | Radio energy (J) |
 |---|---|---|---|---|---|---|
@@ -139,6 +149,8 @@ The figures are from `npm run benchmark`: scenarios A–F, 5 seeds × 4 speeds (
 | D · Multiple faults | 16.37 · 0.68 · 0.00 · 0.16 | 77.3 · 97.0 · 99.0 · 98.2 | 3.38 · 4.10 · 4.27 · 4.19 | 0 · 0 · 49.0 · 0.9 | 1.22 · 1.20 · 2.65 · 1.25 | 113.6 · 86.1 · 197.8 · 90.7 |
 | E · Critical only | 3.80 · 0.00 · 0.00 · 0.00 | 84.9 · 98.3 · 100.0 · 99.0 | 3.71 · 4.23 · 4.38 · 4.30 | 0 · 0 · 99.7 · 1.1 | 1.22 · 1.20 · 3.39 · 1.31 | 42.8 · 35.9 · 101.3 · 38.9 |
 | F · Bulk only | 3.80 · 0.00 · 0.00 · 0.00 | — | — | 0 · 0 · 0 · 0 | 1.22 · 1.20 · 1.20 · 1.31 | 36.3 · 35.9 · 35.9 · 38.9 |
+| G · Radio shadow | 7.88 · 0.39 · 0.21 · 0.00 | 79.5 · 97.8 · 99.2 · 98.6 | 3.47 · 4.18 · 4.31 · 4.25 | 0 · 0 · 93.6 · 1.8 | 1.22 · 1.21 · 3.20 · 1.35 | 54.7 · 39.7 · 105.6 · 43.7 |
+| H · Stale map | 8.26 · 0.35 · 0.00 · 0.10 | 77.8 · 97.5 · 99.8 · 98.2 | 3.40 · 4.14 · 4.37 · 4.18 | 0 · 0 · 93.7 · 2.6 | 1.22 · 1.21 · 3.21 · 1.39 | 54.6 · 39.7 · 105.7 · 44.8 |
 
 | Scenario | Longest interruption (s) | Action vs path failure (s) | Time below MOS 3.6 (s) | Bulk HoL peak (ms) | Critical packets lost per run |
 |---|---|---|---|---|---|
@@ -146,31 +158,42 @@ The figures are from `npm run benchmark`: scenarios A–F, 5 seeds × 4 speeds (
 | B | 3.80 · 0.00 · 0.00 · 0.00 | +1.92 · +0.53 · +0.43 · −3.78 | 14.9 · 4.3 · 0.1 · 0.2 | 411 · 370 · 380 · 133 | 979 · 147 · 37 · 97 |
 | C | 3.73 · 0.00 · 0.00 · 0.00 | +2.27 · +0.41 · +0.45 · −4.60 | 8.2 · 2.4 · 0.1 · 0.0 | 394 · 360 · 320 · 65 | 515 · 82 · 26 · 61 |
 | D | 3.80 · 0.35 · 0.00 · 0.16 | +1.00 · +0.28 · +0.25 · −1.25 | 27.4 · 6.3 · 0.1 · 1.6 | 421 · 360 · 373 · 257 | 1892 · 265 · 89 · 160 |
+| G | 3.80 · 0.35 · 0.21 · 0.00 | +0.41 · +0.09 · +0.04 · −3.15 | 12.3 · 2.4 · 1.0 · 0.0 | 267 · 163 · 173 · 93 | 860 · 98 · 29 · 60 |
+| H | 3.80 · 0.35 · 0.00 · 0.10 | +0.58 · +0.28 · +0.23 · −3.47 | 13.1 · 3.3 · 0.0 · 1.0 | 390 · 385 · 355 · 197 | 909 · 104 · 7 · 76 |
 
 Paired differences have 95 % confidence intervals, over 20 pairs per scenario:
 
 - **FlexiPath − Reactive multipath:**
-  - Critical delivery: +0.64 ± 0.17 pp (A), +0.79 ± 0.19 (B), +0.70 ± 0.21 (C), +1.22 ± 0.15 (D).
-  - MOS: +0.07 to +0.10.
-  - Radio power: +0.11 ± 0.01 W in A–C; +0.05 ± 0.02 W in D.
-  - Interruption in D: −0.52 ± 0.04 s.
+  - Critical delivery: +0.64 ± 0.17 pp (A), +0.79 ± 0.18 (B), +0.70 ± 0.21 (C), +1.22 ± 0.15 (D), +0.87 ± 0.15 (G), +0.73 ± 0.23 (H).
+  - MOS: +0.07 to +0.10 (A–D), +0.07 (G), +0.05 (H).
+  - Radio power: +0.11 ± 0.01 W in A–C; +0.05 ± 0.02 W in D; +0.14 ± 0.02 W in G; +0.18 ± 0.02 W in H.
+  - Interruption: −0.52 ± 0.04 s in D, −0.40 ± 0.03 s in G, −0.25 ± 0.04 s in H.
 - **FlexiPath − Always duplicate:**
-  - Critical delivery: −0.77 ± 0.10 pp (D) to −1.03 ± 0.13 pp (C).
-  - MOS: −0.08.
-  - Radio power: −2.08 ± 0.01 W (A) to −1.39 ± 0.10 W (D), a reduction of 52–61 %.
+  - Critical delivery: −0.77 ± 0.10 pp (D) to −1.03 ± 0.13 pp (C); −0.55 ± 0.22 (G); −1.62 ± 0.20 (H).
+  - MOS: −0.08 (A–D), −0.06 (G), −0.19 (H).
+  - Radio power: −2.08 ± 0.01 W (A) to −1.39 ± 0.10 W (D), a reduction of 52–61 %; −1.86 W in G.
+  - Flights that kept C2 in G: +60 ± 24 points (20 of 20 against 8 of 20).
+
+These hold on a held-out block of seeds never used while building or tuning FlexiPath (`--seed-block test`): critical
+delivery against reactive multipath +0.58 to +1.09 pp, against always duplicate −0.47 to −1.57 pp, and FlexiPath
+again kept C2 on every flight. The README section *Held-out seeds* has the table.
 
 **What the comparison shows:**
 1. **Anchoring the session matters most.** Every anchored stack (reactive multipath, always duplicate, FlexiPath) removes the legacy interruption in the predictable handovers (A, B, C, E, F). Each also removes all TCP resets and remote-visible IP changes.
-2. **Prediction plus a short burst buys the remaining reliability cheaply.** Against reactive multipath, FlexiPath:
+2. **Prediction buys the remaining reliability cheaply.** Against reactive multipath, FlexiPath:
    - loses 25–40 % fewer critical packets;
    - keeps voice above MOS 3.6 almost all the time;
    - cuts bulk head-of-line peaks 3–5× in A–C and 1.4× in D;
    - acts 1.3–4.6 s **before** the failure instead of 0.3–0.5 s after.
 
    It also shrinks the gap of the one unpredictable outage in D from 0.35 s to 0.16 s. That is inside the 300 ms fail-safe budget; the reactive stack's gap exceeds it, which triggers the fail-safe hover. The price is about 0.1 W (≈ 9 %) more radio power, for the warm probe and the 400 ms burst.
+   The ablation (README, *Ablation: what each part contributes*) shows where this comes from: switching trend
+   prediction off costs 10–30 critical packets per flight in A–E, while switching the 400 ms burst off changes nothing
+   measurable in this model (it saves 0.02–0.04 W).
 3. **Permanent duplication is the most reliable, and the most expensive.** Always duplicate delivers 99.0–100 % with no gaps. It costs 2.65–3.39 W (2.1–2.6× FlexiPath) and duplicates 49–100 % of protected bytes, against FlexiPath's 0.9–1.4 %. FlexiPath keeps 98–99 % of protected packets at less than half of that power.
+4. **A shared dead zone defeats both existing designs (G).** When Wi-Fi and 5G die at the same place, reactive multipath (a 0.35 s gap) hovers on every flight, and always duplicate, whose two copies die together, on 12 of 20. FlexiPath's coverage map sees the zone 8 s ahead, so the satellite is warm and validated and the switch happens before the shadow: 0 s gap and C2 kept on all 20 flights. The cost is 7.5 Mbps less mean throughput than flying without the map. An out-of-date map (H) costs 21.8 Mbps for a needless move and does not help with a new shadow; fast failover still keeps C2 there.
 
-FlexiPath sits between the two existing designs: near-redundant reliability at near-reactive cost.
+FlexiPath sits between the two existing designs: near-redundant reliability at near-reactive cost, and ahead of both where coverage fails in a known place.
 
 ## Limits of this comparison
 
@@ -178,6 +201,8 @@ FlexiPath sits between the two existing designs: near-redundant reliability at n
 - Their detection times are favourable assumptions.
 - Power is the same three-tier system model for every stack. It is not per-technology and not measured.
 - A measurement with real equipment (e.g. a laptop with Wi-Fi and a 5G dongle running Linux MPTCP) would validate the baseline parameters. The challenge welcomes this but does not require it.
+- Always duplicate is modelled on its two best joinable paths. A variant that also kept the satellite transmitting (three networks on all the time) would survive scenario G too, at a still higher power cost.
+- The map scenarios are built to test the map: a 60 dB shadow with 5 m edges. How often real routes have such shared dead zones is a field question.
 
 ## References
 
@@ -189,3 +214,4 @@ FlexiPath sits between the two existing designs: near-redundant reliability at n
 6. J. Iyengar, M. Thomson (eds.). *QUIC: A UDP-Based Multiplexed and Secure Transport.* RFC 9000, 2021, §9 Connection Migration. <https://www.rfc-editor.org/rfc/rfc9000#section-9>
 7. V. Paxson, M. Allman, J. Chu, M. Sargent. *Computing TCP's Retransmission Timer.* RFC 6298, 2011. <https://www.rfc-editor.org/rfc/rfc6298>
 8. *Learning Wi-Fi Connection Loss Predictions for Seamless Vertical Handovers Using Multipath TCP.* arXiv:1907.10493, 2019. <https://arxiv.org/abs/1907.10493>
+9. A. J. Nicholson, B. D. Noble. *BreadCrumbs: Forecasting Mobile Connectivity.* ACM MobiCom, 2008.

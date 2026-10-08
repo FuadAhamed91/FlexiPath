@@ -14,6 +14,7 @@ import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 import { Random } from '../utils/Random.js';
 import { MOBILITY_DEFAULTS } from '../simulation/MobilityModel.js';
 import { ENGINES } from '../simulation/SimulationEngine.js';
+import { INTERFACE_SPECS } from '../simulation/LinkModel.js';
 import { buildRealWorld } from './RealWorld.js';
 
 /** Sky dome colours per look (the realistic night has a warm light-pollution glow on the horizon). */
@@ -124,6 +125,109 @@ export class EnvironmentManager {
     });
     this.group.add(this.real);
     this.setLook('real');
+  }
+
+  /**
+   * Radio shadows of the current scenario, shown in both looks: a red volume where links are really
+   * blocked, and a dashed outline where the coverage map still records a shadow that is gone.
+   */
+  setScenario(scenario) {
+    if (this.shadowGroup) {
+      this.group.remove(this.shadowGroup);
+      this.shadowGroup.traverse((o) => {
+        o.geometry?.dispose?.();
+        if (o.material) for (const m of [].concat(o.material)) m.dispose();
+        if (o.isCSS2DObject) o.element.remove();
+      });
+    }
+    this.shadowGroup = new THREE.Group();
+    this.shadowGroup.name = 'RadioShadows';
+    this.group.add(this.shadowGroup);
+    const real = scenario?.shadows ?? [];
+    const mapped = scenario?.mapShadows ?? real;
+    const same = (a, b) => a.x0 === b.x0 && a.x1 === b.x1;
+    for (const s of real) this._shadowVolume(s, mapped.some((m) => same(m, s)));
+    for (const m of mapped) if (!real.some((s) => same(m, s))) this._staleMapZone(m);
+  }
+
+  /** Box along the route over [x0 − edge, x1 + edge], wide enough for both lanes and tall enough for the drones. */
+  _shadowFrame(s) {
+    const e = s.edge ?? 1;
+    const f = this.world.path.frameAt(this.world.path.sAtX((s.x0 + s.x1) / 2));
+    return { f, length: s.x1 - s.x0 + 2 * e, width: 15, height: 9 };
+  }
+
+  _shadowLabel(title, sub, color, f, height) {
+    const el = document.createElement('div');
+    el.className = 'zone-label';
+    el.style.setProperty('--c', color);
+    el.innerHTML = `${title}<small>${sub}</small>`;
+    const obj = new CSS2DObject(el);
+    obj.position.set(f.x, height + 1.6, f.z);
+    this.shadowGroup.add(obj);
+  }
+
+  _shadowVolume(s, onMap) {
+    const { f, length, width, height } = this._shadowFrame(s);
+    const g = new THREE.Group();
+    const red = new THREE.Color('#ef4444');
+    const volume = new THREE.Mesh(
+      new THREE.BoxGeometry(length, height, width),
+      new THREE.MeshBasicMaterial({ color: red, transparent: true, opacity: 0.1, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }),
+    );
+    volume.position.y = height / 2;
+    g.add(volume);
+    const edges = new THREE.LineSegments(
+      new THREE.EdgesGeometry(volume.geometry),
+      new THREE.LineBasicMaterial({ color: red.clone().multiplyScalar(1.6), transparent: true, opacity: 0.7, toneMapped: false }),
+    );
+    edges.position.copy(volume.position);
+    g.add(edges);
+    // Hatched floor: the stretch where the blocked links are unusable.
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(0, 0, 64, 64);
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 10;
+    for (let k = -64; k <= 128; k += 24) {
+      ctx.beginPath();
+      ctx.moveTo(k, 0);
+      ctx.lineTo(k + 64, 64);
+      ctx.stroke();
+    }
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(length / 2, width / 2);
+    const floor = new THREE.Mesh(
+      new THREE.PlaneGeometry(length, width),
+      new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.55, depthWrite: false, toneMapped: false }),
+    );
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = 0.07;
+    g.add(floor);
+    g.position.set(f.x, 0, f.z);
+    g.rotation.y = f.heading;
+    this.shadowGroup.add(g);
+    const blocked = s.links.map((id) => INTERFACE_SPECS[id]?.name ?? id).join(' + ');
+    this._shadowLabel('RADIO SHADOW', `${blocked.toUpperCase()} BLOCKED · ${onMap ? 'ON THE COVERAGE MAP' : 'NOT ON THE MAP'}`, '#ef4444', f, height);
+  }
+
+  _staleMapZone(s) {
+    const { f, length, width, height } = this._shadowFrame(s);
+    const box = new THREE.BoxGeometry(length, height, width);
+    const outline = new THREE.LineSegments(
+      new THREE.EdgesGeometry(box),
+      new THREE.LineDashedMaterial({ color: '#cbd5e1', dashSize: 0.8, gapSize: 0.6, transparent: true, opacity: 0.8, toneMapped: false }),
+    );
+    box.dispose();
+    outline.computeLineDistances();
+    outline.position.set(f.x, height / 2, f.z);
+    outline.rotation.y = f.heading;
+    this.shadowGroup.add(outline);
+    this._shadowLabel('ON THE MAP', 'SHADOW NO LONGER THERE (STALE MAP)', '#cbd5e1', f, height);
   }
 
   /** `real`: the night city and desert (RealWorld.js); `twin`: the original neon digital twin. */
