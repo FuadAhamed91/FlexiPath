@@ -316,7 +316,7 @@ function signTexture(title, sub, color) {
   });
 }
 
-/** Overhead road-sign gantries where the twin has its neon zone gates. */
+/** Cantilever road-sign gantries where the twin has its neon zone gates. */
 function buildGantries(path, gates) {
   const g = new THREE.Group();
   const steel = new THREE.MeshStandardMaterial({ color: '#7a8087', metalness: 0.65, roughness: 0.45 });
@@ -328,18 +328,23 @@ function buildGantries(path, gates) {
   };
   for (const gate of gates) {
     const f = path.frameAt(path.sAtX(gate.x));
+    // Cantilever: one post on the far (−Z) side and an arm over the lanes, so nothing stands between the
+    // chase camera (+Z side) and the drones.
     const gantry = new THREE.Group();
-    for (const side of [-1, 1]) gantry.add(box(0.4, GANTRY_Y + 0.5, 0.4, steel, 0, (GANTRY_Y + 0.5) / 2, side * 9.0));
-    for (const y of [GANTRY_Y - 0.35, GANTRY_Y + 0.35]) gantry.add(box(0.22, 0.22, 18.4, steel, 0, y, 0));
-    for (let k = -4; k < 4; k++) {
-      const strut = box(0.08, 0.95, 0.08, steel, 0, GANTRY_Y, (k + 0.5) * 2.2);
+    const post = -9.0;
+    const tip = 3.4;
+    const mid = (post + tip) / 2;
+    gantry.add(box(0.45, GANTRY_Y + 0.5, 0.45, steel, 0, (GANTRY_Y + 0.5) / 2, post));
+    for (const y of [GANTRY_Y - 0.35, GANTRY_Y + 0.35]) gantry.add(box(0.22, 0.22, tip - post + 0.2, steel, 0, y, mid));
+    for (let k = 0; k < 6; k++) {
+      const strut = box(0.08, 0.95, 0.08, steel, 0, GANTRY_Y, post + 1.1 + k * 2.1);
       strut.rotation.x = k % 2 ? 0.75 : -0.75;
       gantry.add(strut);
     }
     const tex = signTexture(gate.title, gate.sub, gate.color);
     const face = new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: '#ffffff', emissiveIntensity: 0.5, roughness: 0.6 });
     // BoxGeometry material slots: +x, −x, +y, −y, +z, −z. The face looks back along the route, towards the drones.
-    gantry.add(box(0.12, 1.5, 6.4, [back, face, back, back, back, back], -0.25, GANTRY_Y, 0));
+    gantry.add(box(0.12, 1.5, 6.4, [back, face, back, back, back, back], -0.25, GANTRY_Y, mid));
     gantry.position.set(f.x, 0, f.z);
     gantry.rotation.y = f.heading;
     g.add(gantry);
