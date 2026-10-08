@@ -996,7 +996,7 @@ export class Dashboard {
       ['TCP connection resets', 'tcpResets', '', 0],
       ['Journey time', 'journeyTimeS', 's', 1],
     ];
-    const f = (v, d, u) => (typeof v === 'number' && Number.isFinite(v) ? `${v.toFixed(d)}${u ? ` ${u}` : ''}` : '—');
+    const f = (v, d, u) => (typeof v === 'number' && Number.isFinite(v) ? `${v.toFixed(d).replace('-', '−')}${u ? ` ${u}` : ''}` : '—');
     const body = rows
       .map(([label, key, u, d]) => {
         if (!key) {
