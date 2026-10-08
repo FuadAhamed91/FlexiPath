@@ -70,7 +70,7 @@
               <a href="./simulator.html" class="lp-btn lp-btn-primary"><i data-lucide="play"></i>Launch the simulator</a>
               <a href="./simulator.html?demo=1" class="lp-btn"><i data-lucide="presentation"></i>Watch the guided demo</a>
             </div>
-            <p class="mt-5 font-mono text-[12px] text-slate-500">Simulation prototype · every number here is a simulated measurement or a model parameter</p>
+            <p class="mt-5 font-mono text-[12px] text-slate-500">Simulation prototype · every result here is a simulated measurement or a model parameter</p>
           </div>
 
           <div class="relative mx-auto mt-14 max-w-[1120px] sm:mt-16">
@@ -585,6 +585,20 @@
               </p>
             </div>
           </div>
+          <div class="lp-card lp-reveal mt-4 p-5 sm:p-6">
+            <div class="flex flex-wrap items-baseline justify-between gap-2">
+              <h4 class="text-[15px] font-bold text-slate-900">Checked against real-world measurements</h4>
+              <span class="lp-tag">PUBLISHED SOURCES · SEE README</span>
+            </div>
+            <p class="mt-2 text-[14px] leading-relaxed text-slate-600">
+              The model’s numbers were compared with published measurements: Linux defaults, measured Wi-Fi, 4G and 5G
+              handovers, an LTE modem’s wake-up time and power, and Starlink’s latency and power. One was optimistic: a
+              sleeping LTE modem took 260 ms to wake, not 100 ms. Re-run with 260 ms, FlexiPath’s lead over reactive
+              multipath grows wherever it predicts the failure, but an outage nobody predicts then exceeds the 300 ms
+              piloted budget. Time on the satellite also costs more in reality than in the model: a Starlink Mini draws
+              20–40 W.
+            </p>
+          </div>
         </div>
       </section>
 
@@ -775,8 +789,9 @@
             <span class="text-[13px] text-slate-500">Predictive, traffic-aware connectivity engine</span>
           </div>
           <p class="mt-3 text-[13px] leading-relaxed text-slate-500">
-            A simulation prototype for the ATRC Advanced Technology Pioneers 2026 EDGE Challenge. Every number on this page
-            is a simulated measurement or a model parameter; none is a real-world measurement.
+            A simulation prototype for the ATRC Advanced Technology Pioneers 2026 EDGE Challenge. Every result on this page
+            is a simulated measurement or a model parameter; the real-world figures it compares them with come from the
+            published sources listed in the README.
           </p>
         </div>
         <nav class="flex flex-wrap gap-x-6 gap-y-2 text-[14px] font-medium text-slate-600" aria-label="Footer">

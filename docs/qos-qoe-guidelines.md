@@ -124,6 +124,7 @@ The relay should learn the outer address from the authenticated tunnel packets t
 - Take the deadline from the control mode. 3GPP TS 22.125 (§7.2, Table 7.2-1) gives 40 ms per C2 command for direct stick steering (up to 60 km/h) and 1 s for steering to waypoints (up to 300 km/h). A 160 ms gap meets the waypoint budget but not the stick-steering one.
 - Probe the active path at a rate that matches the most demanding flow's deadline.
 - Budget explicitly: detection + wake + one RTT < deadline.
+- Keep the spare modem in a state that resumes well inside the deadline (5G RRC_INACTIVE or connected-mode DRX). An LTE phone leaving RRC_IDLE took 260 ms (Huang et al., MobiSys 2012). With that wake, FlexiPath's unpredicted-outage gap grows to 0.26–0.32 s and misses the 300 ms piloted budget, while predicted handovers are unaffected (README, *Sensitivity: a slower modem wake*).
 - For the strictest flows, accept a warm spare (+0.6 W while warm) or permanent duplication where a 160 ms gap is still too long.
 
 **In FlexiPath:** `failoverDetectMs`, `wakeLatencyS`.
