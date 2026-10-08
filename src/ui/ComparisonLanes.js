@@ -34,9 +34,10 @@ export class ComparisonLanes {
       <div class="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 pt-2.5 pb-2">
         <div class="flex min-w-0 items-baseline gap-2.5">
           <h2 class="hud-title text-slate-200!">Legacy vs FlexiPath</h2>
-          <span class="truncate font-mono text-[9.5px] text-slate-500">same route · same seed · same RF conditions · times vs. the moment the path actually failed</span>
+          <span class="lanes-sub truncate font-mono text-[9.5px] text-slate-500">same route · same seed · same RF conditions · times vs. the moment the path actually failed</span>
         </div>
         <div class="flex flex-wrap items-center gap-2">
+          <button type="button" class="btn h-[24px]! px-2! text-[10.5px]!" data-ref="stepsBtn" aria-expanded="false" title="Step-by-step timeline of the latest handover">Show steps</button>
           <div class="kpi-cell flex items-baseline gap-3">
             <span class="sim-int">SIMULATED INTERRUPTION</span>
             <span class="text-[10px] font-bold tracking-[0.14em] text-fp">FP <b class="v" data-ref="fpInt">0.00</b> s</span>
@@ -54,7 +55,7 @@ export class ComparisonLanes {
           </div>
         </div>
       </div>
-      <div class="flex flex-col gap-2 px-3 pb-3">
+      <div class="lanes-body flex flex-col gap-2 px-3 pb-3">
         <div class="lane" style="--lc:#00F0FF">
           <div class="lane-head"><span class="who">FLEXIPATH</span><span class="what" data-ref="fpWhat">monitoring</span></div>
           <div class="lane-steps" data-ref="fpSteps"></div>
@@ -66,6 +67,12 @@ export class ComparisonLanes {
       </div>`;
     this.refs = {};
     root.querySelectorAll('[data-ref]').forEach((n) => (this.refs[n.dataset.ref] = n));
+    // The Mission view shows the KPIs only; the step-by-step lanes open on demand.
+    this.refs.stepsBtn.addEventListener('click', () => {
+      const open = root.classList.toggle('is-open');
+      this.refs.stepsBtn.textContent = open ? 'Hide steps' : 'Show steps';
+      this.refs.stepsBtn.setAttribute('aria-expanded', String(open));
+    });
     this.set = makeSetter();
   }
 

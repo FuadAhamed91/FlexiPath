@@ -134,6 +134,15 @@ vehicles, nodes, beams, particles }` in the console.
 - Views: `data-mode="mission|advanced"` on `.fp-shell`, elements tagged `data-view`; theatre mode (`data-theatre`)
   hides `.fp-deck`, `.fp-bottom` and `.fp-toolbar`. These rules sit at the end of `styles.css`, outside `@layer`,
   with `!important`.
+- The Mission view is deliberately compact. A block of Mission-scoped rules near the end of `styles.css` hides or shrinks:
+  - `.tb-text` toolbar labels (the buttons become icons);
+  - `.loop-head` and inactive loop captions;
+  - the decision card's `.dp-sub` / `.dp-legacy` lines;
+  - `.glance-note`;
+  - the lanes body (until **Show steps** adds `is-open`);
+  - `.fp-legend` (until the legend button sets `data-legend="1"`).
+
+  Put new detail in the Advanced view rather than growing the Mission view.
 - Lucide: an `<i data-lucide="name">` renders only if the icon is imported and added to `ICONS` in `Dashboard.js`,
   and `renderIcons(subtree)` runs after the HTML is injected.
 - Chart.js is tree-shaken: `BaseTimeSeriesChart.js` registers only the components it uses; register any new

@@ -1687,9 +1687,87 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/*
+ * Mission view, debloated: the 3D twin first, a one-line story around it. Everything removed here is still in
+ * the Advanced view (M) or one click away (Show details · Show steps · legend).
+ */
+.fp-shell[data-mode='mission'] > header {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.fp-shell[data-mode='mission'] .tb-text {
+  display: none;
+}
+.fp-shell[data-mode='mission'] .fp-toolbar .btn:has(.tb-text) {
+  width: 32px;
+  justify-content: center;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+}
+.fp-shell[data-mode='mission'] .fp-loop {
+  padding: 6px 8px !important;
+}
+.fp-shell[data-mode='mission'] .loop-head {
+  display: none;
+}
+.fp-shell[data-mode='mission'] .loop-stages {
+  display: flex;
+  gap: 12px;
+}
+.fp-shell[data-mode='mission'] .loop-stage {
+  flex: 0 0 auto;
+  align-items: center;
+  padding: 5px 10px 5px 6px;
+}
+.fp-shell[data-mode='mission'] .loop-stage:not(:last-child)::after {
+  right: -13px;
+  width: 13px;
+}
+.fp-shell[data-mode='mission'] .loop-stage .cap,
+.fp-shell[data-mode='mission'] .loop-stage .time {
+  display: none;
+}
+.fp-shell[data-mode='mission'] .loop-stage[data-state='active'] {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.fp-shell[data-mode='mission'] .loop-stage[data-state='active'] .cap {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  min-height: 0;
+  margin-top: 3px;
+  font-size: 11px;
+}
+.fp-shell[data-mode='mission'] .loop-stage[data-state='active'] .time {
+  display: block;
+}
+.decision-panel.is-compact .dp-sub,
+.decision-panel.is-compact .dp-legacy {
+  display: none !important;
+}
+.decision-panel.is-compact .dp-clamp {
+  -webkit-line-clamp: 2;
+}
+.fp-shell[data-mode='mission'] .glance-note,
+.fp-shell[data-mode='mission'] .lanes-sub,
+.fp-shell[data-mode='mission'] [data-ref='lanes']:not(.is-open) .lanes-body {
+  display: none;
+}
+.fp-shell[data-mode='mission']:not([data-legend='1']) .fp-legend {
+  display: none !important;
+}
+/* Calmer chrome so the realistic twin reads first: no HUD corner brackets or outer glow on the Mission cards. */
+.fp-shell[data-mode='mission'] .hud-panel {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
+}
+.fp-shell[data-mode='mission'] .hud-panel::before,
+.fp-shell[data-mode='mission'] .hud-panel::after {
+  display: none;
+}
+
 @media (min-width: 1280px) {
   .fp-shell[data-mode='mission'] .fp-main {
-    grid-template-columns: minmax(0, 1fr) 344px;
+    grid-template-columns: minmax(0, 1fr) 312px;
   }
   .fp-shell[data-mode='advanced'] .fp-main {
     grid-template-columns: 292px minmax(0, 1fr) 328px;
