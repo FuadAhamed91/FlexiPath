@@ -4,7 +4,7 @@
  *   • a moon over the night sky (the moonlight, fog and sky colours are set per look elsewhere)
  *   • ground that turns from city concrete to desert sand in zone 4, with dunes and the ridge that shadows 5G
  *   • tarmac road with lane markings, pavements and street lights through the city (zones 1–3)
- *   • solid buildings with lit windows on the twin city's plots; date palms and rocks in the desert
+ *   • the city blocks (RealCity.js) on the twin city's plots; date palms and rocks in the desert
  *   • road-sign gantries at the zone borders and a concrete dock apron with painted landing pads
  *
  * Visual only: built once from the route and the city plots, it never reads the simulation state.
@@ -13,13 +13,11 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { Random } from '../utils/Random.js';
 import { MOON_DIRECTION } from './SceneManager.js';
+import { buildRealCity } from './RealCity.js';
 
 const SAND_FROM_X = 150; // the ground turns from city to desert sand between these route X
 const SAND_TO_X = 185;
 const CITY_END_X = 158; // pavements, street lights and buildings stop here (end of zone 3)
-const CELL_W = 0.9; // facade window cell, scene units (≈ 4.5 m)
-const CELL_H = 0.75; // one floor (≈ 3.75 m)
-const WIN_CELLS = 8; // window cells per side of the facade texture tile
 const GANTRY_Y = 8.35; // sign height: the drones' corridor (≈ 5 units + airframe) passes under it
 
 const smooth = (e0, e1, x) => THREE.MathUtils.smoothstep(x, e0, e1);
@@ -62,28 +60,6 @@ function radialTexture() {
     g.fillStyle = grad;
     g.fillRect(0, 0, w, w);
   });
-}
-
-/** One facade tile of windows: a colour map, and an emissive map that holds only the lit windows. */
-function windowTextures(rng) {
-  const px = 32;
-  const size = WIN_CELLS * px;
-  const cells = Array.from({ length: WIN_CELLS * WIN_CELLS }, () => ({
-    lit: rng.next() < 0.32,
-    warm: rng.next() < 0.72,
-    k: 0.55 + 0.45 * rng.next(),
-  }));
-  const paint = (emissive) => (g) => {
-    g.fillStyle = emissive ? '#000' : '#1c1f25';
-    g.fillRect(0, 0, size, size);
-    cells.forEach((c, i) => {
-      if (emissive && !c.lit) return;
-      if (emissive) g.fillStyle = c.warm ? `rgba(255,190,110,${c.k})` : `rgba(175,210,255,${c.k})`;
-      else g.fillStyle = c.lit ? (c.warm ? '#d9a96a' : '#a9c4e0') : '#0c121c';
-      g.fillRect((i % WIN_CELLS) * px + 6, Math.floor(i / WIN_CELLS) * px + 7, px - 12, px - 13);
-    });
-  };
-  return { map: canvasTexture(size, size, paint(false)), emissiveMap: canvasTexture(size, size, paint(true)) };
 }
 
 /** Route centre-line Z as a function of X (X increases strictly along the route). */
@@ -237,36 +213,6 @@ function buildStreetLights(path) {
   return g;
 }
 
-/** Solid buildings with lit windows on the twin city's plots (merged into one mesh, one draw call). */
-function buildBuildings(boxes, rng) {
-  const tile = WIN_CELLS;
-  const geos = [];
-  const addBox = (x, y0, z, w, h, d, windows) => {
-    const g = new THREE.BoxGeometry(w, h, d);
-    const uv = g.attributes.uv;
-    const du = rng.next();
-    const dv = Math.floor(rng.next() * tile) / tile;
-    const faceWidth = [d, d, 0, 0, w, w]; // BoxGeometry faces: +x, −x, +y, −y, +z, −z (4 vertices each)
-    for (let f = 0; f < 6; f++) {
-      for (let k = 0; k < 4; k++) {
-        const i = f * 4 + k;
-        if (!windows || faceWidth[f] === 0) uv.setXY(i, 0.01, 0.01); // roofs and plant boxes: plain facade
-        else uv.setXY(i, du + (uv.getX(i) * faceWidth[f]) / (CELL_W * tile), dv + (uv.getY(i) * h) / (CELL_H * tile));
-      }
-    }
-    g.translate(x, y0 + h / 2, z);
-    geos.push(g);
-  };
-  for (const b of boxes) {
-    if (b.x > CITY_END_X) continue; // the desert has no city blocks
-    addBox(b.x, 0, b.z, b.w, b.h, b.d, true);
-    if (rng.next() < 0.45) addBox(b.x + rng.range(-0.25, 0.25) * b.w, b.h, b.z + rng.range(-0.25, 0.25) * b.d, b.w * 0.35, 0.6, b.d * 0.3, false);
-  }
-  const { map, emissiveMap } = windowTextures(rng);
-  const mat = new THREE.MeshStandardMaterial({ map, emissiveMap, emissive: '#ffffff', emissiveIntensity: 1.1, roughness: 0.82, metalness: 0.15 });
-  return new THREE.Mesh(mergeGeometries(geos), mat);
-}
-
 function buildRocks(rng, height, roadZ) {
   const inst = new THREE.InstancedMesh(
     new THREE.IcosahedronGeometry(1, 0),
@@ -293,8 +239,8 @@ function buildRocks(rng, height, roadZ) {
   return inst;
 }
 
-/** A small date-palm grove where the desert begins. */
-function buildPalms(rng, height, roadZ) {
+/** Date palms as two instanced meshes (trunks, fronds) at spots {x, y, z, s, yaw, lean}. */
+function palmGroup(spots) {
   const trunk = new THREE.CylinderGeometry(0.14, 0.24, 4.4, 6, 4);
   trunk.translate(0, 2.2, 0);
   const fronds = [];
@@ -307,26 +253,50 @@ function buildPalms(rng, height, roadZ) {
     f.translate(0, 4.35, 0);
     fronds.push(f);
   }
-  const spots = [];
-  for (let tries = 0; spots.length < 14 && tries < 200; tries++) {
-    const x = rng.range(166, 200);
-    const side = rng.next() < 0.5 ? -1 : 1;
-    const z = roadZ(x) + side * rng.range(16, 34);
-    if (spots.some((o) => Math.hypot(o.x - x, o.z - z) < 3.5)) continue;
-    spots.push({ x, z, s: rng.range(0.8, 1.15), yaw: rng.range(0, Math.PI * 2), lean: rng.range(-0.08, 0.08) });
-  }
   const g = new THREE.Group();
   const m = new THREE.Matrix4();
   const q = new THREE.Quaternion();
   const e = new THREE.Euler();
   const p = new THREE.Vector3();
   const sc = new THREE.Vector3();
-  for (const [geo, color] of [[trunk, '#3d3027'], [mergeGeometries(fronds), '#24442c']]) {
+  for (const [geo, color] of [[trunk, '#5b4838'], [mergeGeometries(fronds), '#3f7048']]) {
     const inst = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ color, roughness: 0.9 }), spots.length);
-    spots.forEach((o, i) => inst.setMatrixAt(i, m.compose(p.set(o.x, height(o.x, o.z), o.z), q.setFromEuler(e.set(o.lean, o.yaw, o.lean)), sc.setScalar(o.s))));
+    spots.forEach((o, i) => inst.setMatrixAt(i, m.compose(p.set(o.x, o.y, o.z), q.setFromEuler(e.set(o.lean, o.yaw, o.lean)), sc.setScalar(o.s))));
     g.add(inst);
   }
   return g;
+}
+
+/** A small date-palm grove where the desert begins. */
+function buildDesertPalms(rng, height, roadZ) {
+  const spots = [];
+  for (let tries = 0; spots.length < 14 && tries < 200; tries++) {
+    const x = rng.range(166, 200);
+    const side = rng.next() < 0.5 ? -1 : 1;
+    const z = roadZ(x) + side * rng.range(16, 34);
+    if (spots.some((o) => Math.hypot(o.x - x, o.z - z) < 3.5)) continue;
+    spots.push({ x, y: height(x, z), z, s: rng.range(0.8, 1.15), yaw: rng.range(0, Math.PI * 2), lean: rng.range(-0.08, 0.08) });
+  }
+  return palmGroup(spots);
+}
+
+/** Palms lining both pavements through the city, clear of the network masts and the dock. */
+function buildBoulevardPalms(path, rng) {
+  const keepOut = [
+    { x: 22, z: -14, r: 3.5 }, // Wi-Fi pole
+    { x: 125, z: -22, r: 5 }, // 5G mast
+    { x: -1, z: 0, r: 11 }, // dock apron
+  ];
+  const spots = [];
+  const sEnd = path.sAtX(CITY_END_X - 4);
+  for (let s = 8; s < sEnd; s += 12) {
+    for (const side of [-1, 1]) {
+      const f = path.frameAt(Math.min(sEnd, s + (side > 0 ? 6 : 0)), side * 12.4);
+      if (keepOut.some((k) => Math.hypot(k.x - f.x, k.z - f.z) < k.r)) continue;
+      spots.push({ x: f.x, y: 0, z: f.z, s: rng.range(0.85, 1.05), yaw: rng.range(0, Math.PI * 2), lean: rng.range(-0.05, 0.05) });
+    }
+  }
+  return palmGroup(spots);
 }
 
 function signTexture(title, sub, color) {
@@ -346,7 +316,7 @@ function signTexture(title, sub, color) {
   });
 }
 
-/** Overhead road-sign gantries where the twin has its neon zone gates. */
+/** Cantilever road-sign gantries where the twin has its neon zone gates. */
 function buildGantries(path, gates) {
   const g = new THREE.Group();
   const steel = new THREE.MeshStandardMaterial({ color: '#7a8087', metalness: 0.65, roughness: 0.45 });
@@ -358,18 +328,23 @@ function buildGantries(path, gates) {
   };
   for (const gate of gates) {
     const f = path.frameAt(path.sAtX(gate.x));
+    // Cantilever: one post on the far (−Z) side and an arm over the lanes, so nothing stands between the
+    // chase camera (+Z side) and the drones.
     const gantry = new THREE.Group();
-    for (const side of [-1, 1]) gantry.add(box(0.4, GANTRY_Y + 0.5, 0.4, steel, 0, (GANTRY_Y + 0.5) / 2, side * 9.0));
-    for (const y of [GANTRY_Y - 0.35, GANTRY_Y + 0.35]) gantry.add(box(0.22, 0.22, 18.4, steel, 0, y, 0));
-    for (let k = -4; k < 4; k++) {
-      const strut = box(0.08, 0.95, 0.08, steel, 0, GANTRY_Y, (k + 0.5) * 2.2);
+    const post = -9.0;
+    const tip = 3.4;
+    const mid = (post + tip) / 2;
+    gantry.add(box(0.45, GANTRY_Y + 0.5, 0.45, steel, 0, (GANTRY_Y + 0.5) / 2, post));
+    for (const y of [GANTRY_Y - 0.35, GANTRY_Y + 0.35]) gantry.add(box(0.22, 0.22, tip - post + 0.2, steel, 0, y, mid));
+    for (let k = 0; k < 6; k++) {
+      const strut = box(0.08, 0.95, 0.08, steel, 0, GANTRY_Y, post + 1.1 + k * 2.1);
       strut.rotation.x = k % 2 ? 0.75 : -0.75;
       gantry.add(strut);
     }
     const tex = signTexture(gate.title, gate.sub, gate.color);
     const face = new THREE.MeshStandardMaterial({ map: tex, emissiveMap: tex, emissive: '#ffffff', emissiveIntensity: 0.5, roughness: 0.6 });
     // BoxGeometry material slots: +x, −x, +y, −y, +z, −z. The face looks back along the route, towards the drones.
-    gantry.add(box(0.12, 1.5, 6.4, [back, face, back, back, back, back], -0.25, GANTRY_Y, 0));
+    gantry.add(box(0.12, 1.5, 6.4, [back, face, back, back, back, back], -0.25, GANTRY_Y, mid));
     gantry.position.set(f.x, 0, f.z);
     gantry.rotation.y = f.heading;
     g.add(gantry);
@@ -429,9 +404,10 @@ function buildMoon() {
 
 /**
  * @param {{world: object, boxes: Array<{x:number,z:number,w:number,d:number,h:number}>, pads: Array<object>,
- *          gates: Array<{x:number,title:string,sub:string,color:string}>, ribbon: Function}} opts
+ *          gates: Array<{x:number,title:string,sub:string,color:string}>, ribbon: Function,
+ *          renderer: THREE.WebGLRenderer}} opts
  */
-export function buildRealWorld({ world, boxes, pads, gates, ribbon }) {
+export function buildRealWorld({ world, boxes, pads, gates, ribbon, renderer }) {
   const rng = new Random('flexipath-real');
   const path = world.path;
   const roadZ = roadZLookup(path);
@@ -444,9 +420,10 @@ export function buildRealWorld({ world, boxes, pads, gates, ribbon }) {
     buildDunes(rng, height),
     buildRoad(path, ribbon, rng),
     buildStreetLights(path),
-    buildBuildings(boxes, rng),
+    buildRealCity({ boxes, rng: new Random('flexipath-real-city'), renderer, maxX: CITY_END_X, roadZ }),
+    buildBoulevardPalms(path, rng),
     buildRocks(rng, height, roadZ),
-    buildPalms(rng, height, roadZ),
+    buildDesertPalms(rng, height, roadZ),
     buildGantries(path, gates),
     buildDock(pads, rng),
   );

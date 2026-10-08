@@ -37,7 +37,7 @@ const LOOKS = {
     background: 0x05070c,
     fog: 0x0a0e16,
     fogDensity: 0.005,
-    hemi: { sky: 0x5d6f99, ground: 0x2a2219, intensity: 0.65 },
+    hemi: { sky: 0x5d6f99, ground: 0x1c1e24, intensity: 0.65 },
     moon: { color: 0xd6defa, intensity: 1.6, position: MOON_DIRECTION.clone().multiplyScalar(400) },
     rim: 0.12,
     ambient: { color: 0x161c27, intensity: 0.45 },
