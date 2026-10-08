@@ -19,10 +19,10 @@ import {
 Chart.register(LineController, LineElement, PointElement, LinearScale, LogarithmicScale, Filler, Tooltip);
 
 export const SERIES_COLORS = {
-  flexipath: '#00F0FF',
-  legacy: '#F43F5E',
-  replication: 'rgba(168, 85, 247, 0.16)',
-  stall: 'rgba(244, 63, 94, 0.18)',
+  flexipath: '#0891B2',
+  legacy: '#E11D48',
+  replication: 'rgba(124, 58, 237, 0.1)',
+  stall: 'rgba(225, 29, 72, 0.1)',
 };
 
 const FONT = { family: "'JetBrains Mono', ui-monospace, monospace", size: 9 };
@@ -88,15 +88,15 @@ export class BaseTimeSeriesChart {
     this.data = { flexipath: [], legacy: [] };
     const ctx = canvas.getContext('2d');
     const gradient = ctx.createLinearGradient(0, 0, 0, canvas.clientHeight || 160);
-    gradient.addColorStop(0, 'rgba(0, 240, 255, 0.28)');
-    gradient.addColorStop(1, 'rgba(0, 240, 255, 0)');
+    gradient.addColorStop(0, 'rgba(8, 145, 178, 0.2)');
+    gradient.addColorStop(1, 'rgba(8, 145, 178, 0)');
 
     const yScale = {
       type: opts.yType ?? 'linear',
       min: opts.yMin,
       max: opts.yMax,
       suggestedMax: opts.suggestedMax,
-      grid: { color: 'rgba(148, 163, 184, 0.07)', drawTicks: false },
+      grid: { color: 'rgba(15, 23, 42, 0.06)', drawTicks: false },
       border: { display: false },
       ticks: {
         color: '#64748b',
@@ -154,10 +154,10 @@ export class BaseTimeSeriesChart {
         scales: {
           x: {
             type: 'linear',
-            grid: { color: 'rgba(148, 163, 184, 0.05)', drawTicks: false },
+            grid: { color: 'rgba(15, 23, 42, 0.04)', drawTicks: false },
             border: { display: false },
             ticks: {
-              color: '#475569',
+              color: '#64748b',
               font: FONT,
               maxTicksLimit: 7,
               padding: 4,
@@ -170,9 +170,11 @@ export class BaseTimeSeriesChart {
         plugins: {
           legend: { display: false },
           tooltip: {
-            backgroundColor: 'rgba(3, 7, 18, 0.95)',
-            borderColor: 'rgba(34, 211, 238, 0.3)',
+            backgroundColor: 'rgba(255, 255, 255, 0.97)',
+            borderColor: '#e2e8f0',
             borderWidth: 1,
+            titleColor: '#0f172a',
+            bodyColor: '#334155',
             titleFont: FONT,
             bodyFont: FONT,
             padding: 8,

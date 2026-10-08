@@ -9,7 +9,7 @@
 import { INTERFACE_SPECS } from '../simulation/LinkModel.js';
 import { FLEXIPATH_PARAMS } from '../simulation/FlexiPathController.js';
 import { POWER_PARAMS } from '../simulation/PowerModel.js';
-import { esc, fmtPct, fmtSignal, linkChip, linkName, makeSetter, tag } from './format.js';
+import { esc, fmtPct, fmtSignal, inkHex, linkChip, linkName, makeSetter, tag } from './format.js';
 
 const P = FLEXIPATH_PARAMS;
 const W = POWER_PARAMS.tierWatts;
@@ -99,13 +99,13 @@ export class PredictionPanel {
 
     // Trend (3 s regression of the measured signal).
     let trend;
-    if (wired) trend = pred.triggers.context ? '<span class="trend lvl-warn">↓ leaving the dock</span>' : '<span class="text-slate-400">wired carrier · no radio trend</span>';
+    if (wired) trend = pred.triggers.context ? '<span class="trend lvl-warn">↓ leaving the dock</span>' : '<span class="text-slate-600">wired carrier · no radio trend</span>';
     else {
       const s = pred.signalSlopeLong;
-      if (!Number.isFinite(s)) trend = '<span class="text-slate-400">collecting samples…</span>';
+      if (!Number.isFinite(s)) trend = '<span class="text-slate-600">collecting samples…</span>';
       else if (s < -P.minSignalSlope) trend = `<span class="trend lvl-warn">↓ degrading</span> <span class="num">${s.toFixed(1)} dB/s</span>`;
       else if (s > P.minSignalSlope) trend = `<span class="trend lvl-ok">↑ improving</span> <span class="num">+${s.toFixed(1)} dB/s</span>`;
-      else trend = `<span class="trend text-slate-300">→ stable</span> <span class="num text-slate-500">${s >= 0 ? '+' : ''}${s.toFixed(1)} dB/s</span>`;
+      else trend = `<span class="trend text-slate-700">→ stable</span> <span class="num text-slate-500">${s >= 0 ? '+' : ''}${s.toFixed(1)} dB/s</span>`;
     }
     S.html(r.trend, 'trend', trend);
 
@@ -113,16 +113,16 @@ export class PredictionPanel {
     let predText;
     if (wired) {
       predText = pred.triggers.context
-        ? `<span class="lvl-crit">Carrier ends at dock release</span>${Number.isFinite(pred.dockDistM) ? ` <span class="num text-slate-400">(${pred.dockDistM.toFixed(0)} m)</span>` : ''}`
-        : '<span class="text-slate-300">No failure predicted while docked</span>';
+        ? `<span class="lvl-crit">Carrier ends at dock release</span>${Number.isFinite(pred.dockDistM) ? ` <span class="num text-slate-600">(${pred.dockDistM.toFixed(0)} m)</span>` : ''}`
+        : '<span class="text-slate-700">No failure predicted while docked</span>';
     } else {
       const level = `${pred.failLevel.toFixed(1)} ${spec.signalUnit}`;
       if (pred.triggers.ttf && Number.isFinite(pred.ttf)) {
-        predText = `<span class="lvl-crit">Failure level in ≈ ${secs(pred.ttf)} s</span> <span class="num text-slate-400">(${level})</span>`;
+        predText = `<span class="lvl-crit">Failure level in ≈ ${secs(pred.ttf)} s</span> <span class="num text-slate-600">(${level})</span>`;
       } else if (pred.triggers.rapidFade) {
         predText = `<span class="lvl-crit">Signal collapsing ${pred.signalSlope.toFixed(0)} dB/s</span>`;
       } else if (Number.isFinite(pred.projectedTtf)) {
-        predText = `<span class="lvl-warn">Failure level in ≈ ${secs(pred.projectedTtf)} s</span> <span class="num text-slate-400">(${level})</span>`;
+        predText = `<span class="lvl-warn">Failure level in ≈ ${secs(pred.projectedTtf)} s</span> <span class="num text-slate-600">(${level})</span>`;
       } else if (pred.degrading) {
         const why = [];
         if (pred.triggers.deltaLoss) why.push(`loss +${(pred.dLoss * 100).toFixed(1)}% in 1 s`);
@@ -153,7 +153,7 @@ export class PredictionPanel {
       else if (radio === 'DRX') role = 'DRX standby';
       else role = 'standby';
       const hot = d.replica === next || d.prepared === next || radio === 'WARM' || radio === 'WAKING';
-      nextText = `${linkChip(next)} <span class="${hot ? 'text-sky-300' : 'text-slate-400'} font-semibold">${role}</span>${detail ? ` <span class="num text-slate-500">· ${detail}</span>` : ''}`;
+      nextText = `${linkChip(next)} <span class="${hot ? 'text-sky-700' : 'text-slate-600'} font-semibold">${role}</span>${detail ? ` <span class="num text-slate-500">· ${detail}</span>` : ''}`;
     }
     S.html(r.next, 'next', nextText);
 
@@ -243,29 +243,27 @@ export class PredictionPanel {
     const yOf = (v) => 6 + (1 - (v - lo) / (hi - lo)) * (h - 14);
 
     // Now marker and failure level.
-    ctx.strokeStyle = 'rgba(148,163,184,0.18)';
+    ctx.strokeStyle = 'rgba(15,23,42,0.14)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(xNow, 4);
     ctx.lineTo(xNow, h - 4);
     ctx.stroke();
     const yFail = yOf(fail);
-    ctx.strokeStyle = 'rgba(239,68,68,0.75)';
+    ctx.strokeStyle = 'rgba(220,38,38,0.7)';
     ctx.setLineDash([4, 3]);
     ctx.beginPath();
     ctx.moveTo(0, yFail);
     ctx.lineTo(w, yFail);
     ctx.stroke();
     ctx.setLineDash([]);
-    ctx.fillStyle = 'rgba(248,113,113,0.9)';
+    ctx.fillStyle = '#dc2626';
     ctx.textAlign = 'left';
     ctx.fillText(`15% loss level ${fail.toFixed(1)} ${spec.signalUnit}`, 4, Math.min(h - 3, yFail + 11));
 
     // Measured history.
-    ctx.strokeStyle = spec.color;
+    ctx.strokeStyle = inkHex(spec.color, 72);
     ctx.lineWidth = 1.8;
-    ctx.shadowColor = spec.color;
-    ctx.shadowBlur = 6;
     ctx.beginPath();
     this.samples.forEach((s, i) => {
       const x = xOf(s.t);
@@ -274,7 +272,6 @@ export class PredictionPanel {
       else ctx.lineTo(x, y);
     });
     ctx.stroke();
-    ctx.shadowBlur = 0;
 
     // Trend extrapolation to the failure level: the same estimate the text shows — the fast 1 s trend once
     // the time-to-failure trigger is armed, otherwise the 3 s early-warning trend.
@@ -285,7 +282,7 @@ export class PredictionPanel {
       const horizon = Math.min(FUT_S, tCross);
       const x1 = xOf(now + horizon);
       const y1 = yOf(last.v + slope * horizon);
-      ctx.strokeStyle = 'rgba(250,204,21,0.9)';
+      ctx.strokeStyle = 'rgba(180,83,9,0.9)';
       ctx.setLineDash([3, 3]);
       ctx.lineWidth = 1.4;
       ctx.beginPath();
@@ -294,7 +291,7 @@ export class PredictionPanel {
       ctx.stroke();
       ctx.setLineDash([]);
       if (tCross <= FUT_S) {
-        ctx.fillStyle = '#facc15';
+        ctx.fillStyle = '#b45309';
         ctx.beginPath();
         ctx.arc(x1, y1, 3, 0, Math.PI * 2);
         ctx.fill();
@@ -302,7 +299,7 @@ export class PredictionPanel {
         ctx.fillText(`≈ ${secs(tCross)} s`, x1 + (x1 > w - 40 ? -6 : 6), Math.max(10, y1 - 5));
       } else {
         ctx.textAlign = 'right';
-        ctx.fillStyle = 'rgba(250,204,21,0.8)';
+        ctx.fillStyle = 'rgba(180,83,9,0.85)';
         ctx.fillText(`> ${FUT_S} s`, w - 4, Math.max(10, y1 - 5));
       }
     }

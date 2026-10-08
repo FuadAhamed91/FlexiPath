@@ -3,10 +3,10 @@
  * filterable by engine.
  */
 const TAGS = {
-  flexipath: { text: 'FP', color: '#22d3ee' },
-  legacy: { text: 'LG', color: '#fb7185' },
-  env: { text: 'ENV', color: '#fbbf24' },
-  sys: { text: 'SYS', color: '#94a3b8' },
+  flexipath: { text: 'FP', color: '#0e7490' },
+  legacy: { text: 'LG', color: '#e11d48' },
+  env: { text: 'ENV', color: '#b45309' },
+  sys: { text: 'SYS', color: '#64748b' },
 };
 
 const FILTERS = [

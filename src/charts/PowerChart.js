@@ -16,9 +16,9 @@ export class PowerChart extends BaseTimeSeriesChart {
       formatY: (v) => `${v.toFixed(1)}`,
       formatValue: (v) => `${v.toFixed(1)} W`,
       lines: [
-        { value: drx, color: 'rgba(34, 197, 94, 0.35)', label: `DRX ${drx} W` },
-        { value: warm, color: 'rgba(96, 165, 250, 0.35)', label: `warm ${warm} W` },
-        { value: burst, color: 'rgba(192, 132, 252, 0.4)', label: `burst ${burst} W` },
+        { value: drx, color: 'rgba(21, 128, 61, 0.65)', label: `DRX ${drx} W` },
+        { value: warm, color: 'rgba(37, 99, 235, 0.65)', label: `warm ${warm} W` },
+        { value: burst, color: 'rgba(124, 58, 237, 0.65)', label: `burst ${burst} W` },
       ],
     });
   }

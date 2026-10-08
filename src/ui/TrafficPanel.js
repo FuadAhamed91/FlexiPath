@@ -20,19 +20,19 @@ export class TrafficPanel {
     root.innerHTML = `
       <div class="flex items-start justify-between gap-2 px-3 pt-3 pb-1">
         <div>
-          <h2 class="hud-title text-slate-200!">Traffic-aware protection</h2>
+          <h2 class="hud-title text-slate-800!">Traffic-aware protection</h2>
           <div class="mt-1 font-mono text-[9.5px] text-slate-500">Not all traffic is treated the same</div>
         </div>
         <span class="chip" data-ref="mode">FLEXIPATH</span>
       </div>
       <div class="flex flex-col gap-1.5 px-2 pt-1.5 pb-2" data-ref="list"></div>
-      <div class="border-t border-slate-800/80 px-3 pt-2 pb-3">
+      <div class="border-t border-slate-200 px-3 pt-2 pb-3">
         <div class="flex items-center justify-between gap-2">
           <span class="hud-label">Replication overhead · this run</span>${tag('measured')}
         </div>
         <div class="mt-1.5 grid grid-cols-2 gap-2">
           <div class="kpi-cell"><div class="v text-repl" data-ref="ovPkt">0.0%</div><div class="flow-meta mt-1">of critical + real-time bytes</div></div>
-          <div class="kpi-cell"><div class="v text-slate-100" data-ref="ovAll">0.000%</div><div class="flow-meta mt-1">of all traffic bytes</div></div>
+          <div class="kpi-cell"><div class="v text-slate-900" data-ref="ovAll">0.000%</div><div class="flow-meta mt-1">of all traffic bytes</div></div>
         </div>
         <div class="flow-meta mt-1.5" data-ref="ovSub">0 duplicates discarded at the receiver</div>
         <div class="flow-meta mt-1" >Legacy OS: one path for every flow, no replication · a loss stalls its TCP streams 200–500 ms (head-of-line).</div>
@@ -52,8 +52,8 @@ export class TrafficPanel {
       <article class="flow-card" data-flow="${f.id}">
         <header class="flex items-center gap-2">
           ${classBadge(f.cls, f.priority)}
-          <span class="min-w-0 flex-1 truncate text-[11.5px] font-semibold text-slate-100">${esc(f.name)}</span>
-          <span class="num shrink-0 text-[11px] font-semibold text-slate-200" data-ref="metric">—</span>
+          <span class="min-w-0 flex-1 truncate text-[11.5px] font-semibold text-slate-900">${esc(f.name)}</span>
+          <span class="num shrink-0 text-[11px] font-semibold text-slate-800" data-ref="metric">—</span>
         </header>
         <div class="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px]">
           <span class="flow-meta">path</span><span class="flex flex-wrap items-center gap-1" data-ref="paths">—</span>
@@ -112,7 +112,7 @@ export class TrafficPanel {
 
       // Paths.
       let paths;
-      if (!res.paths.length) paths = '<span class="text-rose-300">none · buffered</span>';
+      if (!res.paths.length) paths = '<span class="text-rose-700">none · buffered</span>';
       else if (f.mode === 'packet') {
         paths = res.paths.length > 1 ? `${linkChip(res.paths[0])}<b class="text-repl">⇉</b>${linkChip(res.paths[1])}` : linkChip(res.paths[0]);
       } else {
