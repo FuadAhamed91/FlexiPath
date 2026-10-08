@@ -369,7 +369,7 @@
                     <dt class="text-slate-600">Always duplicate</dt><dd class="font-mono text-slate-700">8 / 20</dd><dd class="font-mono text-slate-700">0.21 s</dd>
                     <dt class="font-semibold text-fp">FlexiPath</dt><dd class="font-mono font-semibold text-slate-900">20 / 20</dd><dd class="font-mono font-semibold text-slate-900">0 s</dd>
                   </dl>
-                  <p class="mt-3 text-[12px] leading-snug text-slate-500">Kept C2 = no fail-safe hover (C2 never silent for more than 300 ms). The cost: 7.5 Mbps less mean throughput than flying without the map, from the extra time on the satellite.</p>
+                  <p class="mt-3 text-[12px] leading-snug text-slate-500">Kept C2 = no fail-safe hover under the piloted-flight rule (C2 never silent for more than 300 ms); under the 1 s waypoint rule all three multipath stacks keep C2 and FlexiPath’s 0 s gap remains. The cost: 7.5 Mbps less mean throughput than flying without the map, from the extra time on the satellite.</p>
                 </div>
               </div>
             </article>
@@ -511,6 +511,21 @@
             </div>
           </div>
 
+          <figure class="lp-card lp-reveal mt-6 p-3 sm:p-4">
+            <img
+              src="./landing/tradeoff.svg"
+              width="800"
+              height="470"
+              loading="lazy"
+              class="block h-auto w-full"
+              alt="Scatter chart of critical packets delivered against mean radio power in scenarios A–D, G and H. Always duplicate: 99.0–100 % at 2.65–3.39 W. FlexiPath: 98.2–99.0 % at 1.25–1.39 W. Reactive multipath: 97.0–98.3 % at 1.20–1.21 W. The legacy OS is below the chart at 77–85 %."
+            />
+            <figcaption class="px-2 pt-2 pb-1 text-[12.5px] leading-snug text-slate-500">
+              Every scenario, every stack: FlexiPath delivers almost what permanent duplication does, at about the radio
+              power of reactive multipath.
+            </figcaption>
+          </figure>
+
           <div class="mt-6 grid gap-4 md:grid-cols-2">
             <div class="lp-reveal rounded-2xl border border-slate-200 bg-white p-6">
               <h3 class="text-[15px] font-bold text-slate-900">Against reactive multipath</h3>
@@ -524,7 +539,17 @@
               <p class="mt-2 text-[14.5px] leading-relaxed text-slate-600">
                 Permanent duplication delivers the most critical packets, 99–100 %, but draws 2.1–2.6× FlexiPath’s radio
                 power and copies 49–100 % of protected bytes, against FlexiPath’s ≈ 1 %. When Wi-Fi and 5G die together
-                (scenario G), its two copies die together too: it kept C2 on 8 of 20 flights, FlexiPath on 20 of 20.
+                (scenario G), its two copies die together too: it kept C2 on 8 of 20 flights, FlexiPath on 20 of 20 (piloted-flight
+                hover rule, below).
+              </p>
+            </div>
+            <div class="lp-reveal rounded-2xl border border-slate-200 bg-white p-6 md:col-span-2">
+              <h3 class="text-[15px] font-bold text-slate-900">The hover rule decides who keeps C2</h3>
+              <p class="mt-2 text-[14.5px] leading-relaxed text-slate-600">
+                A drone hovers when its C2 link stays silent too long. Our default, 300 ms, suits a piloted drone: 3GPP TS
+                22.125 expects a stick command every 40 ms. Under it, FlexiPath is the only stack that keeps C2 on every flight
+                of every scenario. For waypoint flight the standard allows 1 s; then all three multipath stacks keep C2, and
+                FlexiPath’s edge is its shorter gaps, its delivery and its power.
               </p>
             </div>
           </div>

@@ -89,6 +89,7 @@ export const DEFAULT_CONFIG = {
   seed: 2026,
   speedKmh: 60,
   failSafe: true,
+  failSafeS: FAILSAFE_OUTAGE_S, // hover threshold; the benchmark's --failsafe-ms sets 1 s for waypoint flight (README)
   simRate: 1,
   scenario: 'mission',
   agents: ['flexipath', 'legacy'], // + any of BASELINE_ENGINES / ABLATION_ENGINES (headless experiments)
@@ -367,7 +368,7 @@ export class SimulationEngine {
     // Counters before this tick, so an episode that opens now also counts this tick's losses / gap.
     const T0 = agent.traffic.totals;
     const before = { critical: T0.criticalLost, realtime: T0.realtimeLost, dup: T0.duplicateBytes, stall: agent.stats.stallTime };
-    mobility.setFailSafe(this.config.failSafe && agent.criticalOutage > FAILSAFE_OUTAGE_S);
+    mobility.setFailSafe(this.config.failSafe && agent.criticalOutage > this.config.failSafeS);
     const wasFailSafe = agent.failSafeActive;
     const mob = mobility.update(DT, t);
     agent.failSafeActive = mob.failSafe;
@@ -376,7 +377,7 @@ export class SimulationEngine {
       agentEvents.push({
         level: 'crit',
         code: 'FAILSAFE',
-        message: `C2 telemetry silent > ${FAILSAFE_OUTAGE_S * 1000} ms → minimal-risk manoeuvre (hover)`,
+        message: `C2 telemetry silent > ${Math.round(this.config.failSafeS * 1000)} ms → minimal-risk manoeuvre (hover)`,
       });
     }
 
@@ -734,6 +735,7 @@ export class SimulationEngine {
       seed: this.config.seed,
       speedKmh: this.config.speedKmh,
       failSafe: this.config.failSafe,
+      failSafeS: this.config.failSafeS,
       tickHz: TICK_HZ,
       simTimeS: round(this.t, 2),
       ticks: this.tick,
