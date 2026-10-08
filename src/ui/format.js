@@ -10,6 +10,17 @@ export const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ESC[c]);
 export const linkName = (id) => (id ? INTERFACE_SPECS[id]?.name ?? id : '—');
 export const linkColor = (id) => (id ? INTERFACE_SPECS[id]?.color ?? '#64748b' : '#64748b');
 
+/** Deepens a world colour (often neon, e.g. a link or zone colour) so it reads as text on the light HUD. */
+export const ink = (color, pct = 55) => `color-mix(in srgb, ${color} ${pct}%, #0f172a)`;
+
+/** `ink()` for canvas drawing, which needs a plain colour: mixes a #rrggbb colour with #0f172a. */
+export function inkHex(hex, pct = 55) {
+  const n = parseInt(hex.slice(1), 16);
+  const k = pct / 100;
+  const mix = (shift, dark) => Math.round(((n >> shift) & 255) * k + dark * (1 - k));
+  return `rgb(${mix(16, 15)}, ${mix(8, 23)}, ${mix(0, 42)})`;
+}
+
 /** Coloured link chip, e.g. "Wi-Fi" in cyan. */
 export function linkChip(id, text) {
   if (!id) return '<span class="text-slate-500">—</span>';

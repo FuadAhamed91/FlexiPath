@@ -29,9 +29,9 @@ function cardHTML(id) {
   return `
   <article class="iface-card" style="--c:${s.color}" data-id="${id}">
     <header class="flex items-center gap-2">
-      <i data-lucide="${ICON[id]}" class="size-4 shrink-0" style="color:var(--c)"></i>
+      <i data-lucide="${ICON[id]}" class="size-4 shrink-0" style="color:color-mix(in srgb, var(--c) 55%, #0f172a)"></i>
       <div class="flex min-w-0 flex-1 items-baseline gap-2">
-        <span class="font-mono text-[12px] font-bold text-slate-100">${id}</span>
+        <span class="font-mono text-[12px] font-bold text-slate-900">${id}</span>
         <span class="truncate text-[10px] text-slate-500">${s.label}</span>
       </div>
       <span class="radio-badge" data-ref="radio">—</span>
@@ -39,20 +39,20 @@ function cardHTML(id) {
     </header>
     <div class="mt-2 flex items-center gap-2">
       <span class="hud-label w-10 shrink-0">${s.signalLabel === 'CARRIER' ? 'LINK' : s.signalLabel}</span>
-      <span class="num w-[76px] shrink-0 text-[12px] font-semibold text-slate-100" data-ref="signal">—</span>
+      <span class="num w-[76px] shrink-0 text-[12px] font-semibold text-slate-900" data-ref="signal">—</span>
       <div class="sig-bars" data-ref="bars">${BAR_HEIGHTS.map((h) => `<i style="height:${h}px"></i>`).join('')}</div>
       <span class="num ml-auto truncate text-[9px] text-slate-500" data-ref="extra"></span>
     </div>
     <div class="iface-metrics mt-1.5 grid grid-cols-4 gap-1">
-      <div><div class="hud-label">Thr</div><div class="num text-[11px] text-slate-200"><span data-ref="thr">—</span><span class="text-[8px] text-slate-500"> Mb</span></div></div>
-      <div><div class="hud-label">RTT</div><div class="num text-[11px] text-slate-200"><span data-ref="rtt">—</span><span class="text-[8px] text-slate-500"> ms</span></div></div>
+      <div><div class="hud-label">Thr</div><div class="num text-[11px] text-slate-800"><span data-ref="thr">—</span><span class="text-[8px] text-slate-500"> Mb</span></div></div>
+      <div><div class="hud-label">RTT</div><div class="num text-[11px] text-slate-800"><span data-ref="rtt">—</span><span class="text-[8px] text-slate-500"> ms</span></div></div>
       <div><div class="hud-label">Loss</div><div class="num text-[11px]"><span data-ref="loss">—</span><span class="text-[8px] text-slate-500"> %</span></div></div>
-      <div><div class="hud-label">Jitter</div><div class="num text-[11px] text-slate-200"><span data-ref="jit">—</span><span class="text-[8px] text-slate-500"> ms</span></div></div>
+      <div><div class="hud-label">Jitter</div><div class="num text-[11px] text-slate-800"><span data-ref="jit">—</span><span class="text-[8px] text-slate-500"> ms</span></div></div>
     </div>
     <div class="mt-2 flex items-center gap-2">
       <span class="hud-label w-10 shrink-0" data-ref="scoreLabel">Score</span>
       <div class="meter flex-1"><span data-ref="meter"></span></div>
-      <span class="num w-8 text-right text-[13px] font-bold" style="color:var(--c)" data-ref="score">0</span>
+      <span class="num w-8 text-right text-[13px] font-bold" style="color:color-mix(in srgb, var(--c) 55%, #0f172a)" data-ref="score">0</span>
     </div>
     <div class="num mt-1 flex justify-between gap-2 text-[9px] text-slate-500">
       <span class="truncate" data-ref="sub"></span><span class="shrink-0 text-right" data-ref="pred"></span>
@@ -70,7 +70,7 @@ export class TelemetryPanel {
       </div>
       <div class="flex items-center justify-between gap-2 px-3 pb-2">
         <span class="hud-label">Radio power</span>
-        <span class="flex items-center gap-2"><b class="num text-[15px] text-slate-100" data-ref="watts">1.2 W</b><span class="tier-badge" data-ref="tier">DRX STANDBY</span></span>
+        <span class="flex items-center gap-2"><b class="num text-[15px] text-slate-900" data-ref="watts">1.2 W</b><span class="tier-badge" data-ref="tier">DRX STANDBY</span></span>
       </div>
       <div class="flex flex-col gap-2 px-2 pb-2">${INTERFACE_IDS.map(cardHTML).join('')}</div>`;
     this.focusChip = root.querySelector('[data-ref="focus"]');
@@ -166,7 +166,7 @@ export class TelemetryPanel {
       this._set(card, 'thr', live ? fmt.mbps(L.throughputMbps) : '—');
       this._set(card, 'rtt', live ? fmt.ms(L.rttMs) : '—');
       this._set(card, 'loss', live ? fmt.pct(L.lossRate) : L.up ? '—' : '100');
-      const lossColor = !L.up || L.lossRate > 0.15 ? '#fb7185' : L.lossRate > 0.05 ? '#fbbf24' : '#e2e8f0';
+      const lossColor = !L.up || L.lossRate > 0.15 ? '#e11d48' : L.lossRate > 0.05 ? '#b45309' : '#0f172a';
       if (card.cache.lossColor !== lossColor) {
         card.cache.lossColor = lossColor;
         card.refs.loss.parentElement.style.color = lossColor;
@@ -209,7 +209,7 @@ export class TelemetryPanel {
     if (this._engine === engine) return;
     this._engine = engine;
     this.focusChip.textContent = engine === 'legacy' ? 'LEGACY OS VIEW' : 'FLEXIPATH VIEW';
-    this.focusChip.style.color = engine === 'legacy' ? '#fb7185' : '#67e8f9';
-    this.focusChip.style.borderColor = engine === 'legacy' ? 'rgba(244,63,94,.4)' : 'rgba(0,240,255,.35)';
+    this.focusChip.style.color = engine === 'legacy' ? '#e11d48' : '#0e7490';
+    this.focusChip.style.borderColor = engine === 'legacy' ? '#fecdd3' : '#a5f3fc';
   }
 }

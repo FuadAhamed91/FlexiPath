@@ -22,8 +22,8 @@ export class FlowInspector {
       </div>
       <div class="grid grid-cols-3 gap-2 px-3 pb-2">
         <div><div class="hud-label">Dups discarded</div><div class="num mt-1 text-[15px] font-bold text-repl" data-ref="dups">0</div></div>
-        <div><div class="hud-label">Critical lost</div><div class="num mt-1 text-[15px] font-bold text-slate-100" data-ref="lost">0</div></div>
-        <div><div class="hud-label">Overhead</div><div class="num mt-1 text-[15px] font-bold text-slate-100" data-ref="rtime">0.0%</div></div>
+        <div><div class="hud-label">Critical lost</div><div class="num mt-1 text-[15px] font-bold text-slate-900" data-ref="lost">0</div></div>
+        <div><div class="hud-label">Overhead</div><div class="num mt-1 text-[15px] font-bold text-slate-900" data-ref="rtime">0.0%</div></div>
       </div>
       <div class="flex flex-col gap-1.5 px-2 pb-3" data-ref="flows"></div>`;
     this.refs = {};
@@ -46,12 +46,12 @@ export class FlowInspector {
             <div class="min-w-0">
               <div class="flex items-center gap-1.5">
                 <span class="${cls}">${text}</span>
-                <span class="font-mono text-[11px] font-semibold text-slate-100">${f.tag ?? f.id}</span>
+                <span class="font-mono text-[11px] font-semibold text-slate-900">${f.tag ?? f.id}</span>
               </div>
               <div class="mt-0.5 truncate text-[10px] text-slate-500">${f.label}</div>
             </div>
             <div class="text-right">
-              <div class="num text-[11px] font-semibold text-slate-100" data-ref="rate">—</div>
+              <div class="num text-[11px] font-semibold text-slate-900" data-ref="rate">—</div>
               <div class="num text-[9px] text-slate-500" data-ref="lat">—</div>
             </div>
             <div class="col-span-2 mt-1 flex min-h-[17px] flex-wrap items-center gap-1" data-ref="paths"></div>
@@ -87,16 +87,16 @@ export class FlowInspector {
     let replColor = '#64748b';
     if (engine === 'legacy') {
       replText = d.stalled ? 'SOCKETS STALLED' : 'NOT SUPPORTED';
-      replColor = d.stalled ? '#f87171' : '#64748b';
+      replColor = d.stalled ? '#dc2626' : '#64748b';
     } else if (d.replicationActive) {
       replText = `ACTIVE · ${d.replicationElapsed.toFixed(1)} s`;
-      replColor = '#d8b4fe';
+      replColor = '#7c3aed';
     } else if (d.protecting) {
       replText = 'PROTECTION · NO ELIGIBLE FLOWS';
-      replColor = '#93c5fd';
+      replColor = '#2563eb';
     } else if (d.watching && d.prepared) {
       replText = `ARMED · ${d.prepared} PREPARED`;
-      replColor = '#93c5fd';
+      replColor = '#2563eb';
     }
     if (this.cache.replText !== replText) {
       this.cache.replText = replText;
@@ -106,7 +106,7 @@ export class FlowInspector {
     }
     this._set(this.refs.dups, 'dups', st.duplicatesDiscarded.toLocaleString('en-US'));
     this._set(this.refs.lost, 'lost', st.criticalLost.toLocaleString('en-US'));
-    this.refs.lost.style.color = st.criticalLost > 0 && engine === 'legacy' ? '#f87171' : '';
+    this.refs.lost.style.color = st.criticalLost > 0 && engine === 'legacy' ? '#dc2626' : '';
     this._set(this.refs.rtime, 'rtime', `${(st.overheadPct ?? 0).toFixed(1)}%`);
 
     for (const f of tr.flows) {
@@ -130,7 +130,7 @@ export class FlowInspector {
         const total = entries.reduce((a, [, v]) => a + v, 0) || 1;
         paths = entries.length
           ? entries.map(([id, v]) => chip(id, `${id} ${Math.round((v / total) * 100)}%`)).join('') +
-            (f.pacing ? `<span class="num ml-auto text-[9px] text-sky-300">paced: ${f.pacing.slowPath} +${f.pacing.offsetMs.toFixed(0)} ms</span>` : '')
+            (f.pacing ? `<span class="num ml-auto text-[9px] text-sky-700">paced: ${f.pacing.slowPath} +${f.pacing.offsetMs.toFixed(0)} ms</span>` : '')
           : `<span class="role role-stalled">STALLED</span>`;
       }
       this._set(row.refs.rate, 'rate', rate, row.cache);

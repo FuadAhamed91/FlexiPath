@@ -15,12 +15,12 @@ const W = POWER_PARAMS.tierWatts;
 const BURST_MS = Math.round(POWER_PARAMS.burstWindowS * 1000);
 
 export const STAGE_META = {
-  DETECT: { color: '#00F0FF', question: `Measure the primary at 10 Hz · other modems in DRX (${W[0]} W)` },
-  PREDICT: { color: '#FACC15', question: 'Is the current path degrading?' },
-  PREPARE: { color: '#60A5FA', question: `Wake and validate the next path (warm probe, ${W[1]} W)` },
-  REPLICATE: { color: '#A855F7', question: `Burst-protect critical traffic for ${BURST_MS} ms (${W[2]} W)` },
-  SWITCH: { color: '#E2E8F0', question: 'Make the prepared path primary' },
-  CONTINUE: { color: '#22C55E', question: 'Sessions continue via the anchor relay' },
+  DETECT: { color: '#0891B2', question: `Measure the primary at 10 Hz · other modems in DRX (${W[0]} W)` },
+  PREDICT: { color: '#B45309', question: 'Is the current path degrading?' },
+  PREPARE: { color: '#2563EB', question: `Wake and validate the next path (warm probe, ${W[1]} W)` },
+  REPLICATE: { color: '#7C3AED', question: `Burst-protect critical traffic for ${BURST_MS} ms (${W[2]} W)` },
+  SWITCH: { color: '#334155', question: 'Make the prepared path primary' },
+  CONTINUE: { color: '#15803D', question: 'Sessions continue via the anchor relay' },
 };
 
 const KIND_LABEL = {
@@ -31,12 +31,12 @@ const KIND_LABEL = {
 };
 
 const LEGACY_LABEL = {
-  CONNECTED: ['connected', '#94a3b8'],
-  DEGRADING: ['link degrading · no prediction', '#facc15'],
-  FAILED: ['link failed · still attached', '#f87171'],
-  INTERRUPTED: ['SIMULATED INTERRUPTION', '#ef4444'],
-  STOPPING: ['SIMULATED INTERRUPTION · fail-safe hover', '#ef4444'],
-  RECOVERED: ['recovered', '#e2e8f0'],
+  CONNECTED: ['connected', '#64748b'],
+  DEGRADING: ['link degrading · no prediction', '#b45309'],
+  FAILED: ['link failed · still attached', '#dc2626'],
+  INTERRUPTED: ['SIMULATED INTERRUPTION', '#dc2626'],
+  STOPPING: ['SIMULATED INTERRUPTION · fail-safe hover', '#dc2626'],
+  RECOVERED: ['recovered', '#334155'],
 };
 
 const secs = (v) => (v < 1 ? v.toFixed(2) : v.toFixed(1));
@@ -47,7 +47,7 @@ export class SystemLoop {
     root.innerHTML = `
       <div class="loop-head flex flex-wrap items-center justify-between gap-x-4 gap-y-1 pb-2">
         <div class="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
-          <h2 class="hud-title text-slate-300!">FlexiPath decision loop</h2>
+          <h2 class="hud-title text-slate-700!">FlexiPath decision loop</h2>
           <span class="min-w-0 font-mono text-[10px] text-slate-500" data-ref="ep">Monitoring</span>
         </div>
         <div class="flex min-w-0 flex-wrap items-center gap-x-2 font-mono text-[10px]">
@@ -186,7 +186,7 @@ export class SystemLoop {
 
     // Legacy, at the same moment (no loop: it reacts after failure).
     const lg = snapshot.agents.legacy;
-    const [label, color] = LEGACY_LABEL[lg.trace.stage] ?? ['—', '#94a3b8'];
+    const [label, color] = LEGACY_LABEL[lg.trace.stage] ?? ['—', '#64748b'];
     const serving = lg.decision?.primary ?? lg.decision?.stall?.from;
     const text = `${serving ? `${linkName(serving)} · ` : ''}${label}`;
     if (this.set.cache.lgText !== text) {
