@@ -401,8 +401,11 @@ packets, coverage rings and labels. The world around it changes.
   - ground that turns to desert sand in zone 4, with dunes, the ridge that shadows 5G, date palms and rocks;
   - road-sign gantries at the zone borders, and a concrete dock apron with painted landing pads.
 
-  The network gear is drawn in steel, with its glow cut to status-light level.
-- **Twin** is the original neon digital twin: grid floor, wireframe city and neon zone gates.
+  The network gear is drawn in steel, with its glow cut to status-light level. The drones are painted like
+  enterprise drones, each with LED lights under its motors:
+  - FlexiPath: white with cyan accents;
+  - Legacy: graphite with red.
+- **Twin** is the original neon digital twin: grid floor, wireframe city, neon zone gates and neon drones.
 
 Everything in both looks is built procedurally in code, with no image files.
 

@@ -76,6 +76,7 @@ async function boot() {
     sceneManager.setLook(look);
     environment.setLook(look);
     nodes.setLook(look);
+    vehicles.setLook(look);
   };
   dashboard.setLook(params.look, { quiet: true });
   dashboard.hooks.onBeforeReset = () => particles.clear();
