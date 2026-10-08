@@ -164,6 +164,14 @@ vehicles, nodes, beams, particles }` in the console.
   and `REAL_EMISSIVE` glow, both kept per material so switching back is exact).
 - `RealWorld.js` builds the realistic world once, procedurally (canvas textures, merged or instanced geometry, no
   image files), from the route, the twin city's plots (`EnvironmentManager.cityBoxes`) and the dock pad frames. It
-  uses its own `Random('flexipath-real')`. Anything that belongs only to the neon world goes into
+  uses its own `Random('flexipath-real')`. `RealCity.js` turns the plots (plus low-rise plots on the camera side) into
+  buildings:
+  - one canvas-painted facade tile per type (curtain wall, ribbon, punched) with colour, emissive and
+    roughness / metalness maps;
+  - world-scale UVs with a whole-storey offset per building;
+  - one merged mesh per material;
+  - a night environment map for the glass;
+  - an `onBeforeCompile` uplight (street-light spill fading with height).
+  Keep tall buildings off the camera side (+Z): the chase and cinematic cameras look across it. Anything that belongs only to the neon world goes into
   `EnvironmentManager.twin`; labels and the sky dome are shared.
 - The drones' corridor passes under the gantries' signs (`GANTRY_Y`); keep that clearance if either height changes.
