@@ -66,7 +66,7 @@ import { PredictionInternals } from './PredictionInternals.js';
 import { GuidedDemo } from './GuidedDemo.js';
 import { openExperiments } from './ExperimentPanel.js';
 import { infoHTML } from './InfoContent.js';
-import { esc, tag } from './format.js';
+import { esc, ink, tag } from './format.js';
 import { ThroughputChart } from '../charts/ThroughputChart.js';
 import { RTTChart } from '../charts/RTTChart.js';
 import { PacketLossChart } from '../charts/PacketLossChart.js';
@@ -128,16 +128,16 @@ export function renderIcons(root = document) {
 }
 
 const LOGO = `
-  <svg viewBox="0 0 64 64" class="size-9 shrink-0 drop-shadow-[0_0_10px_rgba(0,240,255,0.55)]" aria-hidden="true">
-    <path d="M6 44 C 20 44, 22 18, 32 18 S 44 44, 58 44" fill="none" stroke="#00F0FF" stroke-width="4" stroke-linecap="round"/>
-    <path d="M6 44 C 20 44, 24 31, 32 31 S 44 44, 58 44" fill="none" stroke="#A855F7" stroke-width="4" stroke-linecap="round"/>
-    <circle cx="6" cy="44" r="4.5" fill="#00F0FF"/><circle cx="58" cy="44" r="4.5" fill="#10B981"/>
+  <svg viewBox="0 0 64 64" class="size-9 shrink-0" aria-hidden="true">
+    <path d="M6 44 C 20 44, 22 18, 32 18 S 44 44, 58 44" fill="none" stroke="#0891B2" stroke-width="4" stroke-linecap="round"/>
+    <path d="M6 44 C 20 44, 24 31, 32 31 S 44 44, 58 44" fill="none" stroke="#7C3AED" stroke-width="4" stroke-linecap="round"/>
+    <circle cx="6" cy="44" r="4.5" fill="#0891B2"/><circle cx="58" cy="44" r="4.5" fill="#10B981"/>
   </svg>`;
 
 const chartCard = (key, title, unit) => `
   <article class="hud-panel chart-card flex min-h-[172px] flex-col px-3 pt-2.5 pb-1.5">
     <header class="flex items-center justify-between gap-2">
-      <h3 class="hud-title truncate">${title} <span class="font-mono text-[9px] tracking-normal text-slate-600 normal-case">${unit}</span></h3>
+      <h3 class="hud-title truncate">${title} <span class="font-mono text-[9px] tracking-normal text-slate-400 normal-case">${unit}</span></h3>
       <div class="num flex shrink-0 gap-2.5 text-[10.5px] font-semibold">
         <span class="text-fp" data-chart-fp="${key}">—</span><span class="text-legacy" data-chart-lg="${key}">—</span>
       </div>
@@ -228,7 +228,7 @@ export class Dashboard {
     const zones = ZONES.map((z) => {
       const w = ((z.x1 - z.x0) / ROUTE_END_X) * 100;
       return `<div class="relative" style="width:${w}%">
-        <div class="mb-1 truncate pr-1 font-mono text-[8.5px] font-bold tracking-[0.12em]" style="color:${z.color}">Z${z.id} · ${z.name.toUpperCase()}</div>
+        <div class="mb-1 truncate pr-1 font-mono text-[8.5px] font-bold tracking-[0.12em]" style="color:${ink(z.color)}">Z${z.id} · ${z.name.toUpperCase()}</div>
         <div class="rounded-sm" style="height:6px;background:${z.color}"></div>
       </div>`;
     }).join('');
@@ -236,11 +236,11 @@ export class Dashboard {
 
     this.root.innerHTML = `
     <div class="fp-shell hud-scroll flex h-full flex-col overflow-y-auto" data-ref="shell" data-mode="mission">
-      <header class="relative z-10 flex shrink-0 flex-wrap items-center gap-x-5 gap-y-2 border-b border-cyan-400/10 bg-slate-950/70 px-4 py-2.5 backdrop-blur">
+      <header class="relative z-10 flex shrink-0 flex-wrap items-center gap-x-5 gap-y-2 border-b border-slate-200 bg-white/90 px-4 py-2.5 backdrop-blur">
         <div class="flex min-w-0 shrink-0 items-center gap-3 max-sm:w-full max-sm:shrink">
-          ${LOGO}
+          <a href="./" class="shrink-0 rounded-md" title="FlexiPath home page" aria-label="FlexiPath home page">${LOGO}</a>
           <div class="min-w-0">
-            <h1 class="font-display text-[12px] font-extrabold tracking-[0.12em] text-slate-100 sm:text-[14px] sm:tracking-[0.22em]">FLEXIPATH <span class="text-fp">CONNECTIVITY ENGINE</span></h1>
+            <h1 class="font-display text-[12px] font-extrabold tracking-[0.12em] text-slate-900 sm:text-[14px] sm:tracking-[0.22em]">FLEXIPATH <span class="text-fp">CONNECTIVITY ENGINE</span></h1>
             <p class="truncate font-mono text-[9px] tracking-[0.12em] text-slate-500" data-view="advanced">PREDICTIVE · TRAFFIC-AWARE · HETEROGENEOUS NETWORKS<span class="hidden 2xl:inline"> · ATRC EDGE 2026</span></p>
           </div>
         </div>
@@ -254,12 +254,12 @@ export class Dashboard {
         <div class="flex min-w-0 flex-wrap items-center gap-2">
           <span class="chip sim-badge" title="Everything on this screen is produced by the FlexiPath simulation model (seeded, deterministic). No real-world measurements are shown."><span class="dot"></span>SIMULATION · v${VERSION}</span>
           <span class="chip border-fp/30!" data-view="advanced" title="Static anchor relay: FlexiPath tunnels every flow (userspace UDP) to this address, so remote services only ever see it and no socket is reset by a path change">
-            <i data-lucide="lock" class="text-fp"></i>ANCHOR RELAY <b class="text-slate-100">${ANCHOR_IP}</b>
+            <i data-lucide="lock" class="text-fp"></i>ANCHOR RELAY <b class="text-slate-900">${ANCHOR_IP}</b>
           </span>
           <span class="chip hidden min-[1700px]:inline-flex" data-ref="clientIp" data-view="advanced" title="FlexiPath's current physical (outer) address — changes with the network; remote services never see it">CLIENT IP —</span>
           <span class="chip hidden min-[1440px]:inline-flex" data-ref="radioChip" data-view="advanced" title="FlexiPath radio power (three-tier sleep model)">RADIO 1.2 W</span>
           <span class="chip hidden 2xl:inline-flex" data-view="advanced"><i data-lucide="map-pin"></i><span data-ref="zone">ZONE 1</span></span>
-          <span class="chip"><i data-lucide="timer"></i><span class="text-slate-100" data-ref="clock">T+00:00.0</span></span>
+          <span class="chip"><i data-lucide="timer"></i><span class="text-slate-900" data-ref="clock">T+00:00.0</span></span>
         </div>
       </header>
 
@@ -297,7 +297,6 @@ export class Dashboard {
         <main class="viewport hud-panel relative order-first h-[62vh] min-h-[380px] overflow-hidden xl:order-none xl:h-auto" data-ref="viewport">
           <div class="absolute inset-0 isolate" data-ref="canvasHost"></div>
           <div class="viewport-vignette"></div>
-          <div class="scanlines" data-view="advanced"></div>
 
           <div class="overlay-glass pointer-events-none absolute inset-x-3 top-3 px-3 pt-2 pb-2.5">
             <div class="relative">
@@ -347,7 +346,7 @@ export class Dashboard {
               <div class="hud-label">FLEXIPATH · SIMULATION PROTOTYPE</div>
               <h2 class="mt-3">Connectivity shouldn’t wait for failure.</h2>
               <p>Predict the degradation. Prepare the next path. Protect what matters. Continue without waiting for failure.</p>
-              <p class="text-[12px]! text-slate-400!">A predictive, traffic-aware connectivity engine for heterogeneous networks, shown beside a legacy break-before-make stack under identical simulated conditions.</p>
+              <p class="text-[12px]! text-slate-600!">A predictive, traffic-aware connectivity engine for heterogeneous networks, shown beside a legacy break-before-make stack under identical simulated conditions.</p>
               <div class="mt-5 flex flex-wrap justify-center gap-2">
                 <button type="button" class="btn btn-demo h-[36px]! px-4!" data-intro="demo"><i data-lucide="presentation"></i>Start guided demo</button>
                 <button type="button" class="btn h-[36px]! px-4!" data-intro="explore"><i data-lucide="play"></i>Explore freely</button>
@@ -366,7 +365,7 @@ export class Dashboard {
               ['warm probe / next path (dashed)', '#60A5FA'],
               ['failure', '#EF4444'],
             ]
-              .map(([l, c]) => `<div class="flex items-center gap-2 font-mono text-[9.5px] text-slate-400"><span class="h-[3px] w-5 rounded-full" style="background:${c};box-shadow:0 0 8px ${c}"></span>${l}</div>`)
+              .map(([l, c]) => `<div class="flex items-center gap-2 font-mono text-[9.5px] text-slate-600"><span class="h-[3px] w-5 rounded-full" style="background:${c}"></span>${l}</div>`)
               .join('')}
           </div>
 
@@ -375,7 +374,7 @@ export class Dashboard {
             <div class="seg p-[2px]!" role="group" aria-label="Simulation rate">
               ${[0.5, 1, 2, 4].map((r) => `<button type="button" class="h-[24px]! px-2.5! font-mono" data-rate="${r}" aria-pressed="${r === 1}">${r}×</button>`).join('')}
             </div>
-            <span class="num hidden px-1 text-[11px] text-slate-400 sm:inline" data-ref="simInfo">10 Hz</span>
+            <span class="num hidden px-1 text-[11px] text-slate-600 sm:inline" data-ref="simInfo">10 Hz</span>
             <button type="button" class="btn h-[26px]! w-[30px] justify-center px-0!" data-ref="legendBtn" data-view="mission" aria-pressed="false" aria-label="Show the beam legend" title="Beam legend"><i data-lucide="list"></i></button>
           </div>
 
@@ -566,8 +565,8 @@ export class Dashboard {
   _onTick(snap) {
     for (const c of Object.values(this.charts)) c.pushSnapshot(snap);
     this.prediction.sample(snap);
-    this._trackBand(this.replBands, snap.agents.flexipath.decision?.replicationActive, snap.t, SERIES_COLORS.replication, 'rgba(168,85,247,0.7)');
-    this._trackBand(this.stallBands, snap.agents.legacy.decision?.stalled, snap.t, SERIES_COLORS.stall, 'rgba(239,68,68,0.8)');
+    this._trackBand(this.replBands, snap.agents.flexipath.decision?.replicationActive, snap.t, SERIES_COLORS.replication, 'rgba(124,58,237,0.55)');
+    this._trackBand(this.stallBands, snap.agents.legacy.decision?.stalled, snap.t, SERIES_COLORS.stall, 'rgba(225,29,72,0.6)');
     this.dirty = true;
     this._chartDirty = true;
   }
@@ -651,36 +650,36 @@ export class Dashboard {
     const d = agent.decision;
     if (engine === 'legacy') {
       if (d.stalled && d.stall) {
-        return { text: 'SIMULATED INTERRUPTION · TCP RESET', detail: `${d.stall.remaining.toFixed(1)} s left`, color: '#EF4444', pulse: true };
+        return { text: 'SIMULATED INTERRUPTION · TCP RESET', detail: `${d.stall.remaining.toFixed(1)} s left`, color: '#DC2626', pulse: true };
       }
       const st = agent.trace.stage;
-      if (st === 'FAILED') return { text: 'LEGACY OS · ON A FAILED LINK', detail: `route ${d.primary ?? '—'} · waiting for floor`, color: '#F87171', pulse: true };
-      if (st === 'DEGRADING') return { text: 'LEGACY OS · LINK DEGRADING', detail: `route ${d.primary ?? '—'} · no prediction`, color: '#FACC15', pulse: false };
-      return { text: 'LEGACY OS · BREAK-BEFORE-MAKE', detail: `route ${d.primary ?? '—'}`, color: '#FB7185', pulse: false };
+      if (st === 'FAILED') return { text: 'LEGACY OS · ON A FAILED LINK', detail: `route ${d.primary ?? '—'} · waiting for floor`, color: '#DC2626', pulse: true };
+      if (st === 'DEGRADING') return { text: 'LEGACY OS · LINK DEGRADING', detail: `route ${d.primary ?? '—'} · no prediction`, color: '#B45309', pulse: false };
+      return { text: 'LEGACY OS · BREAK-BEFORE-MAKE', detail: `route ${d.primary ?? '—'}`, color: '#E11D48', pulse: false };
     }
-    if (!d.primary) return { text: 'NO USABLE PATH', detail: 'buffering at anchor', color: '#EF4444', pulse: true };
+    if (!d.primary) return { text: 'NO USABLE PATH', detail: 'buffering at anchor', color: '#DC2626', pulse: true };
     if (d.replicationActive) {
-      return { text: 'PREDICTIVE REPLICATION ACTIVE', detail: `${d.primary} ⇉ ${d.replica} · burst ${agent.power?.watts?.toFixed(1) ?? ''} W`, color: '#A855F7', pulse: true };
+      return { text: 'PREDICTIVE REPLICATION ACTIVE', detail: `${d.primary} ⇉ ${d.replica} · burst ${agent.power?.watts?.toFixed(1) ?? ''} W`, color: '#7C3AED', pulse: true };
     }
-    if (d.protecting) return { text: 'PROTECTION WINDOW', detail: `bulk paced ${d.primary} → ${d.replica}`, color: '#60A5FA', pulse: true };
+    if (d.protecting) return { text: 'PROTECTION WINDOW', detail: `bulk paced ${d.primary} → ${d.replica}`, color: '#2563EB', pulse: true };
     const ls = d.lastSwitch;
     if (ls && t - ls.t < 2.5) {
       return ls.seamless
-        ? { text: 'SWITCHED · 0 MS GAP', detail: `${ls.from} → ${ls.to} · sessions kept`, color: '#22C55E', pulse: false }
-        : { text: 'UNPLANNED FAILOVER', detail: `${ls.from} → ${ls.to} · ${ls.blackoutMs} ms`, color: '#F59E0B', pulse: true };
+        ? { text: 'SWITCHED · 0 MS GAP', detail: `${ls.from} → ${ls.to} · sessions kept`, color: '#15803D', pulse: false }
+        : { text: 'UNPLANNED FAILOVER', detail: `${ls.from} → ${ls.to} · ${ls.blackoutMs} ms`, color: '#C2410C', pulse: true };
     }
     if (d.watching) {
       const next = d.prepared ?? d.warmTarget;
       return {
         text: 'DEGRADATION PREDICTED',
         detail: `${d.primary}${next ? ` · next ${next} ${d.prepared ? 'validated' : 'waking'} · ${agent.power?.watts?.toFixed(1) ?? ''} W` : ' · searching'}`,
-        color: '#FACC15',
+        color: '#B45309',
         pulse: false,
       };
     }
     const warm = d.warmTarget && (d.radio?.[d.warmTarget] === 'WARM' || d.radio?.[d.warmTarget] === 'WAKING') ? d.warmTarget : null;
-    if (warm) return { text: 'MONITORING · WARM PROBE', detail: `primary ${d.primary} · ${warm} awake · ${agent.power?.watts?.toFixed(1) ?? ''} W`, color: '#60A5FA', pulse: false };
-    return { text: 'MONITORING · DRX STANDBY', detail: `primary ${d.primary} · others asleep · ${agent.power?.watts?.toFixed(1) ?? ''} W`, color: '#00F0FF', pulse: false };
+    if (warm) return { text: 'MONITORING · WARM PROBE', detail: `primary ${d.primary} · ${warm} awake · ${agent.power?.watts?.toFixed(1) ?? ''} W`, color: '#2563EB', pulse: false };
+    return { text: 'MONITORING · DRX STANDBY', detail: `primary ${d.primary} · others asleep · ${agent.power?.watts?.toFixed(1) ?? ''} W`, color: '#0891B2', pulse: false };
   }
 
   _updateHeader(snap) {
@@ -700,10 +699,10 @@ export class Dashboard {
     let color;
     if (other === 'legacy') {
       short = od.stalled ? `LEGACY · INTERRUPTED ${od.stall?.remaining.toFixed(1) ?? ''}s` : `LEGACY · ROUTE ${od.primary ?? '—'}`;
-      color = od.stalled ? '#EF4444' : '#FB7185';
+      color = od.stalled ? '#DC2626' : '#E11D48';
     } else {
       short = od.replicationActive ? 'FLEXIPATH · REPLICATING' : `FLEXIPATH · PRIMARY ${od.primary ?? '—'}`;
-      color = od.replicationActive ? '#C084FC' : '#67E8F9';
+      color = od.replicationActive ? '#7C3AED' : '#0E7490';
     }
     if (this._pill2Key !== short) {
       this._pill2Key = short;
@@ -716,7 +715,7 @@ export class Dashboard {
       this._zoneKey = zone.id;
       this.refs.zone.textContent = `ZONE ${zone.id}`;
       this.refs.zone.title = zone.name;
-      this.refs.zone.style.color = zone.color;
+      this.refs.zone.style.color = ink(zone.color);
     }
     this.refs.clock.textContent = fmtClock(snap.t);
     const fpa = snap.agents.flexipath;
@@ -730,7 +729,7 @@ export class Dashboard {
     if (this._radioKey !== rk) {
       this._radioKey = rk;
       this.refs.radioChip.textContent = `RADIO ${(fpa.power?.watts ?? 0).toFixed(1)} W · ${tier.key}`;
-      this.refs.radioChip.style.color = tier.color;
+      this.refs.radioChip.style.color = ink(tier.color);
       this.refs.radioChip.style.borderColor = `${tier.color}66`;
     }
   }
@@ -948,8 +947,8 @@ export class Dashboard {
   }
 
   _modalHeader(title, sub) {
-    return `<div class="flex items-start justify-between gap-4 border-b border-cyan-400/10 px-5 pt-4 pb-3">
-      <div><h2 class="hud-title text-[11px]! text-slate-200!">${title}</h2>${sub ? `<p class="mt-1.5 font-mono text-[10.5px] text-slate-500">${sub}</p>` : ''}</div>
+    return `<div class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 pt-4 pb-3">
+      <div><h2 class="hud-title text-[11px]! text-slate-800!">${title}</h2>${sub ? `<p class="mt-1.5 font-mono text-[10.5px] text-slate-500">${sub}</p>` : ''}</div>
       <button type="button" class="btn w-[30px] px-0!" data-close aria-label="Close"><i data-lucide="x"></i></button>
     </div>`;
   }
@@ -991,7 +990,7 @@ export class Dashboard {
     const html = `
       ${this._modalHeader(`Run complete · ${esc(sc.code)} · ${esc(sc.label)}`, `seed ${summary.meta.seed} · ${summary.meta.speedKmh} km/h · ${summary.meta.simTimeS} s simulated · ${summary.faults.length} fault(s) · one paired run`)}
       <div class="px-5 py-4">
-        <div class="mb-3 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400">${tag('measured')}<span>One simulated run, both stacks on identical conditions. A single run is an example; use paired trials for evidence.</span></div>
+        <div class="mb-3 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-600">${tag('measured')}<span>One simulated run, both stacks on identical conditions. A single run is an example; use paired trials for evidence.</span></div>
         <div class="hud-scroll overflow-x-auto">
           <table class="exp-table">
             <thead><tr><th>Metric</th><th class="text-legacy!">Legacy</th><th class="text-fp!">FlexiPath</th><th>Difference (FP − LG)</th></tr></thead>

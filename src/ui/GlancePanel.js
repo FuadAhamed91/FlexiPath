@@ -17,7 +17,7 @@ export class GlancePanel {
     this.root = root;
     root.innerHTML = `
       <div class="flex items-center justify-between gap-2 px-3 pt-3 pb-2">
-        <h2 class="hud-title text-slate-200!">At a glance</h2>
+        <h2 class="hud-title text-slate-800!">At a glance</h2>
         <div class="flex items-center gap-1.5">
           ${tag('measured')}
           <button type="button" class="btn h-[20px]! px-2! text-[10px]!" data-ref="details" title="Full detail in the Advanced view (M)">Details</button>
@@ -33,7 +33,7 @@ export class GlancePanel {
         <span class="glance-label" title="Client address changes that remote services saw. FlexiPath tunnels every flow to the anchor relay ${RELAY_PARAMS.anchorIp}; each legacy change resets its TCP sessions.">IP changes seen</span>
         <b class="glance-v text-fp" data-ref="fpIp">—</b><b class="glance-v text-legacy" data-ref="lgIp">—</b>
       </div>
-      <div class="glance-note flow-meta truncate border-t border-slate-800/80 px-3 py-2" data-ref="note">—</div>`;
+      <div class="glance-note flow-meta truncate border-t border-slate-200 px-3 py-2" data-ref="note">—</div>`;
     this.refs = {};
     root.querySelectorAll('[data-ref]').forEach((n) => (this.refs[n.dataset.ref] = n));
     this.refs.details.addEventListener('click', () => onDetails?.());

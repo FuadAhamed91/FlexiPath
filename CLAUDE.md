@@ -18,7 +18,7 @@ documents the model rules, parameters and published results; `docs/existing-mech
 ## Commands
 
 ```bash
-npm run dev          # Vite dev server, http://localhost:5173
+npm run dev          # Vite dev server: landing page http://localhost:5173, simulator /simulator.html
 npm run build        # production bundle → dist/ (base './', sourcemaps on)
 npm run preview      # serve dist/ on :4173
 npm run benchmark    # headless paired experiments in Node → results/benchmark_<stamp>.{json,csv} + _comparison / _mechanisms CSVs
@@ -37,7 +37,8 @@ There is no test suite, linter or type checker. Verify changes with `npm run bui
 - The README's "Measured results" tables come from the default `npm run benchmark`; when model behaviour changes,
   re-run it and update them.
 
-In the browser, URL parameters give reproducible states: `?scenario=A&seed=2026&speed=90&mode=advanced&focus=legacy
+In the browser, URL parameters on `simulator.html` give reproducible states (`index.html` forwards any link that carries
+one of them to the simulator): `?scenario=A&seed=2026&speed=90&mode=advanced&focus=legacy
 &camera=overview&intro=0&paused=1` (`paused` only applies with `intro=0`); `demo=1` starts the guided demo,
 `models=procedural` forces the primitive models and `look=twin` starts in the neon look. `window.flexipath` exposes `{ engine, dashboard, sceneManager,
 vehicles, nodes, beams, particles }` in the console.
@@ -121,6 +122,9 @@ vehicles, nodes, beams, particles }` in the console.
 
 ### Front end (`src/main.js`, `src/ui`, `src/charts`, `src/three`)
 
+- Two pages (`vite.config.js` lists both): `index.html` is the static landing page (`src/landing/landing.{js,css}`,
+  screenshots in `public/landing/`); `simulator.html` loads `src/main.js`. The landing page copies its numbers from the
+  README tables and keeps the same provenance labels, so update it when the results change.
 - `main.js` creates the engine paused → `Dashboard` → `SceneManager` and the environment / node / vehicle managers →
   awaits the GLB loads → beams and particles. Each animation frame: `engine.advance(dt)` → each manager's
   `update(render, snapshot, …)` → camera → render → `dashboard.frame(now)`. Visual animation runs on wall-clock time
@@ -147,9 +151,14 @@ vehicles, nodes, beams, particles }` in the console.
   and `renderIcons(subtree)` runs after the HTML is injected.
 - Chart.js is tree-shaken: `BaseTimeSeriesChart.js` registers only the components it uses; register any new
   controller, scale or plugin there.
-- Tailwind v4 via `@tailwindcss/vite`: theme tokens (`void`, `fp`, `legacy`, `repl`, fonts) are in the `@theme` block
+- Tailwind v4 via `@tailwindcss/vite`: theme tokens (`fp`, `legacy`, `repl`, fonts) are in the `@theme` block
   of `src/styles.css`, HUD component classes in `@layer components`. Utility classes must appear as complete literal
   strings; composed names such as `lvl-${level}` or `cls-${cls}` must be component classes in `styles.css`.
+- The HUD is light: white panels (`--ui-*` tokens on `:root` in `styles.css`) around the dark 3D viewport, which keeps
+  its neon world colours. Status colours in UI code (loop stages, decision kinds, lanes, pills, charts) use the deep
+  palette that reads on white (e.g. `#0891B2`, `#B45309`, `#7C3AED`, `#15803D`, `#DC2626`). A world colour shown as
+  text (link, zone or radio-tier colours from the simulation) is deepened with `ink()` / `inkHex()` from `format.js`,
+  or `color-mix(in srgb, var(--c) 52%, var(--ink))` in CSS; scene labels (`.node-label`, `.veh-label`) are light chips.
 
 ### 3D assets
 

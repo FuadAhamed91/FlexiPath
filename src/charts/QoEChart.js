@@ -13,7 +13,7 @@ export class QoEChart extends BaseTimeSeriesChart {
       yMax: 4.5,
       formatY: (v) => v.toFixed(1),
       formatValue: (v) => `MOS ${v.toFixed(2)}`,
-      lines: [{ value: MOS_THRESHOLD, color: 'rgba(250, 204, 21, 0.55)', label: `MOS ${MOS_THRESHOLD} satisfaction floor` }],
+      lines: [{ value: MOS_THRESHOLD, color: 'rgba(180, 83, 9, 0.75)', label: `MOS ${MOS_THRESHOLD} satisfaction floor` }],
     });
   }
 

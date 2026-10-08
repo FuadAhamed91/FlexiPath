@@ -16,7 +16,7 @@ export class HolChart extends BaseTimeSeriesChart {
       stepped: true,
       formatY: (v) => `${v}`,
       formatValue: (v) => `${v.toFixed(0)} ms`,
-      lines: [{ value: HOL_PARAMS.rtoMinMs, color: 'rgba(239, 68, 68, 0.45)', label: `TCP RTO min ${HOL_PARAMS.rtoMinMs} ms` }],
+      lines: [{ value: HOL_PARAMS.rtoMinMs, color: 'rgba(220, 38, 38, 0.7)', label: `TCP RTO min ${HOL_PARAMS.rtoMinMs} ms` }],
     });
   }
 

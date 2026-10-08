@@ -57,7 +57,7 @@ export class PredictionInternals {
   _row(key, value, state) {
     const r = this.rows[key];
     this.set.text(r.v, `${key}v`, value);
-    const [text, cls] = state === 'fire' ? ['FIRING', 'lvl-crit'] : state === 'armed' ? ['ARMED', 'lvl-warn'] : ['—', 'text-slate-600'];
+    const [text, cls] = state === 'fire' ? ['FIRING', 'lvl-crit'] : state === 'armed' ? ['ARMED', 'lvl-warn'] : ['—', 'text-slate-400'];
     const k = `${key}s`;
     if (this.set.cache[k] !== text) {
       this.set.cache[k] = text;

@@ -36,7 +36,7 @@ Both are modelled as baselines and run on the same seeds as FlexiPath and Legacy
 
 ## What the demo shows
 
-Open the app and you get the **Mission view**, kept to the story. The 3D twin takes most of the screen, with one short column beside it. The header and toolbar are one line each; the decision loop is a one-line stepper where only the active stage shows its text. Fault injection, reset, Experiments and "Why FlexiPath?" are icon buttons with tooltips. The beam legend sits behind a button in the playback bar.
+The site opens on a **landing page** that explains the solution (the problem, the decision loop, the six ideas, the results against existing mechanisms, the guidelines and the real-life plan). **Launch the simulator** opens `simulator.html` on the **Mission view**, kept to the story. The HUD is light (white panels) around the night-time 3D twin. The 3D twin takes most of the screen, with one short column beside it. The header and toolbar are one line each; the decision loop is a one-line stepper where only the active stage shows its text. Fault injection, reset, Experiments and "Why FlexiPath?" are icon buttons with tooltips. The beam legend sits behind a button in the playback bar.
 
 | Area | What it answers |
 | --- | --- |
@@ -281,7 +281,7 @@ runner alike.
 
 ```bash
 npm install
-npm run dev          # http://localhost:5173
+npm run dev          # landing page http://localhost:5173 · simulator http://localhost:5173/simulator.html
 ```
 
 | Command | What it does |
@@ -291,7 +291,8 @@ npm run dev          # http://localhost:5173
 | `npm run benchmark` | Paired experiments → `results/benchmark_*.json`, per-run `.csv`, `_comparison.csv` and `_mechanisms.csv` (`--quick`, `--seeds 10`, `--speeds 60`, `--scenarios A,D`, `--no-failsafe`, `--baselines mptcp,redundant` or `none`) |
 | `npm run models` | Regenerate the six GLB assets with headless Blender (`blender` on `PATH`) |
 
-URL parameters: `?scenario=A&seed=2026&speed=90&mode=advanced&focus=legacy&camera=overview&paused=1`, `intro=0` skips
+Simulator URL parameters (on `simulator.html`; a link to the site root that carries any of them is forwarded to the
+simulator): `?scenario=A&seed=2026&speed=90&mode=advanced&focus=legacy&camera=overview&paused=1`, `intro=0` skips
 the intro screen, `demo=1` starts the guided demo, `models=procedural` forces the built-in primitive models, `look=twin` starts in the neon digital-twin look.
 
 Keys: `Space` pause · `M` mission / advanced · `D` guided demo · `X` experiments · `I` why FlexiPath? · `F` Wi-Fi fade ·
@@ -416,13 +417,16 @@ healthy `#22C55E`.
 
 ```
 FlexiPath/
-├── index.html · package.json · vite.config.js
+├── index.html                          landing page (static; its numbers are copied from the tables above)
+├── simulator.html · package.json · vite.config.js
 ├── blender/generate_all_models.py      procedural asset generator (headless or MCP)
 ├── docs/                               existing mechanisms (references + comparison) · QoS / QoE guidelines
 ├── public/models/                      generated GLBs + manifest.json
+├── public/landing/                     simulator screenshots for the landing page (WebP, 1200 / 2400 px)
 ├── scripts/benchmark.js                Node CLI for paired experiments
 └── src/
-    ├── main.js · styles.css            entry point, Tailwind v4 theme + HUD components
+    ├── main.js · styles.css            simulator entry point, Tailwind v4 theme + light HUD components
+    ├── landing/                        landing.js · landing.css (the landing page)
     ├── simulation/                     SimulationEngine, Scenarios, NetworkEnvironment, LinkModel, MobilityModel,
     │                                   TrafficManager, FlexiPathController, LegacyController, MultipathController
     │                                   (existing-mechanism baselines), DecisionTrace,
