@@ -2,7 +2,6 @@
  * landing.js — the landing page (index.html): icons, the decision-loop highlight, range bars, the screenshot
  * switcher and scroll reveals. The simulator itself lives in simulator.html.
  */
-import './landing.css';
 import {
   createIcons,
   Activity,
