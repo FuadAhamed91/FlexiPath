@@ -55,7 +55,7 @@ function grain(g, w, h, rng, amount) {
 }
 
 /** Which windows of one storey are lit: dark floors, whole lit floors, or runs of lit offices. */
-function floorPlan(rng, n, dark = 0.5, full = 0.14) {
+function floorPlan(rng, n, dark = 0.28, full = 0.27) {
   const roll = rng.next();
   const mode = roll < dark ? 'dark' : roll < dark + full ? 'full' : 'part';
   const lit = [];
@@ -70,7 +70,7 @@ function floorPlan(rng, n, dark = 0.5, full = 0.14) {
 /** Corridor and night lighting behind an unlit window: just enough to show the window grid. */
 function dimWindow(e, x, y, w, h, rng) {
   const warm = rng.next() < 0.55;
-  const a = 0.05 + 0.11 * rng.next();
+  const a = 0.08 + 0.14 * rng.next();
   e.fillStyle = warm ? `rgba(255,200,140,${a})` : `rgba(200,215,255,${a})`;
   e.fillRect(x, y, w, h);
 }
@@ -108,46 +108,55 @@ function paintFacade(kind, rng) {
   const mr = (rough, metal) => `rgb(0,${rough},${metal})`;
 
   if (kind === 'curtain') {
-    c.fillStyle = '#7a838d'; // aluminium mullions
+    c.fillStyle = '#353c46'; // slim dark aluminium mullions
     c.fillRect(0, 0, W, H);
-    m.fillStyle = mr(150, 230);
+    m.fillStyle = mr(140, 220);
     m.fillRect(0, 0, W, H);
     for (let r = 0; r < ROWS; r++) {
       const plan = floorPlan(rng, cols);
       const y = r * ch;
-      const ph = Math.round(ch * 0.74) - 4;
+      const ph = Math.round(ch * 0.76) - 2;
       for (let k = 0; k < cols; k++) {
-        const x = k * px + 4;
-        const pw = px - 8;
-        const sky = c.createLinearGradient(0, y + 4, 0, y + 4 + ph);
-        sky.addColorStop(0, '#25303c');
-        sky.addColorStop(1, '#090e14');
-        c.fillStyle = sky;
-        c.fillRect(x, y + 4, pw, ph);
-        c.fillStyle = '#272e37'; // spandrel panel
-        c.fillRect(x, y + 6 + ph, pw, ch - ph - 10);
-        m.fillStyle = mr(26, 175);
-        m.fillRect(x, y + 4, pw, ph);
-        m.fillStyle = mr(120, 70);
-        m.fillRect(x, y + 6 + ph, pw, ch - ph - 10);
-        if (plan.lit[k]) litWindow(c, e, x, y + 4, pw, ph, plan.warm, plan.k * (0.85 + 0.15 * rng.next()), rng);
-        else dimWindow(e, x, y + 4, pw, ph, rng);
+        const x = k * px + 2;
+        const pw = px - 4;
+        // Blue-black glass, each pane a little different, with the city's lights faintly reflected in it.
+        const lift = rng.next() * 0.08;
+        const pane = c.createLinearGradient(x, y + 2, x + pw * 0.6, y + 2 + ph);
+        pane.addColorStop(0, `rgb(${30 + 60 * lift},${44 + 70 * lift},${62 + 90 * lift})`);
+        pane.addColorStop(0.55, '#0c141e');
+        pane.addColorStop(1, '#070b11');
+        c.fillStyle = pane;
+        c.fillRect(x, y + 2, pw, ph);
+        if (rng.next() < 0.35) {
+          for (let i = 0; i < 3; i++) {
+            c.fillStyle = rng.next() < 0.6 ? 'rgba(255,196,130,0.35)' : 'rgba(190,210,255,0.3)';
+            c.fillRect(x + rng.next() * (pw - 4), y + 2 + ph * (0.35 + 0.6 * rng.next()), 2 + rng.next() * 3, 2);
+          }
+        }
+        c.fillStyle = '#141b25'; // spandrel panel
+        c.fillRect(x, y + 4 + ph, pw, ch - ph - 6);
+        m.fillStyle = mr(18, 190);
+        m.fillRect(x, y + 2, pw, ph);
+        m.fillStyle = mr(110, 90);
+        m.fillRect(x, y + 4 + ph, pw, ch - ph - 6);
+        if (plan.lit[k]) litWindow(c, e, x, y + 2, pw, ph, plan.warm, plan.k * (0.85 + 0.15 * rng.next()), rng);
+        else dimWindow(e, x, y + 2, pw, ph, rng);
       }
     }
   } else if (kind === 'ribbon') {
-    c.fillStyle = '#6c7177'; // concrete
+    c.fillStyle = '#7a8087'; // concrete
     c.fillRect(0, 0, W, H);
     grain(c, W, H, rng, 22);
     m.fillStyle = mr(215, 10);
     m.fillRect(0, 0, W, H);
     const half = px / 2;
     for (let r = 0; r < ROWS; r++) {
-      const plan = floorPlan(rng, cols * 2, 0.45, 0.2);
+      const plan = floorPlan(rng, cols * 2, 0.28, 0.3);
       const y = r * ch + 6;
       const gh = Math.round(ch * 0.56);
       const band = c.createLinearGradient(0, y, 0, y + gh);
-      band.addColorStop(0, '#2a3847');
-      band.addColorStop(1, '#0d151e');
+      band.addColorStop(0, '#1f2b38');
+      band.addColorStop(1, '#080d13');
       c.fillStyle = band;
       c.fillRect(0, y, W, gh);
       m.fillStyle = mr(30, 160);
@@ -155,8 +164,8 @@ function paintFacade(kind, rng) {
       for (let s = 0; s < cols * 2; s++) {
         if (plan.lit[s]) litWindow(c, e, s * half + 2, y, half - 4, gh, plan.warm, plan.k, rng);
         else dimWindow(e, s * half + 2, y, half - 4, gh, rng);
-        c.fillStyle = '#4b525a'; // mullion
-        c.fillRect(s * half, y, 3, gh);
+        c.fillStyle = '#353c45'; // mullion
+        c.fillRect(s * half, y, 2, gh);
       }
       c.fillStyle = '#6f757c'; // sill shadow line
       c.fillRect(0, y + gh, W, 2);
@@ -185,7 +194,7 @@ function paintFacade(kind, rng) {
         c.fillRect(wx, wy, ww, wh);
         m.fillStyle = mr(45, 110);
         m.fillRect(wx, wy, ww, wh);
-        if (rng.next() >= 0.27) dimWindow(e, wx, wy, ww, wh, rng);
+        if (rng.next() >= 0.4) dimWindow(e, wx, wy, ww, wh, rng);
         else {
           const warm = rng.next() < 0.8;
           litWindow(c, e, wx, wy, ww, wh, warm, 0.55 + 0.4 * rng.next(), rng);
@@ -267,8 +276,8 @@ function paintShops(rng) {
  */
 function withUplight(material, strength) {
   material.onBeforeCompile = (shader) => {
-    shader.uniforms.uUpWarm = { value: new THREE.Color('#ffc98f').multiplyScalar(0.32 * strength) };
-    shader.uniforms.uSkyFill = { value: new THREE.Color('#8fa3c8').multiplyScalar(0.035 * strength) };
+    shader.uniforms.uUpWarm = { value: new THREE.Color('#ffc98f').multiplyScalar(0.4 * strength) };
+    shader.uniforms.uSkyFill = { value: new THREE.Color('#9fb3d8').multiplyScalar(0.06 * strength) };
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nvarying float vWorldY;')
       .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWorldY = (modelMatrix * vec4(transformed, 1.0)).y;');
@@ -276,7 +285,7 @@ function withUplight(material, strength) {
       .replace('#include <common>', '#include <common>\nuniform vec3 uUpWarm;\nuniform vec3 uSkyFill;\nvarying float vWorldY;')
       .replace(
         '#include <emissivemap_fragment>',
-        '#include <emissivemap_fragment>\ntotalEmissiveRadiance += (diffuseColor.rgb + 0.12) * (uUpWarm * exp(-vWorldY / 5.0) + uSkyFill);',
+        '#include <emissivemap_fragment>\ntotalEmissiveRadiance += (diffuseColor.rgb + 0.1) * (uUpWarm * exp(-vWorldY / 2.8) + uSkyFill);',
       );
   };
   return material;
@@ -287,9 +296,9 @@ function nightEnvironment(renderer, rng) {
   const [cv, g] = canvas(1024, 512);
   const sky = g.createLinearGradient(0, 0, 0, 512);
   sky.addColorStop(0, '#04060c');
-  sky.addColorStop(0.4, '#121a2a');
-  sky.addColorStop(0.49, '#5a4a36');
-  sky.addColorStop(0.53, '#1a1a1d');
+  sky.addColorStop(0.4, '#101828');
+  sky.addColorStop(0.49, '#2a3142');
+  sky.addColorStop(0.53, '#14161b');
   sky.addColorStop(1, '#070809');
   g.fillStyle = sky;
   g.fillRect(0, 0, 1024, 512);
@@ -506,7 +515,7 @@ export function buildRealCity({ boxes, rng, renderer, maxX, roadZ }) {
         map: tex.map,
         emissiveMap: tex.emissiveMap,
         emissive: '#ffffff',
-        emissiveIntensity: 0.95,
+        emissiveIntensity: 1.2,
         roughnessMap: tex.mrMap,
         metalnessMap: tex.mrMap,
         roughness: 1,
