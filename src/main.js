@@ -7,7 +7,6 @@
  * URL parameters: ?scenario=mission|A…F&seed=2026&speed=60&mode=mission|advanced
  *                 &focus=flexipath|legacy&camera=chase|cinematic|overview&intro=0&paused=1&demo=1
  */
-import './styles.css';
 import * as THREE from 'three';
 import { SimulationEngine } from './simulation/SimulationEngine.js';
 import { SCENARIOS } from './simulation/Scenarios.js';
