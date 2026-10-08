@@ -48,15 +48,21 @@ The site opens on a **landing page** that explains the solution (the problem, th
 
 The header carries the status, the `SIMULATION` badge, the static **anchor relay** address and the clock.
 
-The **Advanced view** (`M`) holds every panel: prediction · live (trend, time to failure, next path with its radio
-state, signal sparkline), the full decision record, traffic-aware protection (per flow: class, path, backup, burst or
-pacing state, overhead), battery · ordering · session (radio badges, journey energy, HoL stalls, relay tunnel vs the
-legacy IP changes), interface health (radio power and a radio badge per modem; a modem asleep in DRX shows signal only),
-prediction internals (every trigger with its live value and threshold, including the radio wake triggers), flow
-inspector (sequence numbers, per-flow HoL, pacing offset), relay tunnel (session ID, outer addresses, leases, rebinds),
-controls, event log and six 60 s charts (throughput, latency, loss, MOS, **radio power**, **bulk HoL stall**), plus the
-client IP and radio power chips in the header. **Guided demo** (`D`) replays scenario A and captions each real decision
-as it happens; **Experiments** (`X`) runs paired trials and shows the existing-mechanisms comparison on the same runs.
+The **Advanced view** (`M`) holds every panel. Each side column shows one group at a time, chosen by tabs that the
+page remembers:
+
+| Column | Tab | Panels |
+| --- | --- | --- |
+| Left | **Prediction** | Prediction · live (trend, time to failure, next path with its radio state, signal sparkline) and prediction internals (every trigger with its live value and threshold, including the radio wake triggers) |
+| Left | **Links** | Interface health (radio power and a radio badge per modem; a modem asleep in DRX shows signal only) |
+| Left | **Session** | Battery · ordering · session (radio badges, journey energy, HoL stalls, relay tunnel vs the legacy IP changes) and the relay tunnel (session ID, outer addresses, leases, rebinds) |
+| Right | **Decision** | The full decision record and its history |
+| Right | **Traffic** | Traffic-aware protection (per flow: class, path, backup, burst or pacing state, overhead) and the flow inspector (sequence numbers, per-flow HoL, pacing offset) |
+| Right | **Controls** · **Log** | Simulation controls, fault injection and exports · the event log |
+
+Six 60 s charts run underneath: throughput, latency, loss, MOS, **radio power** and **bulk HoL stall**. **Guided demo**
+(`D`) replays scenario A and captions each real decision as it happens; **Experiments** (`X`) runs paired trials and
+shows the existing-mechanisms comparison on the same runs.
 
 ## Measured results (simulation)
 
