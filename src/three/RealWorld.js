@@ -4,7 +4,8 @@
  *   • a moon over the night sky (the moonlight, fog and sky colours are set per look elsewhere)
  *   • ground that turns from city concrete to desert sand in zone 4, with dunes and the ridge that shadows 5G
  *   • tarmac road with lane markings, pavements and street lights through the city (zones 1–3)
- *   • the city blocks (RealCity.js) on the twin city's plots; date palms and rocks in the desert
+ *   • the city blocks (RealCity.js) on the twin city's plots and its own infill; date palms and rocks in the desert
+ *   • the city beyond the city (RealSkyline.js): a distant skyline, far street lights and a horizon glow
  *   • road-sign gantries at the zone borders and a concrete dock apron with painted landing pads
  *
  * Visual only: built once from the route and the city plots, it never reads the simulation state.
@@ -14,6 +15,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { Random } from '../utils/Random.js';
 import { MOON_DIRECTION } from './SceneManager.js';
 import { buildRealCity } from './RealCity.js';
+import { buildSkyline } from './RealSkyline.js';
 
 const SAND_FROM_X = 150; // the ground turns from city to desert sand between these route X
 const SAND_TO_X = 185;
@@ -420,7 +422,8 @@ export function buildRealWorld({ world, boxes, pads, gates, ribbon, renderer }) 
     buildDunes(rng, height),
     buildRoad(path, ribbon, rng),
     buildStreetLights(path),
-    buildRealCity({ boxes, rng: new Random('flexipath-real-city'), renderer, maxX: CITY_END_X, roadZ }),
+    buildRealCity({ boxes, rng: new Random('flexipath-real-city'), infillRng: new Random('flexipath-real-city-infill'), renderer, maxX: CITY_END_X, roadZ }),
+    buildSkyline({ rng: new Random('flexipath-real-skyline'), roadZ, cityEndX: CITY_END_X }),
     buildBoulevardPalms(path, rng),
     buildRocks(rng, height, roadZ),
     buildDesertPalms(rng, height, roadZ),
