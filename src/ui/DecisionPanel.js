@@ -161,11 +161,6 @@ export class DecisionPanel {
     this.onChange?.();
   }
 
-  /** Pin the newest record in the history (the guided tour's "do it for me"). */
-  pinFirst() {
-    const b = this.refs.history.querySelector('[data-idx]');
-    if (b) this.select(Number(b.dataset.idx));
-  }
 
   get current() {
     if (this.pinned !== null && this.records[this.pinned]) return this.records[this.pinned];

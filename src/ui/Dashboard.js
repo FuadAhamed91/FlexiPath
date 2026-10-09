@@ -8,8 +8,8 @@
  *   ADVANCED           decision loop · interface health · prediction internals · flow inspector ·
  *                      3D twin · controls · event log · 60 s charts (throughput, RTT, loss, MOS)
  *
- * Every panel reads the engine snapshot; nothing here holds simulation state of its own. The guided tour
- * (GuidedDemo.js) spotlights the panels through their `refs` and the tour layer at the end of the markup.
+ * Every panel reads the engine snapshot; nothing here holds simulation state of its own. The guided demo
+ * (GuidedDemo.js) draws its card and its ring in the tour layer at the end of the markup.
  */
 import {
   createIcons,
@@ -50,10 +50,7 @@ import {
   Info,
   SkipForward,
   ChartLine,
-  MousePointerClick,
-  ChevronLeft,
   ChevronRight,
-  Check,
 } from 'lucide';
 import { TelemetryPanel } from './TelemetryPanel.js';
 import { FlowInspector } from './FlowInspector.js';
@@ -124,10 +121,7 @@ const ICONS = {
   Info,
   SkipForward,
   ChartLine,
-  MousePointerClick,
-  ChevronLeft,
   ChevronRight,
-  Check,
 };
 
 export function renderIcons(root = document) {
@@ -289,7 +283,7 @@ export class Dashboard {
           <button type="button" class="btn btn-icon btn-fault-sm" data-fault="cell-outage" data-view="mission" title="Inject an abrupt 5G cell outage (G)" aria-label="Inject a 5G outage"><i data-lucide="tower-control"></i></button>
           <button type="button" class="btn btn-icon" data-ref="resetBtn" data-view="mission" title="Reset scenario, same seed (R)" aria-label="Reset the scenario"><i data-lucide="rotate-ccw"></i></button>
           <button type="button" class="btn" data-ref="chartsBtn" data-view="advanced" aria-pressed="false" title="Show or hide the six live charts"><i data-lucide="chart-line"></i>Charts</button>
-          <button type="button" class="btn btn-demo" data-ref="demoBtn" title="Guided tour: the screen, a live flight, the Advanced view and the proof (D)"><i data-lucide="presentation"></i>Guided tour</button>
+          <button type="button" class="btn btn-demo" data-ref="demoBtn" title="Guided demo: scenario A, paused at each real decision with a short caption (D)"><i data-lucide="presentation"></i>Guided demo</button>
           <button type="button" class="btn btn-icon btn-primary" data-ref="expBtn" title="Paired experiments (X)" aria-label="Paired experiments"><i data-lucide="flask-conical"></i></button>
           <button type="button" class="btn btn-icon" data-ref="infoBtn" title="Why FlexiPath? (I)" aria-label="Why FlexiPath?"><i data-lucide="info"></i></button>
         </div>
@@ -302,7 +296,7 @@ export class Dashboard {
           <div class="absolute inset-0 isolate" data-ref="canvasHost"></div>
           <div class="viewport-vignette"></div>
 
-          <div class="overlay-glass pointer-events-none absolute inset-x-3 top-3 px-3 pt-2 pb-2.5" data-ref="routeStrip">
+          <div class="overlay-glass pointer-events-none absolute inset-x-3 top-3 px-3 pt-2 pb-2.5">
             <div class="relative">
               <div class="flex">${zones}</div>
               <div class="absolute inset-x-0 bottom-0 h-[6px]" data-ref="shadowStrip"></div>
@@ -311,7 +305,7 @@ export class Dashboard {
             </div>
           </div>
 
-          <div class="fp-camctl absolute top-[62px] right-3 flex items-center gap-2" data-ref="camctl">
+          <div class="fp-camctl absolute top-[62px] right-3 flex items-center gap-2">
             <div class="seg overlay-glass" role="group" aria-label="Camera mode">
               <button type="button" class="px-2.5" data-cam="chase" aria-pressed="true"><i data-lucide="crosshair"></i>Chase</button>
               <button type="button" class="px-2.5" data-cam="cinematic" aria-pressed="false"><i data-lucide="video"></i>Cinematic</button>
@@ -339,7 +333,7 @@ export class Dashboard {
               <p>Predict the degradation. Prepare the next path. Protect what matters. Continue without waiting for failure.</p>
               <p class="text-[12px]! text-slate-600!">A predictive, traffic-aware connectivity engine for heterogeneous networks, shown beside a legacy break-before-make stack under identical simulated conditions.</p>
               <div class="mt-5 flex flex-wrap justify-center gap-2">
-                <button type="button" class="btn btn-demo h-[36px]! px-4!" data-intro="demo"><i data-lucide="presentation"></i>Start the guided tour</button>
+                <button type="button" class="btn btn-demo h-[36px]! px-4!" data-intro="demo"><i data-lucide="presentation"></i>Start guided demo</button>
                 <button type="button" class="btn h-[36px]! px-4!" data-intro="explore"><i data-lucide="play"></i>Explore freely</button>
                 <button type="button" class="btn h-[36px]! px-4!" data-intro="why"><i data-lucide="info"></i>Why FlexiPath?</button>
               </div>
@@ -360,7 +354,7 @@ export class Dashboard {
               .join('')}
           </div>
 
-          <div class="overlay-glass absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-2 px-2 py-1.5" data-ref="playbar">
+          <div class="overlay-glass absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-2 px-2 py-1.5">
             <button type="button" class="btn btn-primary w-[34px] px-0!" data-ref="play" aria-label="Pause simulation"><i data-lucide="pause"></i></button>
             <div class="seg p-[2px]!" role="group" aria-label="Simulation rate">
               ${[0.5, 1, 2, 4].map((r) => `<button type="button" class="h-[24px]! px-2.5! font-mono" data-rate="${r}" aria-pressed="${r === 1}">${r}×</button>`).join('')}
@@ -904,7 +898,7 @@ export class Dashboard {
     el.style.top = `${y}px`;
   }
 
-  // ── Intro and guided tour ────────────────────────────────────────────────
+  // ── Intro and guided demo ────────────────────────────────────────────────
   showIntro() {
     this.refs.intro.hidden = false;
     this.engine.setPaused(true);
@@ -915,7 +909,7 @@ export class Dashboard {
     this.refs.intro.hidden = true;
   }
 
-  /** The guided tour (GuidedDemo.js): onboarding, the live flight, the Advanced view and the proof. */
+  /** The guided demo (GuidedDemo.js): scenario A, paused at each real decision with a short caption. */
   startDemo() {
     this.demo.start();
   }
