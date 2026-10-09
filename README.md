@@ -80,7 +80,8 @@ shows. Nothing resumes by itself: from a paused moment, Next steps through the p
 Mission panels, the Advanced view's tabs or the charts, as the moment needs — one card per panel, placed beside the
 ringed panel and reading its live numbers; each panel is explained once, so later stops get shorter; the last card
 resumes the flight, back in the Mission view, from where it paused. Hold flight, the play button and Space pause the running flight the same way. It ends with the result of the
-mission and buttons for 10 paired trials, a walk through every dashboard, a replay or free exploration. **Experiments** (`X`) runs paired trials and shows the
+mission and buttons for 10 paired trials, a walk through every dashboard, a replay or free exploration, and a last
+card on the scenario picker: the eight scenarios A–H, any of which ends the demo and flies with the same two drones. **Experiments** (`X`) runs paired trials and shows the
 existing-mechanisms comparison on the same runs.
 
 ## Measured results (simulation)
