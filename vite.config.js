@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
 import tailwindcss from '@tailwindcss/vite';
 
-// Two pages: the landing page (index.html) and the simulator (simulator.html).
+// Three pages: the landing page (index.html), the simulator (simulator.html) and the video page (video.html).
 const page = (file) => fileURLToPath(new URL(file, import.meta.url));
 
 export default defineConfig({
@@ -22,6 +22,7 @@ export default defineConfig({
       input: {
         main: page('./index.html'),
         simulator: page('./simulator.html'),
+        video: page('./video.html'),
       },
     },
   },

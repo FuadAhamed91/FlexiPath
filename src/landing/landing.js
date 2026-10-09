@@ -19,10 +19,11 @@ import {
   Presentation,
   Server,
   TriangleAlert,
+  Video,
 } from 'lucide';
 
 createIcons({
-  icons: { Activity, CircleCheck, Copy, Drone, FlaskConical, Layers, ListOrdered, Lock, Map: MapIcon, MessageSquareText, Moon, Play, Presentation, Server, TriangleAlert },
+  icons: { Activity, CircleCheck, Copy, Drone, FlaskConical, Layers, ListOrdered, Lock, Map: MapIcon, MessageSquareText, Moon, Play, Presentation, Server, TriangleAlert, Video },
   attrs: { 'stroke-width': '1.75' },
 });
 

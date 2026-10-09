@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light" />
+    <meta name="theme-color" content="#ffffff" />
+    <title>FlexiPath · The two-minute video</title>
+    <meta name="description" content="A two-minute video of the FlexiPath prototype: a drone keeps its command link while it flies between Wi-Fi, 5G and LEO satellite." />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&family=Orbitron:wght@700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/src/landing/landing.css" />
+    <script type="module" src="/src/landing/video.js"></script>
+  </head>
+  <body class="font-sans antialiased">
+    <main id="main" class="lp-wrap pt-10 pb-16 sm:pt-14">
+      <div class="mx-auto max-w-[1120px]">
+        <a href="./index.html" class="lp-btn lp-btn-sm"><i data-lucide="chevron-left"></i>FlexiPath overview</a>
+        <span class="lp-eyebrow mt-8 block w-fit"><span class="dot"></span>EDGE Challenge · ATRC Advanced Technology Pioneers 2026</span>
+        <h1 class="lp-h1 mt-4">FlexiPath in <span class="lp-grad">two minutes</span>.</h1>
+        <p class="lp-lead max-w-[720px]">
+          Two identical drones fly the same corridor under the same simulated radio conditions. FlexiPath predicts the
+          failing link and switches before it breaks; the legacy stack notices only after the failure and has to hover.
+        </p>
+
+        <figure class="lp-shot mt-10">
+          <div class="lp-shot-bar" aria-hidden="true"><i></i><i></i><i></i><span class="ml-2">FlexiPath · two-minute video</span></div>
+          <video
+            id="video"
+            class="block w-full bg-slate-950"
+            controls
+            playsinline
+            preload="metadata"
+            poster="./landing/simulator-mission-1200.webp"
+            width="2400"
+            height="1350"
+          >
+            <source src="./video/flexipath-two-minutes.mp4" type="video/mp4" />
+          </video>
+        </figure>
+        <p id="video-note" class="mt-4 hidden rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[14px] text-amber-900">
+          The video file is not published yet. The guided demo below walks through the same flight live, pausing at each
+          real decision.
+        </p>
+
+        <div class="mt-8 flex flex-wrap items-center gap-3">
+          <a href="./simulator.html?demo=1" class="lp-btn lp-btn-primary"><i data-lucide="presentation"></i>Try the live prototype: guided demo</a>
+          <a href="./simulator.html" class="lp-btn"><i data-lucide="play"></i>Launch the simulator</a>
+        </div>
+        <p class="mt-5 font-mono text-[12px] text-slate-500">Simulation prototype · every result shown is a simulated measurement or a model parameter</p>
+      </div>
+    </main>
+    <script>
+      // Until the MP4 is published the player would show an empty frame: say so and point at the guided demo.
+      (function () {
+        var v = document.getElementById('video');
+        var note = document.getElementById('video-note');
+        var show = function () {
+          note.classList.remove('hidden');
+        };
+        v.addEventListener('error', show, true);
+        v.querySelector('source').addEventListener('error', show);
+      })();
+    </script>
+  </body>
+</html>
