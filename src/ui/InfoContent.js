@@ -86,7 +86,7 @@ const WHY = [
 const KEYS = [
   ['Space', 'Pause / resume'],
   ['M', 'Mission ↔ Advanced view'],
-  ['D', 'Start the guided tour'],
+  ['D', 'Start the guided demo'],
   ['X', 'Experiments (paired trials)'],
   ['I', 'Why FlexiPath? (this page)'],
   ['F / G', 'Inject Wi-Fi fade / 5G cell outage'],
