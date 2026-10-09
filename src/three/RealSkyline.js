@@ -4,7 +4,9 @@
  *     downtown core (zone 2) and thinning out where the desert begins;
  *   • street lights on the far ground between those blocks;
  *   • a warm light-pollution glow over the horizon on the city side (none over the desert).
- * Cheap on purpose: one merged mesh, one point cloud and one glow band. Visual only, with its own random stream.
+ * The far buildings come in three finishes (dark glass, concrete, sand render), each with its own wall tint and window
+ * light per building, and the taller ones often step back near the top.
+ * Cheap on purpose: three merged facade meshes, one point cloud and one glow band. Visual only, own random stream.
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -26,8 +28,16 @@ function canvasTexture(w, h, draw, srgb = true) {
   return t;
 }
 
-/** Distant facades: dark walls with small windows, a third of them lit, whole floors dark or lit at times. */
-function distantFacade(rng) {
+/** The three finishes of the far city: wall colour, unlit-window colour and how much of the wall is window. */
+const FINISHES = {
+  glass: { wall: '#151a22', dark: '#0a0e14', inset: [3, 2] },
+  concrete: { wall: '#3a3d43', dark: '#101318', inset: [6, 4] },
+  sand: { wall: '#5b4f41', dark: '#15120f', inset: [8, 4] },
+};
+
+/** Distant facades: walls with small windows, a third of them lit, whole floors dark or lit at times. */
+function distantFacade(rng, finish) {
+  const { wall, dark, inset } = FINISHES[finish];
   const cols = 8;
   const rows = 16;
   const S = 256;
@@ -44,13 +54,13 @@ function distantFacade(rng) {
     }
   }
   const cell = (g, paint) => {
-    for (let r = 0; r < rows; r++) for (let k = 0; k < cols; k++) paint(g, k * cw + 4, r * ch + 3, cw - 8, ch - 6, lit[r * cols + k]);
+    for (let r = 0; r < rows; r++) for (let k = 0; k < cols; k++) paint(g, k * cw + inset[0], r * ch + inset[1], cw - 2 * inset[0], ch - 2 * inset[1], lit[r * cols + k]);
   };
   const map = canvasTexture(S, S, (g) => {
-    g.fillStyle = '#1a1d23';
+    g.fillStyle = wall;
     g.fillRect(0, 0, S, S);
     cell(g, (gg, x, y, w, h, l) => {
-      gg.fillStyle = l ? (l.warm ? '#7a5e3e' : '#5d6678') : '#0c0f13';
+      gg.fillStyle = l ? (l.warm ? '#7a5e3e' : '#5d6678') : dark;
       gg.fillRect(x, y, w, h);
     });
   });
@@ -79,13 +89,48 @@ function dotTexture() {
 
 const smooth = (e0, e1, x) => THREE.MathUtils.smoothstep(x, e0, e1);
 
+/** Scale each far building's window light by its `aGlow` attribute (its walls take the vertex colour). */
+function withGlow(material) {
+  material.vertexColors = true;
+  material.onBeforeCompile = (shader) => {
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute vec3 aGlow;\nvarying vec3 vGlow;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvGlow = aGlow;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vGlow;')
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\ntotalEmissiveRadiance *= vGlow;');
+  };
+  return material;
+}
+
+/** Tint and window light for one far building, written to every vertex of its walls. */
+function stampFar(geo, rng) {
+  const b = rng.range(0.75, 1.2);
+  const shift = rng.range(-1, 1);
+  const roll = rng.next();
+  const level = roll < 0.15 ? rng.range(0.15, 0.35) : roll < 0.4 ? rng.range(0.45, 0.75) : roll < 0.82 ? rng.range(0.8, 1.1) : rng.range(1.15, 1.5);
+  const warm = rng.range(-1, 1);
+  const tint = [b * (1 + 0.06 * shift), b, b * (1 - 0.06 * shift)];
+  const glow = [level * (1 + 0.12 * warm), level * (1 + 0.02 * warm), level * (1 - 0.2 * warm)];
+  const n = geo.attributes.position.count;
+  const color = new Float32Array(n * 3);
+  const aGlow = new Float32Array(n * 3);
+  for (let i = 0; i < n; i++) {
+    color.set(tint, i * 3);
+    aGlow.set(glow, i * 3);
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(color, 3));
+  geo.setAttribute('aGlow', new THREE.BufferAttribute(aGlow, 3));
+  return geo;
+}
+
 /**
  * @param {{rng: object, roadZ: (x:number)=>number, cityEndX: number}} opts
  */
 export function buildSkyline({ rng, roadZ, cityEndX }) {
   const g = new THREE.Group();
   g.name = 'RealSkyline';
-  const facades = [];
+  const facades = { glass: [], concrete: [], sand: [] };
   const roofs = [];
   const blocks = [];
   // 1 through the city, 0 past the desert edge; the downtown core (zone 2) gets the tallest towers.
@@ -96,9 +141,22 @@ export function buildSkyline({ rng, roadZ, cityEndX }) {
     const x1 = x + w / 2;
     const z0 = z - d / 2;
     const z1 = z + d / 2;
+    // Tall buildings are mostly glass towers; low ones concrete or sand render.
+    const roll = rng.next();
+    const finish = h > 20 ? (roll < 0.7 ? 'glass' : 'concrete') : roll < 0.3 ? 'glass' : roll < 0.65 ? 'concrete' : 'sand';
     const v = Math.floor(rng.next() * 16) / 16;
-    facades.push(walls(x0, x1, z0, z1, 0, h, TILE_W, TILE_H, { u: Math.floor(rng.next() * 8) / 8, v }));
-    roofs.push(roof(x0, x1, z0, z1, h));
+    const u = Math.floor(rng.next() * 8) / 8;
+    const stepped = h > 18 && rng.next() < 0.4;
+    const low = stepped ? h * rng.range(0.6, 0.78) : h;
+    const parts = [walls(x0, x1, z0, z1, 0, low, TILE_W, TILE_H, { u, v })];
+    roofs.push(roof(x0, x1, z0, z1, low));
+    if (stepped) {
+      const jx = w * rng.range(0.15, 0.25);
+      const jz = d * rng.range(0.15, 0.25);
+      parts.push(walls(x0 + jx, x1 - jx, z0 + jz, z1 - jz, low, h, TILE_W, TILE_H, { u, v }));
+      roofs.push(roof(x0 + jx, x1 - jx, z0 + jz, z1 - jz, h));
+    }
+    facades[finish].push(stampFar(mergeGeometries(parts), rng));
     blocks.push({ x0, x1, z0, z1 });
   };
 
@@ -124,10 +182,13 @@ export function buildSkyline({ rng, roadZ, cityEndX }) {
     }
   }
 
-  const tex = distantFacade(rng);
-  const facadeMat = new THREE.MeshStandardMaterial({ map: tex.map, emissiveMap: tex.emissiveMap, emissive: '#ffffff', emissiveIntensity: 1.5, roughness: 1, metalness: 0 });
-  const roofMat = new THREE.MeshStandardMaterial({ color: '#202328', roughness: 1, metalness: 0 });
-  g.add(new THREE.Mesh(mergeGeometries(facades), facadeMat), new THREE.Mesh(mergeGeometries(roofs), roofMat));
+  for (const [finish, geos] of Object.entries(facades)) {
+    if (!geos.length) continue;
+    const tex = distantFacade(rng, finish);
+    const mat = withGlow(new THREE.MeshStandardMaterial({ map: tex.map, emissiveMap: tex.emissiveMap, emissive: '#ffffff', emissiveIntensity: 1.5, roughness: 1, metalness: 0 }));
+    g.add(new THREE.Mesh(mergeGeometries(geos), mat));
+  }
+  g.add(new THREE.Mesh(mergeGeometries(roofs), new THREE.MeshStandardMaterial({ color: '#202328', roughness: 1, metalness: 0 })));
 
   // Street lights on the far ground: a loose grid of lit streets between the blocks.
   const pts = [];

@@ -233,8 +233,12 @@ vehicles, nodes, beams, particles }` in the console.
   adds low-rise plots on the camera side and its own infill (`infillPlots`): rows 1–6 behind the street, a downtown
   skyline in zone 2, low-rise rows on the camera side, and a city edge behind the dock. The infill has its own random
   stream (`flexipath-real-city-infill`) so the twin's buildings keep their look. Each building gets:
-  - one canvas-painted facade tile per type (curtain wall, bronze curtain wall, ribbon, punched) with colour, emissive
-    and roughness / metalness maps;
+  - one canvas-painted facade tile per style (`STYLES`: four glass curtain walls, three stone ribbon finishes, three
+    renders, each with its own window pattern) with colour, emissive and roughness / metalness maps;
+  - per building, a wall tint (vertex colour), a window light level and colour (`aGlow`) and, on about a third of the
+    towers, a coloured crown wash (`aAccent`), all read by the uplight shader;
+  - varied forms: round, twin, stepped and classic towers with crowns, spires or pyramid caps; L-shaped and terraced
+    mid-rises; paired low-rises (never taller on the camera side);
   - world-scale UVs with a whole-storey offset per building;
   - one merged mesh per material;
   - a night environment map for the glass;

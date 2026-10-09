@@ -662,9 +662,11 @@ drone.
 packets, coverage rings and labels. The world around it changes.
 - **Real** (default) is a moonlit night (`RealWorld.js`):
   - a city on the twin's plots and its own infill (`RealCity.js`), rising to a downtown skyline behind zone 2:
-    - glass towers (blue-black or bronze) with reflective curtain walls, podiums, setbacks, LED crowns and spires;
-    - office slabs with ribbon windows;
-    - sand-coloured residential blocks with balconies;
+    - towers in blue, bronze, teal or silver glass or stone on stone podiums: round, twin, stepped and classic shafts,
+      with LED crowns, spires or pyramid caps, and soft coloured crown lighting on about a third of them;
+    - office slabs in concrete, granite or limestone with ribbon windows;
+    - residential blocks in sand, white or terracotta render with balconies: plain, L-shaped, terraced or paired;
+    - every building with its own wall tint and window light level, from dark to brightly lit;
     - lit shopfronts along the street;
     - low-rise blocks on the camera side, and a city edge behind the dock;
     - red aviation lights on the tall towers and lit helipads on a few roofs;
