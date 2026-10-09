@@ -565,19 +565,6 @@ function planBuilding(out, b, rng) {
     const glass = STYLES[style].type === 'curtain';
     const warm = rng.next() < 0.3;
     if (glass && rng.next() < 0.6) crown(out, a0, a1, c0, c1, top, warm);
-    if (glass && rng.next() < 0.3) {
-      // LED lines up the corners of the lowest tier
-      const list = warm ? out.ledWarm : out.led;
-      const yTop = cuts.length ? snap(top * cuts[0]) : top;
-      for (const [cx, cz] of [
-        [ax0, az0],
-        [ax1, az0],
-        [ax0, az1],
-        [ax1, az1],
-      ]) {
-        list.push(box(0.05, yTop - y0, 0.05, cx, y0, cz));
-      }
-    }
     const cx = (a0 + a1) / 2;
     const cz = (c0 + c1) / 2;
     let tipY = null;
@@ -849,7 +836,7 @@ function rooftopExtras(out) {
     }
     const pad = new THREE.PlaneGeometry(size, size);
     pad.rotateX(-Math.PI / 2);
-    pad.translate(t.cx, deckY + 0.005, cz);
+    pad.translate(t.cx, deckY + 0.02, cz);
     out.helipad.push(pad);
     for (let i = 0; i < 8; i++) {
       const a = (i / 8) * Math.PI * 2;
@@ -908,12 +895,15 @@ export function buildRealCity({ boxes, rng, infillRng, renderer, maxX, roadZ }) 
       metalness: 0.3,
       envMap: env,
       envMapIntensity: 0.5,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2,
     }),
     roof: new THREE.MeshStandardMaterial({ color: '#46494e', roughness: 0.9, metalness: 0.15, envMap: env, envMapIntensity: 0.2 }),
     led: new THREE.MeshStandardMaterial({ color: '#0b0d10', emissive: '#d9e6ff', emissiveIntensity: 2.4 }),
     ledWarm: new THREE.MeshStandardMaterial({ color: '#0b0d10', emissive: '#ffd6a0', emissiveIntensity: 2.2 }),
     aviation: new THREE.MeshStandardMaterial({ color: '#2a0505', emissive: '#ff2b2b', emissiveIntensity: 3.2 }),
-    helipad: new THREE.MeshStandardMaterial({ ...paintHelipad(), emissive: '#ffffff', emissiveIntensity: 0.9, roughness: 0.85 }),
+    helipad: new THREE.MeshStandardMaterial({ ...paintHelipad(), emissive: '#ffffff', emissiveIntensity: 0.9, roughness: 0.85, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }),
     padLight: new THREE.MeshStandardMaterial({ color: '#06200f', emissive: '#4dff8a', emissiveIntensity: 2.6 }),
   };
   const city = new THREE.Group();

@@ -10,6 +10,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 
 export const BACKGROUND = 0x030712;
@@ -90,6 +91,9 @@ export class SceneManager {
     // High threshold: only hot sources (beams, packets, LEDs) bloom; cabins glow without smearing the bodywork.
     this.bloom = new UnrealBloomPass(new THREE.Vector2(512, 512), 0.9, 0.5, 0.85);
     this.composer.addPass(this.bloom);
+    // The scene renders into the composer's target, not the canvas, so the renderer's `antialias` never reaches it.
+    // SMAA smooths the edges for a small fixed cost; 4× MSAA did it too but doubled the frame time of the busy views.
+    this.composer.addPass(new SMAAPass());
     this.composer.addPass(new OutputPass());
 
     this._addLights();

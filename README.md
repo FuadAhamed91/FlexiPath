@@ -673,7 +673,8 @@ packets, coverage rings and labels. The world around it changes.
   - the city beyond the city (`RealSkyline.js`): a distant skyline with lit windows, street lights on the far ground
     and a warm light-pollution glow over the horizon, none over the desert;
   - windows lit floor by floor, with dim night lighting behind the rest so every facade shows its grid;
-  - a tarmac road with lane markings, pavements, street lights and palms through zones 1–3;
+  - a tarmac road with lane markings, pavements, street lights and date palms through zones 1–3: curved, ringed
+    trunks, a crown of feathery fronds in three tiers, and a warm ground uplight under each boulevard palm;
   - ground that turns to desert sand in zone 4, with dunes, the ridge that shadows 5G, date palms and rocks;
   - road-sign gantries at the zone borders, and a concrete dock apron with painted landing pads.
 
