@@ -1,96 +1,401 @@
 /**
- * GuidedDemo.js — the competition demonstration, driven by real simulation events.
+ * GuidedDemo.js — the guided demo: the full mission flown live, paused at each real moment until the visitor
+ * continues, with the dashboards that moment changed shown one by one before the flight resumes.
  *
- * It does not script outcomes: it restarts scenario A (Wi-Fi → 5G, seed 2026), then listens to the
- * engine. When the controller actually predicts, protects or switches — and when the legacy stack
- * actually interrupts and recovers — it pauses briefly and captions the moment using the decision
- * record and measured values of that tick. At the end it runs paired trials for the experiment table.
+ * It does not script outcomes. One orientation card on the dock, then the flight runs (dock → Wi-Fi → 5G → LEO)
+ * and the engine's own events pause the simulation: when the controller actually predicts, protects or switches,
+ * and when the legacy stack actually interrupts and recovers, the demo stops and says what is happening in two or
+ * three sentences built from the decision record and the measured values of that tick. Nothing resumes on its own.
+ * Next then shows the panels that moment changed — a ring around each, with its live numbers; a panel that lives in
+ * the Advanced view or the charts switches the view for that card — and the last card resumes the flight, back in
+ * the Mission view, from where it paused. Hold flight, the play button or Space pause the running flight. The
+ * mission end card offers 10 paired trials, a walk through every dashboard, a replay, or free exploration.
  */
-import { LEGACY_PARAMS, LEGACY_WIRELESS_STALL_S } from '../simulation/LegacyController.js';
-import { FAILSAFE_OUTAGE_S, ANCHOR_IP } from '../simulation/SimulationEngine.js';
-import { POWER_PARAMS } from '../simulation/PowerModel.js';
-import { linkName } from './format.js';
+import { ANCHOR_IP } from '../simulation/SimulationEngine.js';
+import { EXPERIMENT_SCENARIOS, SCENARIOS } from '../simulation/Scenarios.js';
+import { POWER_PARAMS, POWER_TIERS, RADIO_STATES } from '../simulation/PowerModel.js';
+import { INTERFACE_IDS, INTERFACE_SPECS } from '../simulation/LinkModel.js';
+import { esc, fmtSignal, linkName } from './format.js';
 
-const HOLD = { intro: 5200, beat: 5200, short: 4200 };
-const sentence = (s) => (!s ? '' : /[.!?]$/.test(s.trim()) ? s.trim() : `${s.trim()}.`);
+const BURST_MS = Math.round(POWER_PARAMS.burstWindowS * 1000);
+const W = POWER_PARAMS.tierWatts;
+const MARGIN = 12; // card / window edge
+const GAP = 16; // card / ring
+/** Every dashboard, in walk order (the mission end card offers them all). */
+const ALL_PANELS = ['pill', 'loop', 'decision', 'glance', 'lanes', 'history', 'prediction', 'links', 'traffic', 'session', 'controls', 'log', 'charts'];
+
+const sentence = (s) => {
+  if (!s) return '';
+  const t = s.trim();
+  const cap = t.charAt(0).toUpperCase() + t.slice(1);
+  return /[.!?]$/.test(cap) ? cap : `${cap}.`;
+};
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const nth = (n) => ['First', 'Second', 'Third', 'Fourth', 'Fifth'][n] ?? `${n + 1}th`;
+const secs = (v) => (v < 1 ? v.toFixed(2) : v.toFixed(1));
+const strip = (html) => String(html).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 export class GuidedDemo {
   constructor(dash) {
     this.dash = dash;
     this.engine = dash.engine;
     this.active = false;
+    this.spec = null;
+    this.moment = null; // the card of the moment the flight is paused at (or the last caption while it runs)
+    this.walk = null; // the dashboard cards of the current stop
+    this.endCard = null;
     this.unsubs = [];
+    this.raf = 0;
+    this._last = {};
+    this._frame = this._frame.bind(this);
+    this._build();
   }
 
+  // ── DOM ───────────────────────────────────────────────────────────────
+  _build() {
+    const host = this.dash.refs.tour;
+    host.innerHTML = `
+      <div class="tour-spot" data-ref="spot" hidden></div>
+      <div class="tour-card" data-ref="card" hidden role="status" aria-live="polite">
+        <span class="arrow" data-ref="arrow" hidden></span>
+        <div class="flex items-center justify-between gap-2">
+          <span class="step" data-ref="step"></span>
+          <div class="flex shrink-0 items-center gap-1.5">
+            <button type="button" class="btn h-[24px]! px-2! text-[10.5px]!" data-ref="hold" hidden title="Hold the flight here (Space)"><i data-lucide="pause"></i>Hold flight</button>
+            <button type="button" class="btn h-[24px]! px-2! text-[10.5px]!" data-ref="exit" title="Exit the demo and keep flying (Esc)">Exit demo</button>
+          </div>
+        </div>
+        <div class="title" data-ref="title"></div>
+        <div class="body" data-ref="body"></div>
+        <div class="mt-2.5 flex flex-wrap items-center gap-1.5 empty:hidden" data-ref="actions"></div>
+      </div>`;
+    this.refs = {};
+    host.querySelectorAll('[data-ref]').forEach((n) => (this.refs[n.dataset.ref] = n));
+    this.dash.renderIcons(host);
+    this.refs.hold.addEventListener('click', () => this.dash.togglePause(true));
+    this.refs.exit.addEventListener('click', () => this.stop());
+  }
+
+  // ── Lifecycle ─────────────────────────────────────────────────────────
   start() {
     const d = this.dash;
     this.stop({ silent: true });
     d.closeModal();
     d.hideIntro();
-    d.setMode('mission');
-    d.setFocus('flexipath', { quiet: true });
+    this._missionView();
     d.setGhost(true);
     d.setCamera('chase');
     d.setRate(1);
     this.active = true;
     this.seen = new Set();
-    this.n = 0;
+    this.switches = 0; // FlexiPath handovers so far
+    this.lgLost = 0; // legacy interruptions so far
+    this.lgBack = 0; // legacy recoveries so far
+    this.predictedFor = null; // handover index whose prediction was already told
+    this.shownPanels = new Set(); // a panel is explained once; a stop repeats one only with a '!' (its numbers are the point)
+    this.walk = null;
+    this.endCard = null;
     const e = this.engine;
     this.unsubs = [
       e.on('event', (ev) => this._onEvent(ev)),
       e.on('tick', (s) => this._onTick(s)),
-      e.on('complete', (s) => this._onComplete(s)),
+      e.on('complete', () => this._onComplete()),
       e.on('reset', () => {
         if (!this._resetting) this.stop();
       }),
     ];
     this._resetting = true;
-    d.restart({ scenario: 'demo', seed: 2026, speedKmh: 60 }, { quiet: true });
+    d.restart({ scenario: 'mission', seed: 2026, speedKmh: 60 }, { quiet: true });
     this._resetting = false;
-    this._beat({
-      step: 'GUIDED DEMO · SCENARIO A · Wi-Fi → 5G',
-      title: 'Connectivity shouldn’t wait for failure.',
-      body: 'Two identical drones fly the same corridor with the same seed and the same radio conditions. Cyan = FlexiPath: it predicts, prepares and protects. Crimson = Legacy OS: it reacts only after the link has failed. Everything shown is simulated.',
-      hold: HOLD.intro,
+    d.refs.shell.dataset.demo = '1';
+    this.refs.card.hidden = false;
+    this._last = {};
+    cancelAnimationFrame(this.raf);
+    this.raf = requestAnimationFrame(this._frame);
+    this._moment({
+      step: 'GUIDED DEMO · FULL MISSION · DOCK → Wi-Fi → 5G → LEO',
+      title: 'One mission, two drones, the same simulated radio',
+      body: 'The drone starts on its dock on a wired link and flies out through Wi-Fi, 5G and LEO satellite coverage. <b>Cyan</b> is FlexiPath: it predicts a fading link and prepares the next one before anything fails. <b>Crimson</b> is a legacy stack: it reacts only after a link has failed. The flight pauses at each real decision and waits for you: read what happened, step through the panels it changed, then resume.',
+      panels: [],
+      resumeLabel: 'Start the flight',
     });
   }
 
+  /** Exit: the card and the ring go, the flight keeps going (or stays finished). */
   stop({ silent = false } = {}) {
     for (const u of this.unsubs) u();
     this.unsubs = [];
-    clearTimeout(this.timer);
-    if (this.active && !silent) {
-      this.dash.hideCaption();
-      this.dash.setRate(1);
-    }
+    cancelAnimationFrame(this.raf);
+    const wasActive = this.active;
     this.active = false;
+    this.spec = null;
+    this.moment = null;
+    this.walk = null;
+    this.refs.card.hidden = true;
+    this.refs.spot.hidden = true;
+    this.dash.refs.shell.dataset.demo = '0';
+    if (wasActive && !silent) {
+      this.dash.setRate(1);
+      if (this.engine.paused && !this.engine.completed) this.dash.togglePause(false);
+    }
   }
 
-  _beat({ step, title, body, hold = HOLD.beat, pause = true, actions }) {
-    clearTimeout(this.timer);
-    const e = this.engine;
-    if (pause) e.setPaused(true);
-    this.dash._updatePlay?.();
-    const resume = () => {
-      clearTimeout(this.timer);
-      if (pause && this.active) {
-        e.setPaused(false);
-        this.dash._updatePlay?.();
-      }
+  /** The mission end card's "Explore freely": leave the demo and fly the mission again, hands on. */
+  explore() {
+    this.stop({ silent: true });
+    this._missionView();
+    this.dash.setRate(1);
+    this.dash.restart({ scenario: 'mission' });
+  }
+
+  /** Keyboard, from the dashboard: → / Enter next, ← back. */
+  onKey(key) {
+    if (!this.active) return false;
+    if (key === 'arrowright' || key === 'enter') return this.next(), true;
+    if (key === 'arrowleft') return this.back(), true;
+    return false;
+  }
+
+  /** The visitor paused or resumed the simulation themselves (Hold flight, the play button or Space). */
+  onUserPause(paused) {
+    if (!this.active || this.engine.completed) return;
+    if (paused) {
+      if (this.walk) return; // already stepping through a stop's panels
+      this._render({ ...(this.moment ?? { step: 'FLIGHT HELD', title: 'Flight held', body: 'Resume when you are ready.' }), held: true });
+    } else {
+      this.walk = null;
+      this._missionView();
+      this._render({ ...(this.moment ?? {}), running: true });
+    }
+  }
+
+  next() {
+    const s = this.spec;
+    if (!s) return;
+    if (s.walkIdx !== undefined) {
+      if (s.walkIdx + 1 < this.walk.length) this._showWalk(s.walkIdx + 1);
+      else this.resume();
+    } else if (s.panels?.length) this._startWalk(s.panels, s.step);
+    else if (this.engine.paused && !this.engine.completed) this.resume();
+    else s.actions?.find((a) => a.primary)?.run();
+  }
+
+  back() {
+    const s = this.spec;
+    if (!s || s.walkIdx === undefined) return;
+    if (s.walkIdx > 0) this._showWalk(s.walkIdx - 1);
+    else {
+      this.walk = null;
+      this._missionView();
+      if (this.engine.completed) this._render(this.endCard);
+      else this._render(this.moment);
+    }
+  }
+
+  /** Back to the Mission view, then the flight goes on from where it paused (or, after the mission, back to its result). */
+  resume() {
+    this.walk = null;
+    this._missionView();
+    if (this.engine.completed) this._render(this.endCard);
+    else if (this.engine.paused) this.dash.togglePause(false);
+    else this._render({ ...(this.moment ?? {}), running: true });
+  }
+
+  _missionView() {
+    const d = this.dash;
+    if (d.view.theatre) d.setTheatre(false);
+    if (d.view.mode !== 'mission') d.setMode('mission', { quiet: true });
+    if (d.view.charts) d.setCharts(false);
+    if (d.view.tab !== 'decision') d.setPanelTab('decision');
+    if (d.view.focus !== 'flexipath') d.setFocus('flexipath', { quiet: true });
+  }
+
+  // ── Rendering ─────────────────────────────────────────────────────────
+  _render(spec) {
+    this.spec = spec;
+    const R = this.refs;
+    R.step.textContent = spec.step ?? '';
+    R.title.textContent = spec.title ?? '';
+    R.body.innerHTML = spec.body ?? '';
+    R.actions.innerHTML = '';
+    const button = (label, run, { primary = false, icon = null } = {}) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = `btn h-[26px]! px-2.5! text-[11px]! ${primary ? 'btn-primary' : ''}`;
+      b.innerHTML = `${icon === 'left' ? '<i data-lucide="chevron-left"></i>' : ''}${esc(label)}${icon === 'right' ? '<i data-lucide="chevron-right"></i>' : ''}`;
+      b.addEventListener('click', run);
+      R.actions.append(b);
+      return b;
     };
-    this.dash.showCaption({
-      step,
-      title,
-      body,
-      holdMs: pause ? hold : 0,
-      onNext: pause ? resume : null,
-      onExit: () => {
-        resume();
-        this.stop();
-      },
-      actions,
-    });
-    if (pause) this.timer = setTimeout(resume, hold);
+    const completed = this.engine.completed;
+    const paused = this.engine.paused && !completed;
+    const leave = completed ? 'Back to the result' : 'Resume the flight';
+    if (spec.walkIdx !== undefined) {
+      const last = spec.walkIdx + 1 >= this.walk.length;
+      button('Back', () => this.back(), { icon: 'left' });
+      const count = document.createElement('span');
+      count.className = 'px-1 font-mono text-[10px] tracking-[0.06em] text-slate-500';
+      count.textContent = `${spec.walkIdx + 1} / ${this.walk.length}`;
+      R.actions.append(count);
+      if (last) button(leave, () => this.resume(), { primary: true, icon: 'right' });
+      else button('Next', () => this.next(), { primary: true, icon: 'right' });
+    } else if (paused && spec.panels?.length) {
+      button(`Next: ${plural(spec.panels.length, 'panel')} this changed`, () => this.next(), { primary: true, icon: 'right' });
+      button(spec.resumeLabel ?? 'Resume the flight', () => this.resume());
+    } else if (paused) {
+      button(spec.resumeLabel ?? 'Resume the flight', () => this.resume(), { primary: true, icon: 'right' });
+    }
+    for (const a of spec.actions ?? []) button(a.label, a.run, { primary: !!a.primary });
+    this.dash.renderIcons(R.actions);
+    R.hold.hidden = !(spec.running && !completed);
+    this._last = {};
+    this._layout();
+    const el = this._target(spec);
+    if (el && (paused || completed)) el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  }
+
+  _frame() {
+    if (!this.active) return;
+    this.raf = requestAnimationFrame(this._frame);
+    this._layout();
+  }
+
+  _target(spec) {
+    const t = typeof spec?.target === 'function' ? spec.target() : null;
+    if (!t) return null;
+    return Array.isArray(t) ? t.find((el) => el instanceof Element) ?? null : t;
+  }
+
+  /** Union rectangle of the card's target element(s), or null. */
+  _rectOf(spec) {
+    const t = typeof spec?.target === 'function' ? spec.target() : null;
+    if (!t) return null;
+    let l = Infinity;
+    let tp = Infinity;
+    let r = -Infinity;
+    let b = -Infinity;
+    for (const el of Array.isArray(t) ? t : [t]) {
+      if (!(el instanceof Element)) continue;
+      const rc = el.getBoundingClientRect();
+      if (rc.width < 2 || rc.height < 2) continue;
+      l = Math.min(l, rc.left);
+      tp = Math.min(tp, rc.top);
+      r = Math.max(r, rc.right);
+      b = Math.max(b, rc.bottom);
+    }
+    return Number.isFinite(l) ? { left: l, top: tp, width: r - l, height: b - tp } : null;
+  }
+
+  /**
+   * The ring marks the panel the card talks about while the flight is paused, and the card sits right next to
+   * it with a pointer (left of a right-hand panel, above a bottom strip, below a top one). A card with no panel
+   * floats over the lower part of the twin.
+   */
+  _layout() {
+    const s = this.spec;
+    if (!s) return;
+    const R = this.refs;
+    const L = this._last;
+    const rect = this.engine.paused || this.engine.completed ? this._rectOf(s) : null;
+    const spot = R.spot;
+    if (rect) {
+      const key = `${rect.left | 0},${rect.top | 0},${rect.width | 0},${rect.height | 0}`;
+      if (L.spot !== key) {
+        L.spot = key;
+        spot.hidden = false;
+        spot.style.left = `${rect.left - 5}px`;
+        spot.style.top = `${rect.top - 5}px`;
+        spot.style.width = `${rect.width + 10}px`;
+        spot.style.height = `${rect.height + 10}px`;
+      }
+    } else if (!spot.hidden) {
+      spot.hidden = true;
+      L.spot = null;
+    }
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const anchored = rect ? '1' : '0';
+    if (R.card.dataset.anchored !== anchored) R.card.dataset.anchored = anchored;
+    const w = R.card.offsetWidth;
+    const h = R.card.offsetHeight;
+    let x;
+    let y;
+    let place = null;
+    let ax = 0;
+    let ay = 0;
+    if (rect) {
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const order = rect.left > vw * 0.55 ? ['left', 'top', 'bottom', 'right'] : cy > vh * 0.6 ? ['top', 'left', 'right', 'bottom'] : ['bottom', 'left', 'right', 'top'];
+      for (const p of order) {
+        if (p === 'left') {
+          x = rect.left - GAP - w;
+          y = clamp(cy - h / 2, MARGIN, vh - h - MARGIN);
+          if (x >= MARGIN) place = p;
+        } else if (p === 'right') {
+          x = rect.left + rect.width + GAP;
+          y = clamp(cy - h / 2, MARGIN, vh - h - MARGIN);
+          if (x + w <= vw - MARGIN) place = p;
+        } else if (p === 'top') {
+          y = rect.top - GAP - h;
+          x = clamp(cx - w / 2, MARGIN, vw - w - MARGIN);
+          if (y >= MARGIN) place = p;
+        } else {
+          y = rect.top + rect.height + GAP;
+          x = clamp(cx - w / 2, MARGIN, vw - w - MARGIN);
+          if (y + h <= vh - MARGIN) place = p;
+        }
+        if (place) break;
+      }
+      if (place) {
+        ax = clamp(cx - x, 18, w - 18);
+        ay = clamp(cy - y, 18, h - 18);
+      } else {
+        // No room beside it (a small screen): the edge of the window that is clear of the ring.
+        x = clamp(cx - w / 2, MARGIN, vw - w - MARGIN);
+        y = cy < vh / 2 ? vh - h - MARGIN : MARGIN;
+      }
+    } else {
+      const v = this.dash.refs.viewport.getBoundingClientRect();
+      x = clamp(v.left + v.width / 2 - w / 2, MARGIN, vw - w - MARGIN);
+      y = clamp(v.bottom - h - 64, MARGIN, vh - h - MARGIN);
+    }
+    y = clamp(y, MARGIN, Math.max(MARGIN, vh - h - MARGIN));
+    const key = `${x | 0},${y | 0},${place},${ax | 0},${ay | 0}`;
+    if (L.card !== key) {
+      L.card = key;
+      R.card.style.left = `${x}px`;
+      R.card.style.top = `${y}px`;
+      R.card.dataset.place = place ?? 'none';
+      R.card.style.setProperty('--ax', `${ax}px`);
+      R.card.style.setProperty('--ay', `${ay}px`);
+      R.arrow.hidden = !place;
+    }
+  }
+
+  // ── Moments ───────────────────────────────────────────────────────────
+  /**
+   * A real moment: pause the flight and wait for the visitor (step through the panels it changed, or resume).
+   * A panel is explained once in the demo; a stop lists it again only with a '!' when its numbers are the point.
+   */
+  _moment(spec) {
+    const e = this.engine;
+    if (!e.completed) {
+      e.setPaused(true);
+      this.dash._updatePlay();
+    }
+    const panels = (spec.panels ?? []).filter((k) => k.endsWith('!') || !this.shownPanels.has(k)).map((k) => k.replace(/!$/, ''));
+    this.moment = { ...spec, panels, resumeLabel: spec.resumeLabel ?? 'Resume the flight' };
+    this.walk = null;
+    this._render(this.moment);
+  }
+
+  /** A caption while the flight runs; it never replaces a paused moment's card. */
+  _caption(spec) {
+    if (this.engine.paused) return;
+    this.moment = { ...spec, panels: [] };
+    this._render({ ...this.moment, running: true });
   }
 
   _fp() {
@@ -105,126 +410,305 @@ export class GuidedDemo {
 
   _onEvent(ev) {
     if (!this.active) return;
-    const once = (k) => {
-      if (this.seen.has(k)) return false;
-      this.seen.add(k);
-      return true;
-    };
+    const R = this.dash.refs;
+    const n = this.switches; // which handover this is for FlexiPath
     if (ev.engine === 'flexipath') {
-      if (ev.code === 'PREDICT' && !this.seen.has('repl') && once('predict')) {
+      if (ev.code === 'PREDICT' && this.predictedFor !== n) {
+        this.predictedFor = n;
         const r = this._lastRecord('PREDICT');
-        this.predictBeats = (this.predictBeats ?? 0) + 1;
-        this._beat({
-          step: '1 / 6 · DETECT → PREDICT → PREPARE',
-          title: `${r?.current?.name ?? 'The current link'} is degrading — FlexiPath predicts it`,
-          body: `${sentence(r?.reason ?? ev.message)} ${r?.action ? `Action: ${sentence(r.action)} ` : ''}Until now that modem slept in DRX to save battery. The Legacy OS keeps using ${r?.current?.name ?? 'the link'}: it has no prediction.`,
-          hold: this.predictBeats > 1 ? HOLD.short : HOLD.beat,
+        const cur = r?.current?.name ?? 'The current link';
+        const next = r?.alternate?.name ?? 'the next';
+        const dock = /dock/i.test(r?.reason ?? ev.message);
+        this._moment({
+          step: `${nth(n)} handover · DETECT → PREDICT → PREPARE`,
+          title: dock ? 'Dock release — the wired link is about to end' : `${cur} is fading — FlexiPath predicts it`,
+          body: `${dock ? '' : 'Measured: '}${esc(sentence(r?.reason ?? ev.message))} It wakes the ${esc(next)} modem now and validates it while ${esc(cur)} still works; the legacy drone will notice nothing until ${esc(cur)} is gone.`,
+          target: () => R.loop,
+          panels: n === 0 ? ['pill', 'loop', 'decision', 'glance', 'prediction', 'links'] : n === 1 ? ['loop', 'decision', 'prediction!', 'links'] : ['prediction', 'links'],
         });
-      } else if (ev.code === 'TREND_OFF' && this.seen.has('predict') && !this.seen.has('repl')) {
+      } else if (ev.code === 'TREND_OFF' && this.predictedFor === n) {
         // Honest behaviour: a trend that reverses releases the prediction without spending anything.
-        this.seen.delete('predict');
-        this._beat({
-          step: '1 / 6 · PREDICT',
-          title: 'Trend reversed — prediction released',
-          body: 'The signal recovered (shadowing), so FlexiPath released the prediction without replicating anything: no overhead was spent. The woken modem goes back to DRX sleep after its dwell.',
-          pause: false,
-        });
-      } else if (ev.code === 'REPL_ON' && once('repl')) {
+        this.predictedFor = null;
+        this._caption({ step: 'PREDICT', title: 'The signal recovered — prediction released', body: 'Nothing was replicated and nothing was spent; the woken modem goes back to sleep after its dwell.' });
+      } else if (ev.code === 'PREPARE') {
+        const id = /(?:validated:|→)\s*(\w+)/.exec(ev.message)?.[1];
+        this._caption({ step: 'PREPARE', title: `${id ? linkName(id) : 'Next path'} validated as the next path`, body: `${esc(ev.message)}. Validated means measured: heartbeats over the woken modem gave its RTT and loss before it carries anything.` });
+      } else if (ev.code === 'REPL_ON') {
         const r = this._lastRecord('PROTECT');
-        this._beat({
-          step: '2 / 6 · REPLICATE · DECISION ENGINE',
-          title: r?.headline ?? 'Critical flow protection enabled',
-          body: `Action: ${sentence(r?.action)} Reason: ${sentence(r?.reason)} Purple packets carry critical traffic on both paths for this window only; the receiver keeps the first copy of each sequence number and discards the late duplicate, so delivery never waits (HoL 0 ms). Video and data sync are not duplicated: bulk moves with delay-compensated pacing.`,
-        });
-        this.dash.setRate(0.5); // slow motion while both paths carry critical traffic
-      } else if (ev.code === 'REPL_RT' && this.seen.has('repl') && once('rt')) {
-        this._beat({
-          step: '2 / 6 · TRAFFIC-AWARE',
-          title: 'Real-time traffic joins the protection',
-          body: `${ev.message}. Voice was kept on one path while its loss stayed inside the ${(this.engine.agents.flexipath.controller.p.realtimeLossBudget * 100).toFixed(0)} % budget, which packet-loss concealment can hide.`,
-          pause: false,
-        });
-      } else if ((ev.code === 'HOT_SWAP' || ev.code === 'FAILOVER') && this.seen.has('repl') && once('switch')) {
-        const r = this._lastRecord(ev.code === 'HOT_SWAP' ? 'SWITCH' : 'FAILOVER');
+        const from = r?.current?.name ?? 'the current link';
+        const to = r?.alternate?.name ?? 'the next link';
+        if (n === 1) {
+          this._moment({
+            step: `${nth(n)} handover · REPLICATE`,
+            title: `Critical traffic now rides ${from} and ${to} at once`,
+            body: `${esc(from)} is about to fail, so for ${BURST_MS} ms every critical packet (purple) goes on both paths and the receiver keeps whichever copy arrives first; video and uploads are not duplicated. The radio draws ${W[2]} W for this window only.`,
+            target: () => R.glance,
+            panels: ['glance!', 'traffic', 'session'],
+          });
+          this.dash.setRate(0.5); // slow motion while both paths carry critical traffic
+        } else this._caption({ step: 'REPLICATE', title: `${BURST_MS} ms burst: critical traffic on ${from} and ${to}`, body: esc(ev.message) });
+      } else if (ev.code === 'HOT_SWAP' || ev.code === 'FAILOVER') {
         const fp = this._fp();
-        const ep = fp.trace.episode;
-        let failure = '';
-        if (ep && ep.failureT !== null) {
-          this.seen.add('fail');
-          const lead = ep.failureT - (ep.actionT ?? ep.failureT);
-          failure = ` ${linkName(ep.from)} reached its failure level (loss > 15 %) at T+${ep.failureT.toFixed(1)} s; protection had started ${lead.toFixed(1)} s before that.`;
-        }
+        const to = linkName(ev.to);
+        const from = linkName(ev.from);
+        const r = this._lastRecord(ev.code === 'HOT_SWAP' ? 'SWITCH' : 'FAILOVER');
+        this.switches += 1;
+        this.lastSwitchT = ev.t ?? this.engine.snapshot.t;
         this.dash.setRate(1);
-        this._beat({
-          step: '3 / 6 · FAILURE → SWITCH → CONTINUE',
-          title: r?.headline ?? `Switched to ${linkName(ev.to)}`,
-          body: `${sentence(r?.reason)}${failure} FlexiPath so far: ${fp.stats.stallTime.toFixed(2)} s of simulated interruption, ${fp.stats.criticalLost} critical packets lost. The old radio is back in DRX; the drone continues.`,
+        const tally = n > 0 ? ` ${nth(n)} handover, still ${fp.stats.stallTime.toFixed(2)} s of simulated interruption.` : '';
+        this._moment({
+          step: `${nth(n)} handover · SWITCH → CONTINUE`,
+          title: ev.code === 'HOT_SWAP' ? `Switched to ${to} — 0 ms gap` : `Failover to ${to}`,
+          body: `${esc(to)} is now the primary path and the ${esc(from)} radio goes back to sleep. ${n === 0 ? 'Remote services still see the same address, so no session was reset.' : esc(sentence(r?.reason ?? ''))}${esc(tally)}`,
+          target: () => R.pill,
+          panels: n === 0 ? ['pill', 'decision', 'session'] : ['pill', 'charts'],
         });
       }
     } else if (ev.engine === 'legacy') {
-      if (ev.code === 'LINK_LOST' && this.seen.has('predict') && once('lost')) {
-        const ph = LEGACY_PARAMS.stallPhases.wireless.map((p) => `${p.key} ${p.duration.toFixed(1)} s`).join(' → ');
-        this.dash.setRate(1);
-        this._beat({
-          step: '4 / 6 · LEGACY OS',
-          title: 'Legacy reacts only now: CONNECTION INTERRUPTED',
-          body: `${ev.message.replace(' → break-before-make · all sockets stalled', '')}. It tears the link down first, then looks for another one. Simulated recovery: ${ph} = ${LEGACY_WIRELESS_STALL_S.toFixed(1)} s (model parameters). Its sockets are bound to its physical address, so the new one will reset every TCP session.`,
+      if (ev.code === 'LINK_LOST') {
+        const k = this.lgLost;
+        this.lgLost += 1;
+        const msg = ev.message.replace(/ → break-before-make.*$/, '');
+        const ago = Number.isFinite(this.lastSwitchT) ? ` FlexiPath left that link ${(this.engine.snapshot.t - this.lastSwitchT).toFixed(0)} s ago.` : '';
+        this._moment({
+          step: 'LEGACY OS · INTERRUPTED',
+          title: k === 0 ? 'The legacy drone only notices when the link is gone' : 'The legacy drone reacts only now',
+          body:
+            k === 0
+              ? `${esc(sentence(msg))} Everything stalls while it tears the connection down, scans for another link and resets every TCP session, and when its C2 link is silent for more than ${Math.round(this.engine.config.failSafeS * 1000)} ms it must stop and hover.`
+              : `${esc(sentence(msg))}${esc(ago)} It tears down, scans and attaches again: interrupted and hovering once more, while the FlexiPath drone flies on.`,
+          target: () => R.lanes,
+          panels: k === 0 ? ['pillLegacy', 'lanes', 'log'] : k === 1 ? ['lanes', 'charts'] : ['lanes'],
         });
-      } else if (ev.code === 'FAILSAFE' && this.seen.has('lost') && once('failsafe')) {
-        this._beat({
-          step: '4 / 6 · LEGACY OS',
-          title: 'Fail-safe hover',
-          body: `C2 telemetry has been silent for more than ${FAILSAFE_OUTAGE_S * 1000} ms, so the legacy drone stops and hovers in place (simulated lost-link policy).`,
-          pause: false,
-        });
-      } else if (ev.code === 'RECONNECTED' && this.seen.has('lost') && once('recovered')) {
+      } else if (ev.code === 'FAILSAFE') {
+        this._caption({ step: 'LEGACY OS', title: 'Fail-safe hover', body: `C2 telemetry silent for more than ${Math.round(this.engine.config.failSafeS * 1000)} ms: the legacy drone stops and hovers while it scans. The FlexiPath drone flies on.` });
+      } else if (ev.code === 'RECONNECTED') {
+        const k = this.lgBack;
+        this.lgBack += 1;
         const s = this.engine.snapshot.agents;
-        const A = this.engine.agents;
-        const fpT = A.flexipath.tunnel.state;
-        const lgT = A.legacy.tunnel.state;
-        this._beat({
-          step: '5 / 6 · RESULT OF THIS RUN',
-          title: 'Legacy recovered — same corridor, same radio conditions',
-          body: `${sentence(ev.message)} Simulated interruption so far: FlexiPath ${s.flexipath.stats.stallTime.toFixed(2)} s · Legacy ${s.legacy.stats.stallTime.toFixed(2)} s. Remote services saw Legacy's source address change ${lgT.remoteIpChanges}× (sessions reset); FlexiPath's stayed ${ANCHOR_IP} (${fpT.remoteIpChanges} changes). Mean radio power FlexiPath ${A.flexipath.power.state.meanWatts.toFixed(2)} W · Legacy ${A.legacy.power.state.meanWatts.toFixed(2)} W (both radios always on: ${POWER_PARAMS.tierWatts[2]} W, model parameter). Replication cost ${s.flexipath.stats.overheadPct.toFixed(1)} % of protected-flow bytes.`,
-          hold: HOLD.beat,
-        });
+        if (k === 1) {
+          const A = this.engine.agents;
+          this._moment({
+            step: 'RESULT SO FAR',
+            title: 'Same corridor, same radio — the difference so far',
+            body: `Simulated interruption: FlexiPath <b>${s.flexipath.stats.stallTime.toFixed(2)} s</b>, Legacy <b>${s.legacy.stats.stallTime.toFixed(2)} s</b>. Radio power on average: FlexiPath ${A.flexipath.power.state.meanWatts.toFixed(2)} W, Legacy ${A.legacy.power.state.meanWatts.toFixed(2)} W. Address changes remote services saw: Legacy ${A.legacy.tunnel.state.remoteIpChanges}, FlexiPath ${A.flexipath.tunnel.state.remoteIpChanges} — it always shows the anchor ${ANCHOR_IP}.`,
+            target: () => R.glance,
+            panels: ['glance', 'lanes!', 'session', 'charts'],
+          });
+        } else this._caption({ step: 'LEGACY OS', title: `Legacy is back on ${linkName(ev.to)}`, body: `${esc(sentence(ev.message))} With a new address, so every TCP session was reset. FlexiPath never stopped.` });
       }
     }
   }
 
   _onTick(snapshot) {
-    // A failure that comes *before* the switch is told in the switch step (they are a tick apart);
-    // only a failure that arrives after FlexiPath already switched away gets its own caption.
-    if (!this.active || this.seen.has('fail') || !this.seen.has('switch')) return;
+    // The old link's actual failure, after FlexiPath already left it: a caption, never a pause.
+    if (!this.active) return;
     const tr = snapshot.agents.flexipath.trace;
     const ep = tr.episode ?? tr.last;
-    if (ep && ep.failureT !== null && ep.stages.SWITCH !== null) {
-      this.seen.add('fail');
-      this._beat({
-        step: '3 / 6 · FAILURE',
-        title: `${linkName(ep.from)} has now actually failed (loss > 15 %)`,
-        body: `FlexiPath had already moved to ${linkName(ep.to)} ${(ep.failureT - ep.stages.SWITCH).toFixed(1)} s earlier, so nothing was carried on the failing path.`,
-        pause: false,
-      });
-    }
+    if (!ep || ep.failureT === null || ep.stages.SWITCH === null) return;
+    const key = `fail:${ep.from}:${ep.stages.SWITCH}`;
+    if (this.seen.has(key)) return;
+    this.seen.add(key);
+    const lead = ep.failureT - ep.stages.SWITCH;
+    if (lead > 0) this._caption({ step: 'FAILURE', title: `${linkName(ep.from)} has now actually failed`, body: `FlexiPath had already moved to ${esc(linkName(ep.to))} ${lead.toFixed(1)} s earlier, so nothing was carried on the failing path.` });
   }
 
   _onComplete() {
     if (!this.active) return;
-    this.dash.setRate(1);
-    this._beat({
-      step: '6 / 6 · EXPERIMENTAL PROOF',
-      title: 'One run is an anecdote — now 10 paired trials',
-      body: 'Scenario A again, 10 different seeds, both stacks on identical conditions in every trial. The table reports measured differences with 95 % confidence intervals. DETECT → PREDICT → PREPARE → REPLICATE → SWITCH → CONTINUE.',
-      pause: false,
+    const d = this.dash;
+    d.setRate(1);
+    this.walk = null;
+    this._missionView();
+    const s = this.engine.snapshot.agents;
+    const lgStops = s.legacy.stats.failSafeStops ?? 0;
+    this.moment = null;
+    this.endCard = {
+      step: 'MISSION COMPLETE',
+      title: `FlexiPath flew the whole mission; the legacy drone had to ${lgStops ? `hover ${plural(lgStops, 'time')}` : 'wait'}`,
+      body: `${this.switches} handovers on the same simulated radio. Simulated interruption: FlexiPath <b>${s.flexipath.stats.stallTime.toFixed(2)} s</b>, Legacy <b>${s.legacy.stats.stallTime.toFixed(2)} s</b>. One run is an example: 10 paired trials of this mission, 10 seeds, both stacks on identical conditions, give the evidence with 95 % confidence intervals.`,
       actions: [
-        { label: 'Replay demo', primary: false, run: () => this.start() },
-        { label: 'Why FlexiPath?', primary: false, run: () => this.dash.openInfo() },
+        { label: 'Run 10 paired trials', primary: true, run: () => d.openExperiments({ scenario: 'mission', trials: 10, speed: 60, autoRun: true, title: 'Experimental proof · full mission · 10 paired trials' }) },
+        { label: 'Show me every dashboard', run: () => this._startWalk(ALL_PANELS, 'MISSION COMPLETE') },
+        { label: 'Replay demo', run: () => this.start() },
+        { label: 'Explore freely', run: () => this.explore() },
       ],
+    };
+    this._scenarioCard();
+  }
+
+  /** Straight after the mission: the scenario picker and what else there is to fly, then Next shows the result. */
+  _scenarioCard() {
+    const d = this.dash;
+    this.walk = null;
+    this._missionView();
+    const list = EXPERIMENT_SCENARIOS.map((id) => `<b>${id}</b> ${esc(SCENARIOS[id].label)}`).join(' · ');
+    this._render({
+      step: 'MISSION COMPLETE · MORE TO FLY',
+      title: 'Eight more scenarios are in this dropdown',
+      body: `${list}. Pick one at any time: the demo ends and that scenario flies with the same two drones, and the panels read the way you just saw them. F injects a Wi-Fi fade, G a 5G outage, X runs paired trials of the scenario on screen, D replays this demo.`,
+      target: () => d.refs.scenario,
+      actions: [{ label: 'Next', primary: true, run: () => this._render(this.endCard) }],
     });
-    setTimeout(() => {
-      if (!this.active) return;
-      this.dash.openExperiments({ scenario: 'A', trials: 10, speed: 60, autoRun: true, title: 'Experimental proof · scenario A · 10 paired trials' });
-    }, 1400);
+  }
+
+  // ── The panels a stop changed, one card each, read live ───────────────
+  _startWalk(keys, step) {
+    const cards = this._panelCards();
+    this.walk = keys.map((k) => cards[k] && { ...cards[k], key: k }).filter(Boolean);
+    this.walkStep = step ?? this.moment?.step ?? '';
+    if (this.walk.length) this._showWalk(0);
+  }
+
+  _showWalk(i) {
+    const c = this.walk[i];
+    this.shownPanels.add(c.key);
+    c.onShow?.();
+    this._render({ ...c, walkIdx: i, step: `${this.walkStep} · PANEL ${i + 1} / ${this.walk.length}` });
+  }
+
+  _panelCards() {
+    const d = this.dash;
+    const R = d.refs;
+    const e = this.engine;
+    const snap = e.snapshot;
+    const fp = snap.agents.flexipath;
+    const lg = snap.agents.legacy;
+    const dec = fp.decision ?? {};
+    const n = (v, digits = 1) => (Number.isFinite(v) ? v.toFixed(digits) : '—');
+    const mission = () => this._missionView();
+    const advanced = (tab) => () => {
+      if (d.view.theatre) d.setTheatre(false);
+      if (d.view.focus !== 'flexipath') d.setFocus('flexipath', { quiet: true });
+      if (d.view.mode !== 'advanced') d.setMode('advanced', { quiet: true });
+      if (d.view.charts) d.setCharts(false);
+      d.setPanelTab(tab);
+    };
+
+    // Live readings.
+    const pill = d._pillFor(fp, 'flexipath', snap.t);
+    const lgPill = d._pillFor(lg, 'legacy', snap.t);
+    const stage = fp.trace.stage ?? 'DETECT';
+    const stageCap = d.loop.cells[stage]?.cap.textContent ?? '';
+    const rec = d.decision.current;
+    const classes = strip(d.glance._classes(fp)).replace(/\s+(Critical|Voice|Bulk)/g, ' · $1');
+    const fpHol = fp.hol?.stats?.bulkHolPeakMs;
+    const lgHol = lg.hol?.stats?.bulkHolPeakMs;
+    const fpc = fp.trace.counts ?? { predictedFailures: 0, pathFailures: 0 };
+    const lgc = lg.trace.counts ?? { predictedFailures: 0, pathFailures: 0 };
+    const pred = dec.prediction;
+    const next = dec.prepared ?? dec.warmTarget ?? null;
+    const radio = dec.radio ?? {};
+    const radioLine = INTERFACE_IDS.map((id) => {
+      const st = id === dec.primary ? 'primary' : id === dec.replica && dec.replicationActive ? 'replica' : (RADIO_STATES[radio[id]]?.badge ?? radio[id] ?? '—').toLowerCase();
+      return `${linkName(id)} ${st}`;
+    }).join(' · ');
+    const flows = fp.flows ?? [];
+    const flowLine = flows
+      .map((f) => {
+        const on = f.cls === 'BULK' ? (dec.protecting ? 'paced, never copied' : 'one path') : dec.replicate?.[f.cls] ? 'on two paths' : 'one path';
+        return `${f.name} (${f.cls.toLowerCase()}): ${on}`;
+      })
+      .join('; ');
+    const tier = POWER_TIERS[fp.power?.tier ?? 0];
+    const events = e.events.slice(-2).map((ev) => `T+${ev.t.toFixed(1)} ${ev.engine === 'legacy' ? 'LG' : ev.engine === 'flexipath' ? 'FP' : ev.engine.toUpperCase()}: ${ev.message.split(' · ')[0]}`);
+    const m = { fp: fp.metrics ?? {}, lg: lg.metrics ?? {} };
+    const wired = INTERFACE_SPECS[dec.primary]?.tech === 'wired';
+    const trend = wired ? 'no radio trend on a wired link' : Number.isFinite(pred?.signalSlopeLong) ? `${pred.signalSlopeLong > 0 ? '+' : ''}${pred.signalSlopeLong.toFixed(1)} dB/s` : 'collecting';
+    const ttf = pred?.triggers?.context ? 'the carrier ends at dock release' : Number.isFinite(pred?.ttf) ? `time to failure ${secs(pred.ttf)} s` : Number.isFinite(pred?.projectedTtf) ? `projected failure in ${secs(pred.projectedTtf)} s` : 'no failure predicted';
+    const rebinds = fp.tunnel?.history?.length ?? 0;
+    const lgIp = lg.tunnel?.remoteIpChanges ?? 0;
+
+    return {
+      pill: {
+        title: 'The status pill — FlexiPath’s state right now',
+        body: `Now: <b>${esc(pill.text)}</b> · ${esc(pill.detail)}. Cyan means monitoring on one link with the other modems asleep; amber, a degradation is predicted; purple, critical traffic on two paths; green, a switch with a 0 ms gap; red, no usable path.`,
+        target: () => R.pill,
+        onShow: mission,
+      },
+      pillLegacy: {
+        title: 'The status pill — seen from the legacy stack',
+        body: `Now: <b>${esc(lgPill.text)}</b> · ${esc(lgPill.detail)}. Press 2 at any time to see the flight through the legacy stack, 1 to return to FlexiPath.`,
+        target: () => R.pill,
+        onShow: () => {
+          mission();
+          d.setFocus('legacy', { quiet: true });
+        },
+      },
+      loop: {
+        title: 'The decision loop — DETECT → PREDICT → PREPARE → REPLICATE → SWITCH → CONTINUE',
+        body: `Now at <b>${esc(stage)}</b>: ${esc(stageCap)}. A stage lights up when the controller actually reaches it, with the time it got there; a skipped stage says why (an abrupt outage cannot be predicted). Hover a stage for its caption.`,
+        target: () => R.loop,
+        onShow: mission,
+      },
+      decision: {
+        title: 'Why did FlexiPath do that? — the decision record',
+        body: `Latest: <b>${esc(rec?.headline ?? 'no decision yet')}</b>. ${rec?.action ? `Action: ${esc(sentence(rec.action))} ` : ''}Every decision is recorded with the values measured at that tick; Show details opens the current path and its status, the alternate and its score, and the radio tier. The grey line is what the legacy stack does at the same moment.`,
+        target: () => R.decision,
+        onShow: mission,
+      },
+      glance: {
+        title: 'At a glance — what is protected, and three numbers',
+        body: `Protection now: <b>${esc(classes || '—')}</b>. Radio power FlexiPath ${n(fp.power?.watts)} W vs Legacy ${n(lg.power?.watts)} W; longest bulk data stall ${n(fpHol, 0)} vs ${n(lgHol, 0)} ms; address changes seen by remote services ${fp.tunnel?.remoteIpChanges ?? 0} vs ${lgIp}. Hover a label for its definition.`,
+        target: () => R.glance,
+        onShow: mission,
+      },
+      lanes: {
+        title: 'The scoreboard — Legacy vs FlexiPath',
+        body: `Simulated interruption FlexiPath <b>${fp.stats.stallTime.toFixed(2)} s</b> vs Legacy <b>${lg.stats.stallTime.toFixed(2)} s</b>; critical packets lost ${fp.stats.criticalLost} vs ${lg.stats.criticalLost}; path failures acted on before the path failed ${fpc.predictedFailures}/${fpc.pathFailures} vs ${lgc.predictedFailures}/${lgc.pathFailures}. Show steps opens the step-by-step timeline of the latest handover for both stacks.`,
+        target: () => R.lanes,
+        onShow: mission,
+      },
+      history: {
+        title: 'The Advanced view — the decision record and its history',
+        body: `The same decision card with everything open, plus the <b>decision history</b>: ${plural(d.decision.records.length, 'decision')} so far; press a row to pin one and read the values it was made on. The tabs above pick a group of panels.`,
+        target: () => [R.tabBar, R.decision],
+        onShow: advanced('decision'),
+      },
+      prediction: {
+        title: 'Prediction · live and its internals (Advanced view)',
+        body: `Current link <b>${esc(linkName(dec.primary))}</b> ${esc(dec.primary ? fmtSignal(dec.primary, pred?.signal) : '')}, trend ${esc(trend)}, ${esc(ttf)}; next path ${next ? `<b>${esc(linkName(next))}</b> (${esc((RADIO_STATES[radio[next]]?.badge ?? radio[next] ?? '').toLowerCase())})` : 'none'}. The sparkline is the measured signal against the failure level, with the trend extrapolated to where it crosses it; the internals table lists every trigger’s live value against its threshold.`,
+        target: () => [R.prediction, R.internals],
+        onShow: advanced('prediction'),
+      },
+      links: {
+        title: 'Interface health — one card per modem (Advanced view)',
+        body: `Now: ${esc(radioLine)}. Each card shows signal, throughput, RTT, loss, jitter, a 0–100 score and the radio state; a modem asleep in DRX reports signal only, so its score is an estimate.`,
+        target: () => R.telemetry,
+        onShow: advanced('links'),
+      },
+      traffic: {
+        title: 'Traffic-aware protection and the flow inspector (Advanced view)',
+        body: `Now: ${esc(flowLine || 'no flows')}. Replication overhead so far ${n(fp.stats.overheadPct)} % of protected bytes; ${fp.hol?.stats?.duplicatesDiscarded ?? 0} late duplicates discarded at the receiver. The flow inspector below lists each flow’s rate and latency.`,
+        target: () => [R.traffic, R.flows],
+        onShow: advanced('traffic'),
+      },
+      session: {
+        title: 'Battery · ordering · session, and the relay tunnel (Advanced view)',
+        body: `Radio power ${n(fp.power?.watts)} W (${esc(tier.label.toLowerCase())}) vs Legacy ${n(lg.power?.watts)} W; head-of-line: critical and voice never wait, a bulk TCP stream stalls on loss (longest ${n(fpHol, 0)} ms). The tunnel to ${ANCHOR_IP} has rebound ${plural(rebinds, 'time')} and remote services never saw a change; the legacy stack’s address changed ${plural(lgIp, 'time')} (${lg.stats.tcpResets} TCP resets).`,
+        target: () => [R.engineering, R.tunnel],
+        onShow: advanced('session'),
+      },
+      controls: {
+        title: 'Simulation controls (Advanced view)',
+        body: `Focus FlexiPath or Legacy, show or hide the ghost drone, the fail-safe hover rule, the drone speed (${e.config.speedKmh} km/h), a reproducible seed (${esc(String(e.config.seed))}), fault injection (a Wi-Fi fade with F, a 5G outage with G) and the exports: a JSON with the full record and the 10 Hz CSV time series.`,
+        target: () => R.controls,
+        onShow: advanced('controls'),
+      },
+      log: {
+        title: 'The event log (Advanced view)',
+        body: `Every decision, fault and link event with its time, newest first, filterable by stack. Latest: ${events.length ? esc(events.reverse().join(' — ')) : 'none yet'}.`,
+        target: () => R.log,
+        onShow: advanced('log'),
+      },
+      charts: {
+        title: 'The six live charts — the last 60 s, FlexiPath against Legacy',
+        body: `Throughput ${n(m.fp.throughputMbps, 0)} vs ${n(m.lg.throughputMbps, 0)} Mbps, critical-flow latency ${n(m.fp.latencyMs, 0)} vs ${n(m.lg.latencyMs, 0)} ms, packet loss ${n(m.fp.lossPct)} vs ${n(m.lg.lossPct)} %, voice MOS ${n(m.fp.mos, 2)} vs ${n(m.lg.mos, 2)}, radio power ${n(m.fp.powerW)} vs ${n(m.lg.powerW)} W, bulk stall ${n(m.fp.bulkHolMs, 0)} vs ${n(m.lg.bulkHolMs, 0)} ms. Purple bands are replication bursts, red bands are legacy interruptions. The Charts button opens them in the Advanced view.`,
+        target: () => [R.chartsBtn, R.chartsRow],
+        onShow: () => {
+          advanced(d.view.tab ?? 'decision')();
+          d.setCharts(true);
+        },
+      },
+    };
   }
 }

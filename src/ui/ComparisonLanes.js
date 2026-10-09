@@ -68,12 +68,19 @@ export class ComparisonLanes {
     this.refs = {};
     root.querySelectorAll('[data-ref]').forEach((n) => (this.refs[n.dataset.ref] = n));
     // The Mission view shows the KPIs only; the step-by-step lanes open on demand.
-    this.refs.stepsBtn.addEventListener('click', () => {
-      const open = root.classList.toggle('is-open');
-      this.refs.stepsBtn.textContent = open ? 'Hide steps' : 'Show steps';
-      this.refs.stepsBtn.setAttribute('aria-expanded', String(open));
-    });
+    this.refs.stepsBtn.addEventListener('click', () => this.setOpen(!this.isOpen()));
     this.set = makeSetter();
+  }
+
+  isOpen() {
+    return this.root.classList.contains('is-open');
+  }
+
+  /** Mission view: open or close the step-by-step lanes under the KPIs. */
+  setOpen(open) {
+    this.root.classList.toggle('is-open', !!open);
+    this.refs.stepsBtn.textContent = open ? 'Hide steps' : 'Show steps';
+    this.refs.stepsBtn.setAttribute('aria-expanded', String(!!open));
   }
 
   _render(el, key, steps) {

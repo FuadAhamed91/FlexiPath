@@ -86,7 +86,7 @@ vehicles, nodes, beams, particles }` in the console.
 - `_summarizeAgent` defines the per-run metric keys. `SUMMARY_METRICS` / `COMPARISON_METRICS` in `ExperimentRunner`,
   the CSV exports, the Experiments panel (which reads some keys without null checks) and the README tables use them by
   name, so rename everywhere or not at all.
-- Scenarios (`mission`, `A`–`H`, the hidden `demo`, and the original matrix `baseline` / `wifi-fade` / `cell-outage`)
+- Scenarios (`mission`, `A`–`H`, and the original matrix `baseline` / `wifi-fade` / `cell-outage`)
   are defined once in `Scenarios.js` and shared by the live twin and the runner. Route X runs 0 → 240 scene units
   (1 unit = 5 m) across four zones; X must stay strictly increasing along the route (`sAtX`, X-triggered faults,
   `zoneAt` and the finish test rely on it).
@@ -192,6 +192,22 @@ vehicles, nodes, beams, particles }` in the console.
   - hidden panels keep updating, so a tab shows current values the moment it opens.
 
   A new Advanced panel needs a tab.
+- The guided demo (`GuidedDemo.js`, `D`, `?demo=1`) flies the full `mission` scenario (seed 2026, 60 km/h: three
+  handovers, dock → Wi-Fi → 5G → LEO) and owns the tour layer (`refs.tour`: a fixed card over the lower part of the
+  twin and a ring around the panel a card talks about). It is never scripted: one orientation card on the dock, then
+  engine events pause the simulation (`_moment`) and **nothing resumes by itself**. Each moment names the panels it
+  changed (`panels`, keys of `_panelCards`: the Mission panels, the Advanced tabs, the charts); a panel is explained
+  once in the demo (`shownPanels`) unless a stop marks it `'name!'` because its numbers are the point. Next steps
+  through them one card each, beside the ringed panel with a pointer (`_layout`: left of a right-hand panel, above a
+  bottom strip, below a top one), with the panel's live numbers from the snapshot and an `onShow` that switches view
+  / tab / charts / focus, and the last card resumes the flight after `_missionView` restores the Mission view. On `complete`, `_scenarioCard` first
+  (it rings the scenario picker and lists A–H; picking one goes through `Dashboard.setScenario`, which stops the demo),
+  then Next shows the end card, which
+  offers all of them (`ALL_PANELS`), 10 paired trials, a replay and `explore()` (leave the demo and restart the
+  mission). Captions while the flight runs (`_caption`) never replace a paused card. `Dashboard.togglePause` reports
+  the visitor's own pauses to `demo.onUserPause` (Hold flight, the play button and Space all pause the same way);
+  `→` / Enter next, `←` back; Exit resumes the flight. Keep the moment captions to two or three sentences, the
+  pauses to the real moments, and a stop's panel list to the panels that moment actually changed.
 - Lucide: an `<i data-lucide="name">` renders only if the icon is imported and added to `ICONS` in `Dashboard.js`,
   and `renderIcons(subtree)` runs after the HTML is injected.
 - Chart.js is tree-shaken: `BaseTimeSeriesChart.js` registers only the components it uses; register any new

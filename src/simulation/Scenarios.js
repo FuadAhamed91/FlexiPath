@@ -120,19 +120,6 @@ export const SCENARIOS = {
     shadows: [{ x0: 100, x1: 108, edge: 1, links: ['wlan0', 'wwan0'], depthDb: 60, label: 'New shadow (not on the map)' }],
     mapShadows: [CANYON],
   },
-  // Guided demo: scenario A, cut shortly after the legacy drone recovers.
-  demo: {
-    id: 'demo',
-    code: 'A',
-    hidden: true,
-    label: 'Guided demo · Wi-Fi → 5G',
-    description: 'Scenario A, shortened for the guided demonstration.',
-    startX: 40,
-    endX: 112,
-    rolling: true,
-    faults: [],
-    traffic: 'mixed',
-  },
   // Original benchmark matrix (kept for the CLI and earlier exports).
   baseline: {
     id: 'baseline',
