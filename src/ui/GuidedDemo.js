@@ -527,31 +527,27 @@ export class GuidedDemo {
       title: `FlexiPath flew the whole mission; the legacy drone had to ${lgStops ? `hover ${plural(lgStops, 'time')}` : 'wait'}`,
       body: `${this.switches} handovers on the same simulated radio. Simulated interruption: FlexiPath <b>${s.flexipath.stats.stallTime.toFixed(2)} s</b>, Legacy <b>${s.legacy.stats.stallTime.toFixed(2)} s</b>. One run is an example: 10 paired trials of this mission, 10 seeds, both stacks on identical conditions, give the evidence with 95 % confidence intervals.`,
       actions: [
-        { label: 'Next: try another scenario', primary: true, run: () => this._scenarioCard() },
-        { label: 'Run 10 paired trials', run: () => d.openExperiments({ scenario: 'mission', trials: 10, speed: 60, autoRun: true, title: 'Experimental proof · full mission · 10 paired trials' }) },
+        { label: 'Run 10 paired trials', primary: true, run: () => d.openExperiments({ scenario: 'mission', trials: 10, speed: 60, autoRun: true, title: 'Experimental proof · full mission · 10 paired trials' }) },
         { label: 'Show me every dashboard', run: () => this._startWalk(ALL_PANELS, 'MISSION COMPLETE') },
         { label: 'Replay demo', run: () => this.start() },
         { label: 'Explore freely', run: () => this.explore() },
       ],
     };
-    this._render(this.endCard);
+    this._scenarioCard();
   }
 
-  /** The last card: the scenario picker, with what else there is to fly. Picking one ends the demo and starts it. */
+  /** Straight after the mission: the scenario picker and what else there is to fly, then Next shows the result. */
   _scenarioCard() {
     const d = this.dash;
     this.walk = null;
     this._missionView();
     const list = EXPERIMENT_SCENARIOS.map((id) => `<b>${id}</b> ${esc(SCENARIOS[id].label)}`).join(' · ');
     this._render({
-      step: 'MISSION COMPLETE · TRY ANOTHER SCENARIO',
+      step: 'MISSION COMPLETE · MORE TO FLY',
       title: 'Eight more scenarios are in this dropdown',
-      body: `${list}. Pick one: the demo ends and that scenario flies with the same two drones; the panels then read the way you just saw them. Any time: F injects a Wi-Fi fade, G a 5G outage, X runs paired trials of the scenario on screen, D replays this demo.`,
+      body: `${list}. Pick one at any time: the demo ends and that scenario flies with the same two drones, and the panels read the way you just saw them. F injects a Wi-Fi fade, G a 5G outage, X runs paired trials of the scenario on screen, D replays this demo.`,
       target: () => d.refs.scenario,
-      actions: [
-        { label: 'Back to the result', run: () => this._render(this.endCard) },
-        { label: 'Explore freely', run: () => this.explore() },
-      ],
+      actions: [{ label: 'Next', primary: true, run: () => this._render(this.endCard) }],
     });
   }
 
