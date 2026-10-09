@@ -5,7 +5,7 @@
  * Three.js digital twin (60 fps, interpolated) and the HUD.
  *
  * URL parameters: ?scenario=mission|A…F&seed=2026&speed=60&mode=mission|advanced
- *                 &focus=flexipath|legacy&camera=chase|cinematic|overview&intro=0&paused=1&demo=1
+ *                 &focus=flexipath|legacy&camera=chase|cinematic|overview&intro=0&paused=1&demo=1 (guided tour)
  */
 import * as THREE from 'three';
 import { SimulationEngine } from './simulation/SimulationEngine.js';
@@ -79,6 +79,14 @@ async function boot() {
   };
   dashboard.setLook(params.look, { quiet: true });
   dashboard.hooks.onBeforeReset = () => particles.clear();
+  // The guided tour draws a spotlight around a drone: its position in viewport pixels, or null when it is behind the camera.
+  const projV = new THREE.Vector3();
+  dashboard.hooks.projectAgent = (id) => {
+    vehicles.getPosition(id, projV).project(sceneManager.camera);
+    if (projV.z > 1) return null;
+    const host = dashboard.refs.viewport;
+    return { x: ((projV.x + 1) / 2) * host.clientWidth, y: ((1 - projV.y) / 2) * host.clientHeight };
+  };
   dashboard.setCamera(params.camera);
 
   // A scenario may start anywhere on the route: snap the chase camera to the drones on reset, and show

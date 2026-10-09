@@ -8,7 +8,8 @@
  *   ADVANCED           decision loop · interface health · prediction internals · flow inspector ·
  *                      3D twin · controls · event log · 60 s charts (throughput, RTT, loss, MOS)
  *
- * Every panel reads the engine snapshot; nothing here holds simulation state of its own.
+ * Every panel reads the engine snapshot; nothing here holds simulation state of its own. The guided tour
+ * (GuidedDemo.js) spotlights the panels through their `refs` and the tour layer at the end of the markup.
  */
 import {
   createIcons,
@@ -49,6 +50,10 @@ import {
   Info,
   SkipForward,
   ChartLine,
+  MousePointerClick,
+  ChevronLeft,
+  ChevronRight,
+  Check,
 } from 'lucide';
 import { TelemetryPanel } from './TelemetryPanel.js';
 import { FlowInspector } from './FlowInspector.js';
@@ -119,6 +124,10 @@ const ICONS = {
   Info,
   SkipForward,
   ChartLine,
+  MousePointerClick,
+  ChevronLeft,
+  ChevronRight,
+  Check,
 };
 
 export function renderIcons(root = document) {
@@ -176,7 +185,7 @@ export class Dashboard {
 
     this.loop = new SystemLoop(this.refs.loop);
     this.prediction = new PredictionPanel(this.refs.prediction);
-    this.decision = new DecisionPanel(this.refs.decision);
+    this.decision = new DecisionPanel(this.refs.decision, { onChange: () => (this.dirty = true) });
     this.traffic = new TrafficPanel(this.refs.traffic);
     this.lanes = new ComparisonLanes(this.refs.lanes);
     this.engineering = new EngineeringPanel(this.refs.engineering);
@@ -280,7 +289,7 @@ export class Dashboard {
           <button type="button" class="btn btn-icon btn-fault-sm" data-fault="cell-outage" data-view="mission" title="Inject an abrupt 5G cell outage (G)" aria-label="Inject a 5G outage"><i data-lucide="tower-control"></i></button>
           <button type="button" class="btn btn-icon" data-ref="resetBtn" data-view="mission" title="Reset scenario, same seed (R)" aria-label="Reset the scenario"><i data-lucide="rotate-ccw"></i></button>
           <button type="button" class="btn" data-ref="chartsBtn" data-view="advanced" aria-pressed="false" title="Show or hide the six live charts"><i data-lucide="chart-line"></i>Charts</button>
-          <button type="button" class="btn btn-demo" data-ref="demoBtn" title="Guided demo (D)"><i data-lucide="presentation"></i>Guided demo</button>
+          <button type="button" class="btn btn-demo" data-ref="demoBtn" title="Guided tour: the screen, a live flight, the Advanced view and the proof (D)"><i data-lucide="presentation"></i>Guided tour</button>
           <button type="button" class="btn btn-icon btn-primary" data-ref="expBtn" title="Paired experiments (X)" aria-label="Paired experiments"><i data-lucide="flask-conical"></i></button>
           <button type="button" class="btn btn-icon" data-ref="infoBtn" title="Why FlexiPath? (I)" aria-label="Why FlexiPath?"><i data-lucide="info"></i></button>
         </div>
@@ -293,7 +302,7 @@ export class Dashboard {
           <div class="absolute inset-0 isolate" data-ref="canvasHost"></div>
           <div class="viewport-vignette"></div>
 
-          <div class="overlay-glass pointer-events-none absolute inset-x-3 top-3 px-3 pt-2 pb-2.5">
+          <div class="overlay-glass pointer-events-none absolute inset-x-3 top-3 px-3 pt-2 pb-2.5" data-ref="routeStrip">
             <div class="relative">
               <div class="flex">${zones}</div>
               <div class="absolute inset-x-0 bottom-0 h-[6px]" data-ref="shadowStrip"></div>
@@ -302,7 +311,7 @@ export class Dashboard {
             </div>
           </div>
 
-          <div class="fp-camctl absolute top-[62px] right-3 flex items-center gap-2">
+          <div class="fp-camctl absolute top-[62px] right-3 flex items-center gap-2" data-ref="camctl">
             <div class="seg overlay-glass" role="group" aria-label="Camera mode">
               <button type="button" class="px-2.5" data-cam="chase" aria-pressed="true"><i data-lucide="crosshair"></i>Chase</button>
               <button type="button" class="px-2.5" data-cam="cinematic" aria-pressed="false"><i data-lucide="video"></i>Cinematic</button>
@@ -323,20 +332,6 @@ export class Dashboard {
 
           <div class="offscreen-chip" data-ref="offscreen" hidden aria-hidden="true"></div>
 
-          <div class="demo-caption" data-ref="caption" hidden role="status" aria-live="polite">
-            <div class="flex items-center justify-between gap-2">
-              <span class="step" data-ref="capStep"></span>
-              <div class="flex shrink-0 gap-1.5">
-                <button type="button" class="btn h-[24px]! px-2! text-[10.5px]!" data-ref="capNext"><i data-lucide="skip-forward"></i>Next</button>
-                <button type="button" class="btn h-[24px]! px-2! text-[10.5px]!" data-ref="capExit">Exit demo</button>
-              </div>
-            </div>
-            <div class="title" data-ref="capTitle"></div>
-            <div class="body" data-ref="capBody"></div>
-            <div class="mt-2 flex flex-wrap gap-1.5 empty:hidden" data-ref="capActions"></div>
-            <div class="bar"><span data-ref="capBar"></span></div>
-          </div>
-
           <div class="intro-overlay" data-ref="intro" hidden>
             <div class="intro-card">
               <div class="hud-label">FLEXIPATH · SIMULATION PROTOTYPE</div>
@@ -344,7 +339,7 @@ export class Dashboard {
               <p>Predict the degradation. Prepare the next path. Protect what matters. Continue without waiting for failure.</p>
               <p class="text-[12px]! text-slate-600!">A predictive, traffic-aware connectivity engine for heterogeneous networks, shown beside a legacy break-before-make stack under identical simulated conditions.</p>
               <div class="mt-5 flex flex-wrap justify-center gap-2">
-                <button type="button" class="btn btn-demo h-[36px]! px-4!" data-intro="demo"><i data-lucide="presentation"></i>Start guided demo</button>
+                <button type="button" class="btn btn-demo h-[36px]! px-4!" data-intro="demo"><i data-lucide="presentation"></i>Start the guided tour</button>
                 <button type="button" class="btn h-[36px]! px-4!" data-intro="explore"><i data-lucide="play"></i>Explore freely</button>
                 <button type="button" class="btn h-[36px]! px-4!" data-intro="why"><i data-lucide="info"></i>Why FlexiPath?</button>
               </div>
@@ -365,7 +360,7 @@ export class Dashboard {
               .join('')}
           </div>
 
-          <div class="overlay-glass absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-2 px-2 py-1.5">
+          <div class="overlay-glass absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-2 px-2 py-1.5" data-ref="playbar">
             <button type="button" class="btn btn-primary w-[34px] px-0!" data-ref="play" aria-label="Pause simulation"><i data-lucide="pause"></i></button>
             <div class="seg p-[2px]!" role="group" aria-label="Simulation rate">
               ${[0.5, 1, 2, 4].map((r) => `<button type="button" class="h-[24px]! px-2.5! font-mono" data-rate="${r}" aria-pressed="${r === 1}">${r}×</button>`).join('')}
@@ -405,6 +400,7 @@ export class Dashboard {
       </section>
     </div>
     <div class="toast-stack" data-ref="toasts" aria-live="polite"></div>
+    <div class="tour-layer" data-ref="tour"></div>
     <div class="modal-backdrop" hidden data-ref="modal" role="dialog" aria-modal="true">
       <div class="hud-panel hud-scroll max-h-[90vh] w-[min(900px,100%)] overflow-y-auto" data-ref="modalBody"></div>
     </div>`;
@@ -460,11 +456,7 @@ export class Dashboard {
     this.refs.play.addEventListener('click', () => this.togglePause());
     this.refs.help.addEventListener('click', () => this.openInfo());
     this.refs.theatre.addEventListener('click', () => this.setTheatre(!this.view.theatre));
-    this.refs.legendBtn.addEventListener('click', () => {
-      const on = this.refs.shell.dataset.legend !== '1';
-      this.refs.shell.dataset.legend = on ? '1' : '0';
-      this.refs.legendBtn.setAttribute('aria-pressed', String(on));
-    });
+    this.refs.legendBtn.addEventListener('click', () => this.setLegend(this.refs.shell.dataset.legend !== '1'));
     this.refs.look.addEventListener('click', () => this.setLook(this.view.look === 'real' ? 'twin' : 'real'));
     this.refs.modal.addEventListener('click', (e) => {
       if (e.target === this.refs.modal) this.closeModal();
@@ -504,6 +496,7 @@ export class Dashboard {
         return;
       }
       if (!this.refs.modal.hidden) return;
+      if (this.demo.active && this.demo.onKey(key)) return e.preventDefault();
       const actions = {
         ' ': () => this.togglePause(),
         r: () => this.restart(),
@@ -816,6 +809,13 @@ export class Dashboard {
     const paused = typeof force === 'boolean' ? force : !this.engine.paused;
     this.engine.setPaused(paused);
     this._updatePlay();
+    this.demo.onUserPause(paused);
+  }
+
+  /** The beam legend in the twin's corner (the list button in the playback bar). */
+  setLegend(on) {
+    this.refs.shell.dataset.legend = on ? '1' : '0';
+    this.refs.legendBtn.setAttribute('aria-pressed', String(on));
   }
 
   _updatePlay() {
@@ -904,7 +904,7 @@ export class Dashboard {
     el.style.top = `${y}px`;
   }
 
-  // ── Intro, guided demo captions ─────────────────────────────────────────
+  // ── Intro and guided tour ────────────────────────────────────────────────
   showIntro() {
     this.refs.intro.hidden = false;
     this.engine.setPaused(true);
@@ -915,42 +915,9 @@ export class Dashboard {
     this.refs.intro.hidden = true;
   }
 
+  /** The guided tour (GuidedDemo.js): onboarding, the live flight, the Advanced view and the proof. */
   startDemo() {
     this.demo.start();
-  }
-
-  showCaption({ step, title, body, holdMs = 0, onNext, onExit, actions = [] }) {
-    const r = this.refs;
-    r.capStep.textContent = step ?? '';
-    r.capTitle.textContent = title ?? '';
-    r.capBody.textContent = body ?? '';
-    r.caption.hidden = false;
-    this.refs.shell.dataset.demo = '1';
-    r.capNext.hidden = !onNext;
-    r.capNext.onclick = onNext ? () => onNext() : null;
-    r.capExit.onclick = () => onExit?.();
-    r.capActions.innerHTML = '';
-    for (const a of actions) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = `btn h-[26px]! px-2.5! text-[11px]! ${a.primary ? 'btn-primary' : ''}`;
-      b.textContent = a.label;
-      b.addEventListener('click', () => a.run());
-      r.capActions.append(b);
-    }
-    const bar = r.capBar;
-    bar.style.transition = 'none';
-    bar.style.width = '0%';
-    if (holdMs > 0) {
-      void bar.offsetWidth;
-      bar.style.transition = `width ${holdMs}ms linear`;
-      bar.style.width = '100%';
-    }
-  }
-
-  hideCaption() {
-    this.refs.caption.hidden = true;
-    this.refs.shell.dataset.demo = '0';
   }
 
   // ── Modals ──────────────────────────────────────────────────────────────

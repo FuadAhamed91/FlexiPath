@@ -192,6 +192,15 @@ vehicles, nodes, beams, particles }` in the console.
   - hidden panels keep updating, so a tab shows current values the moment it opens.
 
   A new Advanced panel needs a tab.
+- The guided tour (`GuidedDemo.js`, `D`, `?demo=1`) owns the tour layer (`refs.tour`: a fixed spotlight whose huge
+  box-shadow dims the rest, and the card). Part 1 holds the demo scenario at T+0 and spotlights HUD elements through
+  the dashboard `refs` (`routeStrip`, `camctl`, `playbar`, `pill`, `loop`, `decision`, `glance`, `lanes`, `toolbar`,
+  the tab and mode buttons) or a drone (`hooks.projectAgent`, set in `main.js`); a step's `expect` is a predicate
+  polled every frame with a "Do it for me" fallback (`run`) and an optional `then` card. Part 2 is the live flight:
+  engine events pause the simulation and caption the moment (never scripted); `Dashboard.togglePause` reports the
+  visitor's own pauses to `demo.onUserPause`, which holds the beat (pressing play during part 1 launches the flight).
+  Part 3 walks the Advanced tabs after `complete`; part 4 opens the Experiments window. Keep the tour's targets in
+  step with the dashboard markup: a missing ref gives a card without a spotlight, not an error.
 - Lucide: an `<i data-lucide="name">` renders only if the icon is imported and added to `ICONS` in `Dashboard.js`,
   and `renderIcons(subtree)` runs after the HTML is injected.
 - Chart.js is tree-shaken: `BaseTimeSeriesChart.js` registers only the components it uses; register any new

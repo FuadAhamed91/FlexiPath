@@ -66,8 +66,10 @@ function altText(a) {
 }
 
 export class DecisionPanel {
-  constructor(root) {
+  /** @param {{onChange?: Function}} [opts] onChange: the visitor expanded the card or pinned a record (re-render needed) */
+  constructor(root, { onChange } = {}) {
     this.root = root;
+    this.onChange = onChange;
     root.innerHTML = `
       <div class="flex items-start justify-between gap-2 px-3 pt-3 pb-1">
         <div>
@@ -102,10 +104,7 @@ export class DecisionPanel {
     this.refs = {};
     root.querySelectorAll('[data-ref]').forEach((n) => (this.refs[n.dataset.ref] = n));
     this.refs.follow.addEventListener('click', () => this.select(null));
-    this.refs.more.addEventListener('click', () => {
-      this.expanded = !this.expanded;
-      this._applyCompact();
-    });
+    this.refs.more.addEventListener('click', () => this.setExpanded(!this.expanded));
     this.compactMode = false;
     this.expanded = false;
     this.refs.history.addEventListener('click', (e) => {
@@ -125,6 +124,13 @@ export class DecisionPanel {
   setCompact(on) {
     this.compactMode = !!on;
     this._applyCompact();
+  }
+
+  /** Mission view: show or hide the details of the card ("Show details"). */
+  setExpanded(on) {
+    this.expanded = !!on;
+    this._applyCompact();
+    this.onChange?.();
   }
 
   _applyCompact() {
@@ -152,6 +158,13 @@ export class DecisionPanel {
   select(idx) {
     this.pinned = idx;
     this._dirty = true;
+    this.onChange?.();
+  }
+
+  /** Pin the newest record in the history (the guided tour's "do it for me"). */
+  pinFirst() {
+    const b = this.refs.history.querySelector('[data-idx]');
+    if (b) this.select(Number(b.dataset.idx));
   }
 
   get current() {
