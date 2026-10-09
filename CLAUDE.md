@@ -196,9 +196,11 @@ vehicles, nodes, beams, particles }` in the console.
   handovers, dock → Wi-Fi → 5G → LEO) and owns the tour layer (`refs.tour`: a fixed card over the lower part of the
   twin and a ring around the panel a card talks about). It is never scripted: one orientation card on the dock, then
   engine events pause the simulation (`_moment`) and **nothing resumes by itself**. Each moment names the panels it
-  changed (`panels`, keys of `_panelCards`: the Mission panels, the Advanced tabs, the charts); Next steps through
-  them one card each, with the panel's live numbers from the snapshot and an `onShow` that switches view / tab /
-  charts / focus, and the last card resumes the flight after `_missionView` restores the Mission view. The end card
+  changed (`panels`, keys of `_panelCards`: the Mission panels, the Advanced tabs, the charts); a panel is explained
+  once in the demo (`shownPanels`) unless a stop marks it `'name!'` because its numbers are the point. Next steps
+  through them one card each, beside the ringed panel with a pointer (`_layout`: left of a right-hand panel, above a
+  bottom strip, below a top one), with the panel's live numbers from the snapshot and an `onShow` that switches view
+  / tab / charts / focus, and the last card resumes the flight after `_missionView` restores the Mission view. The end card
   offers all of them (`ALL_PANELS`), 10 paired trials, a replay and `explore()` (leave the demo and restart the
   mission). Captions while the flight runs (`_caption`) never replace a paused card. `Dashboard.togglePause` reports
   the visitor's own pauses to `demo.onUserPause` (Hold flight, the play button and Space all pause the same way);

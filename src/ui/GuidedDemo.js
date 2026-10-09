@@ -18,7 +18,8 @@ import { esc, fmtSignal, linkName } from './format.js';
 
 const BURST_MS = Math.round(POWER_PARAMS.burstWindowS * 1000);
 const W = POWER_PARAMS.tierWatts;
-const MARGIN = 12;
+const MARGIN = 12; // card / window edge
+const GAP = 16; // card / ring
 /** Every dashboard, in walk order (the mission end card offers them all). */
 const ALL_PANELS = ['pill', 'loop', 'decision', 'glance', 'lanes', 'history', 'prediction', 'links', 'traffic', 'session', 'controls', 'log', 'charts'];
 
@@ -56,6 +57,7 @@ export class GuidedDemo {
     host.innerHTML = `
       <div class="tour-spot" data-ref="spot" hidden></div>
       <div class="tour-card" data-ref="card" hidden role="status" aria-live="polite">
+        <span class="arrow" data-ref="arrow" hidden></span>
         <div class="flex items-center justify-between gap-2">
           <span class="step" data-ref="step"></span>
           <div class="flex shrink-0 items-center gap-1.5">
@@ -90,6 +92,7 @@ export class GuidedDemo {
     this.lgLost = 0; // legacy interruptions so far
     this.lgBack = 0; // legacy recoveries so far
     this.predictedFor = null; // handover index whose prediction was already told
+    this.shownPanels = new Set(); // a panel is explained once; a stop repeats one only with a '!' (its numbers are the point)
     this.walk = null;
     this.endCard = null;
     const e = this.engine;
@@ -282,7 +285,11 @@ export class GuidedDemo {
     return Number.isFinite(l) ? { left: l, top: tp, width: r - l, height: b - tp } : null;
   }
 
-  /** The ring marks the panel the card talks about while the flight is paused; the card keeps out of its way. */
+  /**
+   * The ring marks the panel the card talks about while the flight is paused, and the card sits right next to
+   * it with a pointer (left of a right-hand panel, above a bottom strip, below a top one). A card with no panel
+   * floats over the lower part of the twin.
+   */
   _layout() {
     const s = this.spec;
     if (!s) return;
@@ -306,38 +313,78 @@ export class GuidedDemo {
     }
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    const v = this.dash.refs.viewport.getBoundingClientRect();
+    const anchored = rect ? '1' : '0';
+    if (R.card.dataset.anchored !== anchored) R.card.dataset.anchored = anchored;
     const w = R.card.offsetWidth;
     const h = R.card.offsetHeight;
-    const x = clamp(v.left + v.width / 2 - w / 2, MARGIN, vw - w - MARGIN);
-    let y = v.bottom - h - 64;
-    if (y < MARGIN || v.bottom < h + 80) {
-      // The twin is scrolled away (small screens): keep the card clear of the ringed panel.
-      y = rect && rect.top + rect.height / 2 < vh / 2 ? vh - h - MARGIN : MARGIN;
-    }
-    if (rect && y < rect.top + rect.height + 6 && y + h > rect.top - 6) {
-      const above = rect.top - h - 10;
-      const below = rect.top + rect.height + 10;
-      y = above >= MARGIN ? above : Math.min(below, vh - h - MARGIN);
+    let x;
+    let y;
+    let place = null;
+    let ax = 0;
+    let ay = 0;
+    if (rect) {
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      const order = rect.left > vw * 0.55 ? ['left', 'top', 'bottom', 'right'] : cy > vh * 0.6 ? ['top', 'left', 'right', 'bottom'] : ['bottom', 'left', 'right', 'top'];
+      for (const p of order) {
+        if (p === 'left') {
+          x = rect.left - GAP - w;
+          y = clamp(cy - h / 2, MARGIN, vh - h - MARGIN);
+          if (x >= MARGIN) place = p;
+        } else if (p === 'right') {
+          x = rect.left + rect.width + GAP;
+          y = clamp(cy - h / 2, MARGIN, vh - h - MARGIN);
+          if (x + w <= vw - MARGIN) place = p;
+        } else if (p === 'top') {
+          y = rect.top - GAP - h;
+          x = clamp(cx - w / 2, MARGIN, vw - w - MARGIN);
+          if (y >= MARGIN) place = p;
+        } else {
+          y = rect.top + rect.height + GAP;
+          x = clamp(cx - w / 2, MARGIN, vw - w - MARGIN);
+          if (y + h <= vh - MARGIN) place = p;
+        }
+        if (place) break;
+      }
+      if (place) {
+        ax = clamp(cx - x, 18, w - 18);
+        ay = clamp(cy - y, 18, h - 18);
+      } else {
+        // No room beside it (a small screen): the edge of the window that is clear of the ring.
+        x = clamp(cx - w / 2, MARGIN, vw - w - MARGIN);
+        y = cy < vh / 2 ? vh - h - MARGIN : MARGIN;
+      }
+    } else {
+      const v = this.dash.refs.viewport.getBoundingClientRect();
+      x = clamp(v.left + v.width / 2 - w / 2, MARGIN, vw - w - MARGIN);
+      y = clamp(v.bottom - h - 64, MARGIN, vh - h - MARGIN);
     }
     y = clamp(y, MARGIN, Math.max(MARGIN, vh - h - MARGIN));
-    const key = `${x | 0},${y | 0}`;
+    const key = `${x | 0},${y | 0},${place},${ax | 0},${ay | 0}`;
     if (L.card !== key) {
       L.card = key;
       R.card.style.left = `${x}px`;
       R.card.style.top = `${y}px`;
+      R.card.dataset.place = place ?? 'none';
+      R.card.style.setProperty('--ax', `${ax}px`);
+      R.card.style.setProperty('--ay', `${ay}px`);
+      R.arrow.hidden = !place;
     }
   }
 
   // ── Moments ───────────────────────────────────────────────────────────
-  /** A real moment: pause the flight and wait for the visitor (step through the panels it changed, or resume). */
+  /**
+   * A real moment: pause the flight and wait for the visitor (step through the panels it changed, or resume).
+   * A panel is explained once in the demo; a stop lists it again only with a '!' when its numbers are the point.
+   */
   _moment(spec) {
     const e = this.engine;
     if (!e.completed) {
       e.setPaused(true);
       this.dash._updatePlay();
     }
-    this.moment = { ...spec, panels: spec.panels ?? [], resumeLabel: spec.resumeLabel ?? 'Resume the flight' };
+    const panels = (spec.panels ?? []).filter((k) => k.endsWith('!') || !this.shownPanels.has(k)).map((k) => k.replace(/!$/, ''));
+    this.moment = { ...spec, panels, resumeLabel: spec.resumeLabel ?? 'Resume the flight' };
     this.walk = null;
     this._render(this.moment);
   }
@@ -375,7 +422,7 @@ export class GuidedDemo {
           title: dock ? 'Dock release — the wired link is about to end' : `${cur} is fading — FlexiPath predicts it`,
           body: `${dock ? '' : 'Measured: '}${esc(sentence(r?.reason ?? ev.message))} It wakes the ${esc(next)} modem now and validates it while ${esc(cur)} still works; the legacy drone will notice nothing until ${esc(cur)} is gone.`,
           target: () => R.loop,
-          panels: n === 0 ? ['pill', 'loop', 'decision', 'glance', 'prediction', 'links'] : n === 1 ? ['loop', 'decision', 'prediction', 'links'] : ['prediction', 'links'],
+          panels: n === 0 ? ['pill', 'loop', 'decision', 'glance', 'prediction', 'links'] : n === 1 ? ['loop', 'decision', 'prediction!', 'links'] : ['prediction', 'links'],
         });
       } else if (ev.code === 'TREND_OFF' && this.predictedFor === n) {
         // Honest behaviour: a trend that reverses releases the prediction without spending anything.
@@ -394,7 +441,7 @@ export class GuidedDemo {
             title: `Critical traffic now rides ${from} and ${to} at once`,
             body: `${esc(from)} is about to fail, so for ${BURST_MS} ms every critical packet (purple) goes on both paths and the receiver keeps whichever copy arrives first; video and uploads are not duplicated. The radio draws ${W[2]} W for this window only.`,
             target: () => R.glance,
-            panels: ['glance', 'traffic', 'session'],
+            panels: ['glance!', 'traffic', 'session'],
           });
           this.dash.setRate(0.5); // slow motion while both paths carry critical traffic
         } else this._caption({ step: 'REPLICATE', title: `${BURST_MS} ms burst: critical traffic on ${from} and ${to}`, body: esc(ev.message) });
@@ -444,7 +491,7 @@ export class GuidedDemo {
             title: 'Same corridor, same radio — the difference so far',
             body: `Simulated interruption: FlexiPath <b>${s.flexipath.stats.stallTime.toFixed(2)} s</b>, Legacy <b>${s.legacy.stats.stallTime.toFixed(2)} s</b>. Radio power on average: FlexiPath ${A.flexipath.power.state.meanWatts.toFixed(2)} W, Legacy ${A.legacy.power.state.meanWatts.toFixed(2)} W. Address changes remote services saw: Legacy ${A.legacy.tunnel.state.remoteIpChanges}, FlexiPath ${A.flexipath.tunnel.state.remoteIpChanges} — it always shows the anchor ${ANCHOR_IP}.`,
             target: () => R.glance,
-            panels: ['glance', 'lanes', 'session', 'charts'],
+            panels: ['glance', 'lanes!', 'session', 'charts'],
           });
         } else this._caption({ step: 'LEGACY OS', title: `Legacy is back on ${linkName(ev.to)}`, body: `${esc(sentence(ev.message))} With a new address, so every TCP session was reset. FlexiPath never stopped.` });
       }
@@ -490,13 +537,14 @@ export class GuidedDemo {
   // ── The panels a stop changed, one card each, read live ───────────────
   _startWalk(keys, step) {
     const cards = this._panelCards();
-    this.walk = keys.map((k) => cards[k]).filter(Boolean);
+    this.walk = keys.map((k) => cards[k] && { ...cards[k], key: k }).filter(Boolean);
     this.walkStep = step ?? this.moment?.step ?? '';
     if (this.walk.length) this._showWalk(0);
   }
 
   _showWalk(i) {
     const c = this.walk[i];
+    this.shownPanels.add(c.key);
     c.onShow?.();
     this._render({ ...c, walkIdx: i, step: `${this.walkStep} · PANEL ${i + 1} / ${this.walk.length}` });
   }
