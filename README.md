@@ -76,11 +76,11 @@ HoL stall**. They record the whole run while hidden. The **guided demo** (`D`, `
 (dock → Wi-Fi → 5G → LEO, three handovers) and pauses the simulation at each real moment — the prediction, the
 replication burst, the switch, the legacy interruption and its recovery — with a short caption of what is happening,
 built from the decision record and the measured values of that tick, and a ring on the dashboard panel where it
-shows. Nothing resumes by itself: from a paused moment the visitor resumes the flight, or first walks through every
-dashboard — the five Mission panels, then the Advanced view tab by tab, then the six charts — one card per panel,
-each ringing that panel and reading its live numbers at that moment; the last card resumes the flight. Hold flight,
-the play button and Space pause the running flight the same way. It ends with the result of the mission and a button
-for 10 paired trials. **Experiments** (`X`) runs paired trials and shows the
+shows. Nothing resumes by itself: from a paused moment, Next steps through the panels that moment changed — the
+Mission panels, the Advanced view's tabs or the charts, as the moment needs — one card per panel, each ringing that
+panel and reading its live numbers; the last card resumes the flight, back in the Mission view, from where it
+paused. Hold flight, the play button and Space pause the running flight the same way. It ends with the result of the
+mission and buttons for 10 paired trials, a walk through every dashboard, a replay or free exploration. **Experiments** (`X`) runs paired trials and shows the
 existing-mechanisms comparison on the same runs.
 
 ## Measured results (simulation)
