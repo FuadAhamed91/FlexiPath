@@ -33,8 +33,10 @@ There is no test suite, linter or type checker. Verify changes with `npm run bui
   also `--no-failsafe`, `--out <dir>`, `--baselines mptcp,redundant` (default) or `none`, `--ablations
   fpNoPred,fpNoBurst,fpNoMap` (default) or `none`, and `--seed-block dev` (default: `1000 + 7919·i`, the block FlexiPath
   was tuned on) or `test` (held out: `900001 + 7919·i`), and `--failsafe-ms 1000` (the hover rule, default 300 ms =
-  piloted flight; 1000 = waypoint flight, 3GPP TS 22.125; non-default runs get `_failsafe<ms>ms` file names). The
-  default is scenarios A–H × 5 seeds × 30/60/90/120 km/h = 160 paired runs.
+  piloted flight; 1000 = waypoint flight, 3GPP TS 22.125) and `--wake-ms 260` (sensitivity: every multipath stack's
+  modem wake, default 100 ms; it overrides `POWER_PARAMS` / `MULTIPATH_PARAMS` before the runs). Non-default runs get
+  `_failsafe<ms>ms` / `_wake<ms>ms` file names. The default is scenarios A–H × 5 seeds × 30/60/90/120 km/h = 160
+  paired runs.
 - Runs are deterministic per seed. For a change that must not alter behaviour, benchmark into two `--out` dirs (before
   and after) and compare: both CSVs must be byte-identical; the JSON differs only in `meta` (timestamps, wall time).
   The baselines and ablations never change FlexiPath / Legacy values: a `--baselines none --ablations none` run

@@ -284,6 +284,63 @@ used before). The conclusions hold:
 The ablation and prediction results also carry over (trend prediction: +11 to +25 lost packets per flight when off in
 A–E; map: 0.18 s gap when off in G; recall and precision within a few points).
 
+### Checked against published measurements
+
+The challenge welcomes real-world measurements but does not require them. Instead of one laptop test, the model's key
+parameters are compared here with published measurements, Linux defaults and 3GPP requirements. The last column says
+which way the model leans. Where it leans towards the multipath stacks, the benchmark was re-run with the measured value
+(next section).
+
+| What | In the model | Published real-world value | Source | Which way the model leans |
+| --- | --- | --- | --- | --- |
+| Wi-Fi loss detection (legacy) | 1.0 s | Linux declares a beacon loss after 7 missed beacons (≈ 0.72 s at the usual 102.4 ms interval), then waits 500 ms per probe of the access point before it disconnects | [Linux mac80211][linux-mlme] | Shorter than Linux: generous to the legacy stack |
+| Wi-Fi scan + re-association | 0.8 s (scan and attach to the fallback network) | 399.8 ms on average for one card, access point to access point, link layer only; scanning is over 90 % of it | [Mishra et al., 2003][mishra] | Same order; the measured figure leaves out DHCP and the IP layer |
+| TCP retransmission timeout (how reactive multipath notices loss) | 250 ms | Linux minimum 200 ms; RFC 6298 recommends at least 1 s | [Linux `tcp.h`][linux-tcp], [RFC 6298][rfc6298] | Between the two |
+| Cell-to-cell handover | Not modelled | 76 ms (LTE), 110 ms (5G standalone), 167 ms (5G non-standalone) on average, on US commercial networks; data stops for 59 % of a non-standalone handover | [Hassan et al., SIGCOMM 2022][hassan] | Real flights add ≈ 0.1 s handovers for every stack. FlexiPath's 0.16 s abrupt-outage gap is the size of one such handover |
+| Waking a sleeping modem | 100 ms | 260 ms for an LTE phone leaving RRC_IDLE (2012); 3GPP's 5G target from a battery-saving state is 10 ms | [Huang et al., MobiSys 2012][huang], [3GPP TR 38.913 §7.4][tr38913] | Optimistic for an idle LTE modem: re-run with 260 ms below |
+| Modem sleep cycle | 1.28 s | 1.28 s (LTE RRC_IDLE DRX cycle) | [Huang et al., 2012][huang] | Matches |
+| Cellular radio power | 1.2 W one radio · 1.8 W warm probe · 3.4 W burst (system draw) | 1.06 W (LTE tail), 1.21 W (promotion), up to 3.3 W (fast uplink) | [Huang et al., 2012][huang] | Same order |
+| LEO round trip | 65 ms base | Starlink median ≈ 40–50 ms (M-Lab speed tests); ≈ 40 ms from the dish to Starlink's point of presence (RIPE Atlas) | [Mohan et al., WWW 2024][mohan] | Slower than Starlink: conservative for any stack on the satellite |
+| LEO path stability | Steady | Network-wide reconfiguration every 15 s, with brief sub-second disruptions | [Mohan et al., 2024][mohan] | Not modelled: real time on the satellite is bumpier |
+| LEO terminal power | The same three tiers as the other modems | Starlink Mini: 20–40 W on average, 15 W idle | [Starlink Help Centre][starlink-mini] | Not modelled: time on (or warm on) the satellite costs far more power in reality |
+| C2 timing | Hover after 300 ms (piloted) or 1 s (waypoints) | 40 ms per command (stick steering, ≤ 60 km/h); 1 s (waypoints, ≤ 300 km/h) | [3GPP TS 22.125 §7.2][ts22125] | See [The hover rule](#the-hover-rule-piloted-vs-waypoint-flight) |
+
+### Sensitivity: a slower modem wake
+
+`npm run benchmark -- --wake-ms 260` re-runs the benchmark with the measured LTE wake for every multipath stack (260 ms
+instead of 100 ms). The legacy stack has no sleeping spare, so its numbers do not change.
+
+| Scenario | Kept C2, piloted rule: 100 → 260 ms wake (LG · MP · RD · FP, %) | Longest gap, FlexiPath / reactive multipath (s) | FlexiPath − reactive multipath, critical delivery (pp, 95 % CI) |
+| --- | --- | --- | --- |
+| A | unchanged: 0 · 100 · 100 · 100 | 0 / 0 → 0 / 0 | +0.64 ± 0.17 → +0.91 ± 0.27 |
+| B | unchanged: 0 · 100 · 100 · 100 | 0 / 0 → 0 / 0 | +0.79 ± 0.18 → +1.08 ± 0.24 |
+| C | unchanged: 0 · 100 · 100 · 100 | 0 / 0 → 0 / 0 | +0.70 ± 0.21 → +0.97 ± 0.27 |
+| D | 0 · 0 · 100 · 100 → 0 · 0 · 100 · 0 | 0.16 / 0.35 → 0.32 / 0.51 | +1.22 ± 0.15 → +1.47 ± 0.16 |
+| G | unchanged: 0 · 0 · 40 · 100 | 0 / 0.35 → 0 / 0.51 | +0.87 ± 0.15 → +1.33 ± 0.18 |
+| H | 0 · 0 · 100 · 100 → 0 · 0 · 100 · 20 | 0.10 / 0.35 → 0.26 / 0.51 | +0.73 ± 0.23 → +1.00 ± 0.37 |
+
+- **Predicted failures do not pay the wake.** In A–C and G FlexiPath wakes the next modem seconds before it needs it,
+  so nothing changes for it. Reactive multipath pays the full wake on every move: its gaps grow to 0.51 s, and
+  FlexiPath's delivery lead grows by a third to a half.
+- **Unpredicted failures do.** D's cell outage and H's unmapped shadow cost FlexiPath detection plus the wake, 0.26–0.32
+  s. Under the piloted rule it then hovers on all 20 flights of D and 16 of 20 in H; only always duplicate, which never
+  waits for a modem, keeps C2 there. Under the waypoint rule (1 s) every multipath stack still keeps C2 in every
+  scenario (`--wake-ms 260 --failsafe-ms 1000`).
+- **What it means for a design:** a drone flown by stick needs its spare modem in a state that resumes well inside the
+  budget (5G RRC_INACTIVE or connected-mode DRX), or permanent duplication of its C2. The model's 100 ms assumes the
+  former. This is guideline 6 in [docs/qos-qoe-guidelines.md](docs/qos-qoe-guidelines.md).
+
+[linux-mlme]: https://github.com/torvalds/linux/blob/master/net/mac80211/mlme.c
+[linux-tcp]: https://github.com/torvalds/linux/blob/master/include/net/tcp.h
+[rfc6298]: https://www.rfc-editor.org/rfc/rfc6298
+[mishra]: https://drum.lib.umd.edu/items/05f9c530-8b14-4514-b530-229e1318b219
+[hassan]: https://www-users.cse.umn.edu/~fengqian/paper/5g_mobility_sigcomm22.pdf
+[huang]: https://doi.org/10.1145/2307636.2307658
+[tr38913]: https://www.3gpp.org/DynaReport/38913.htm
+[mohan]: https://arxiv.org/abs/2310.09242
+[starlink-mini]: https://www.starlink.com/support/article/a7fe6525-5356-a837-48e6-33df176cdbc5
+[ts22125]: https://www.3gpp.org/DynaReport/22125.htm
+
 ### Guidelines for QoS / QoE
 
 The full guidelines, each with its evidence, are in [docs/qos-qoe-guidelines.md](docs/qos-qoe-guidelines.md):
@@ -491,7 +548,7 @@ Keys: `Space` pause · `M` mission / advanced · `D` guided demo · `X` experime
 | --- | --- |
 | `MODEL PARAMETER` | Set in the model: thresholds, link capacities, RF constants, legacy recovery phases, radio tier draws (1.2 / 1.8 / 3.4 W), DRX cycle and wake latency, TCP timer bounds, NAT idle timeout, addresses. |
 | `MEASURED · SIM` | Measured from simulated runs: interruptions, delivery, MOS, overhead, action-vs-failure times, energy and mean power, HoL stalls, duplicates discarded, IP changes. |
-| `REAL-WORLD MEASUREMENT` | None in the published results: this is a simulation prototype. `scripts/handover-probe.js` measures one network change on your own laptop ([below](#real-world-check-one-network-change-on-your-own-laptop)); report its numbers as real-world, apart from the simulation. |
+| `REAL-WORLD MEASUREMENT` | None of our own: this is a simulation prototype. The model's key parameters are compared with published measurements ([Checked against published measurements](#checked-against-published-measurements)), and `scripts/handover-probe.js` measures one network change on your own laptop ([below](#real-world-check-one-network-change-on-your-own-laptop)). Report such numbers as real-world, apart from the simulation. |
 
 The HUD labels interruptions as *simulated*, shows a `SIMULATION` badge, and reports differences without a score or
 "winner". FlexiPath does not claim zero loss, universal handover or real satellite performance: packets are still lost
@@ -651,6 +708,13 @@ Stack: Vite 8 · Three.js r186 · Chart.js 4 · Tailwind CSS 4 · Lucide.
   prioritised.
 - **The hover rule** is a model parameter: 300 ms by default (piloted flight), 1 s with `--failsafe-ms 1000` (waypoint
   flight). Which stacks keep C2 depends on it ([The hover rule](#the-hover-rule-piloted-vs-waypoint-flight)).
+- **Modem wake** is 100 ms, which assumes a spare modem kept in a fast-resume state; an idle LTE modem measured 260 ms.
+  `--wake-ms 260` shows the effect ([Sensitivity](#sensitivity-a-slower-modem-wake)).
+- **Not modelled, though measured in the real world** ([Checked against published
+  measurements](#checked-against-published-measurements)):
+  - cell-to-cell handovers within one technology (76–167 ms on commercial networks);
+  - Starlink's 15 s reconfigurations;
+  - a LEO terminal's much higher power draw (a Starlink Mini uses 20–40 W).
 - The "failure" instant used for action-vs-failure times is a definition (EWMA of true loss > 15 % or link down),
   applied identically to both engines.
 - Prediction is a linear trend extrapolation. It cannot foresee abrupt outages (scenario D shows the resulting

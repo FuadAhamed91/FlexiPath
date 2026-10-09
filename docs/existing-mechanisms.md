@@ -200,7 +200,8 @@ FlexiPath sits between the two existing designs: near-redundant reliability at n
 ## Limits of this comparison
 
 - The baselines are behavioural models of the mechanisms, not the protocols themselves. There is no packet-level MPTCP, PMF or UPF.
-- Their detection times are favourable assumptions.
+- Their detection times are favourable assumptions. The 250 ms retransmission timeout sits between Linux's 200 ms minimum and the 1 s that RFC 6298 recommends.
+- The modem wake (100 ms) is shared by all multipath stacks. With the 260 ms an idle LTE modem measured, reactive multipath's gap grows to 0.51 s. FlexiPath's predicted handovers are unaffected, but its unpredicted-outage gap grows to 0.26–0.32 s (README, *Checked against published measurements* and *Sensitivity: a slower modem wake*).
 - Power is the same three-tier system model for every stack. It is not per-technology and not measured.
 - A measurement with real equipment (e.g. a laptop with Wi-Fi and a 5G dongle running Linux MPTCP) would validate the baseline parameters. The challenge welcomes this but does not require it. `scripts/handover-probe.js` is a first step: it measures one break-before-make network change on a real laptop (README, *Real-world check*).
 - Always duplicate is modelled on its two best joinable paths. A variant that also kept the satellite transmitting (three networks on all the time) would survive scenario G too, at a still higher power cost.
