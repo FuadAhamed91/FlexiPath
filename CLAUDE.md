@@ -86,7 +86,7 @@ vehicles, nodes, beams, particles }` in the console.
 - `_summarizeAgent` defines the per-run metric keys. `SUMMARY_METRICS` / `COMPARISON_METRICS` in `ExperimentRunner`,
   the CSV exports, the Experiments panel (which reads some keys without null checks) and the README tables use them by
   name, so rename everywhere or not at all.
-- Scenarios (`mission`, `A`–`H`, the hidden `demo`, and the original matrix `baseline` / `wifi-fade` / `cell-outage`)
+- Scenarios (`mission`, `A`–`H`, and the original matrix `baseline` / `wifi-fade` / `cell-outage`)
   are defined once in `Scenarios.js` and shared by the live twin and the runner. Route X runs 0 → 240 scene units
   (1 unit = 5 m) across four zones; X must stay strictly increasing along the route (`sAtX`, X-triggered faults,
   `zoneAt` and the finish test rely on it).
@@ -192,12 +192,16 @@ vehicles, nodes, beams, particles }` in the console.
   - hidden panels keep updating, so a tab shows current values the moment it opens.
 
   A new Advanced panel needs a tab.
-- The guided demo (`GuidedDemo.js`, `D`, `?demo=1`) owns the tour layer (`refs.tour`: a fixed card over the lower
-  part of the twin and a ring around the panel a caption talks about, `refs.loop` / `pill` / `glance` / `lanes`). It
-  is never scripted: one orientation beat at T+0, then engine events pause the simulation for a hold that grows with
-  the caption's length and resume (`_beat` / `_release`). `Dashboard.togglePause` reports the visitor's own pauses to
-  `demo.onUserPause`, which turns a timed hold into an open one; `→` / Enter continue. Keep captions to two or three
-  sentences and keep the pauses to the real moments (prediction, burst, switch, legacy interruption, recovery).
+- The guided demo (`GuidedDemo.js`, `D`, `?demo=1`) flies the full `mission` scenario (seed 2026, 60 km/h: three
+  handovers, dock → Wi-Fi → 5G → LEO) and owns the tour layer (`refs.tour`: a fixed card over the lower part of the
+  twin and a ring around the panel a caption talks about, `refs.loop` / `decision` / `pill` / `glance` / `lanes`, the
+  Advanced mode button and `refs.chartsBtn`). It is never scripted: one orientation beat on the dock, then engine
+  events pause the simulation for a hold that grows with the caption's length and resume (`_beat` / `_release`); a
+  beat can chain another with `then` and adjust the view with `onShow` / `onRelease` (the "more numbers" pair switches
+  to the Advanced view and Charts, then back). Each kind of moment is explained in full the first time (with what the
+  ringed panel shows) and briefly afterwards (`short`); caption-only beats never replace a held card.
+  `Dashboard.togglePause` reports the visitor's own pauses to `demo.onUserPause`, which turns a timed hold into an
+  open one; `→` / Enter continue. Keep captions to two or three sentences and the pauses to the real moments.
 - Lucide: an `<i data-lucide="name">` renders only if the icon is imported and added to `ICONS` in `Dashboard.js`,
   and `renderIcons(subtree)` runs after the HTML is injected.
 - Chart.js is tree-shaken: `BaseTimeSeriesChart.js` registers only the components it uses; register any new
