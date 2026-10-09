@@ -200,9 +200,9 @@ vehicles, nodes, beams, particles }` in the console.
   once in the demo (`shownPanels`) unless a stop marks it `'name!'` because its numbers are the point. Next steps
   through them one card each, beside the ringed panel with a pointer (`_layout`: left of a right-hand panel, above a
   bottom strip, below a top one), with the panel's live numbers from the snapshot and an `onShow` that switches view
-  / tab / charts / focus, and the last card resumes the flight after `_missionView` restores the Mission view. The end card (then
-  `_scenarioCard`, which rings the scenario picker and lists A–H; picking one goes through `Dashboard.setScenario`,
-  which stops the demo)
+  / tab / charts / focus, and the last card resumes the flight after `_missionView` restores the Mission view. On `complete`, `_scenarioCard` first
+  (it rings the scenario picker and lists A–H; picking one goes through `Dashboard.setScenario`, which stops the demo),
+  then Next shows the end card, which
   offers all of them (`ALL_PANELS`), 10 paired trials, a replay and `explore()` (leave the demo and restart the
   mission). Captions while the flight runs (`_caption`) never replace a paused card. `Dashboard.togglePause` reports
   the visitor's own pauses to `demo.onUserPause` (Hold flight, the play button and Space all pause the same way);
