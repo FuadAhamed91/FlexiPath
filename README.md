@@ -72,12 +72,14 @@ pick one group at a time, and the page remembers the choice:
 | **Controls** · **Log** | Simulation controls, fault injection and exports · the event log |
 
 The **Charts** button opens six 60 s charts under the twin: throughput, latency, loss, MOS, **radio power** and **bulk
-HoL stall**. They record the whole run while hidden. The **guided demo** (`D`, `?demo=1`) flies scenario A and
-pauses the simulation at each real decision — the prediction, the replication burst, the switch, the legacy
-interruption and its recovery — with a short caption of what is happening, built from the decision record and the
-measured values of that tick, and a ring on the panel where it shows; then it resumes. The visitor can hold the flight
-at any time (the card's Hold button, the play button or Space) and continue when ready. It ends with the result of
-the run and a button for 10 paired trials. **Experiments** (`X`) runs paired trials and shows the
+HoL stall**. They record the whole run while hidden. The **guided demo** (`D`, `?demo=1`) flies the full mission
+(dock → Wi-Fi → 5G → LEO, three handovers) and pauses the simulation at each real moment — the prediction, the
+replication burst, the switch, the legacy interruption and its recovery — with a short caption of what is happening,
+built from the decision record and the measured values of that tick, and a ring on the dashboard panel where it shows
+together with what that panel is; then it resumes. Each kind of moment is explained in full the first time and briefly
+afterwards; after the second handover it points at the Advanced view and its Charts button, where the rest of the
+numbers live. The visitor can hold the flight at any time (the card's Hold button, the play button or Space) and
+continue when ready. It ends with the result of the mission and a button for 10 paired trials. **Experiments** (`X`) runs paired trials and shows the
 existing-mechanisms comparison on the same runs.
 
 ## Measured results (simulation)

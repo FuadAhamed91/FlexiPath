@@ -283,7 +283,7 @@ export class Dashboard {
           <button type="button" class="btn btn-icon btn-fault-sm" data-fault="cell-outage" data-view="mission" title="Inject an abrupt 5G cell outage (G)" aria-label="Inject a 5G outage"><i data-lucide="tower-control"></i></button>
           <button type="button" class="btn btn-icon" data-ref="resetBtn" data-view="mission" title="Reset scenario, same seed (R)" aria-label="Reset the scenario"><i data-lucide="rotate-ccw"></i></button>
           <button type="button" class="btn" data-ref="chartsBtn" data-view="advanced" aria-pressed="false" title="Show or hide the six live charts"><i data-lucide="chart-line"></i>Charts</button>
-          <button type="button" class="btn btn-demo" data-ref="demoBtn" title="Guided demo: scenario A, paused at each real decision with a short caption (D)"><i data-lucide="presentation"></i>Guided demo</button>
+          <button type="button" class="btn btn-demo" data-ref="demoBtn" title="Guided demo: the full mission, paused at each real decision with a short caption (D)"><i data-lucide="presentation"></i>Guided demo</button>
           <button type="button" class="btn btn-icon btn-primary" data-ref="expBtn" title="Paired experiments (X)" aria-label="Paired experiments"><i data-lucide="flask-conical"></i></button>
           <button type="button" class="btn btn-icon" data-ref="infoBtn" title="Why FlexiPath? (I)" aria-label="Why FlexiPath?"><i data-lucide="info"></i></button>
         </div>
@@ -909,7 +909,7 @@ export class Dashboard {
     this.refs.intro.hidden = true;
   }
 
-  /** The guided demo (GuidedDemo.js): scenario A, paused at each real decision with a short caption. */
+  /** The guided demo (GuidedDemo.js): the full mission, paused at each real decision with a short caption. */
   startDemo() {
     this.demo.start();
   }
@@ -1010,7 +1010,7 @@ export class Dashboard {
     b.querySelector('[data-act="csv"]').addEventListener('click', () => this.exportCSV());
     b.querySelector('[data-act="replay"]').addEventListener('click', () => this.restart());
     b.querySelector('[data-act="trials"]').addEventListener('click', () =>
-      this.openExperiments({ scenario: sc.id === 'demo' ? 'A' : sc.id, trials: 10, autoRun: true }),
+      this.openExperiments({ scenario: sc.id, trials: 10, autoRun: true }),
     );
   }
 
@@ -1019,8 +1019,6 @@ export class Dashboard {
   }
 
   openExperiments(opts = {}) {
-    const sc = this.engine.scenario.id;
-    const scenario = opts.scenario ?? (SCENARIOS[sc]?.hidden ? 'A' : sc);
-    openExperiments(this, { ...opts, scenario });
+    openExperiments(this, { ...opts, scenario: opts.scenario ?? this.engine.scenario.id });
   }
 }
