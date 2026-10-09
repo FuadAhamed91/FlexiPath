@@ -187,6 +187,24 @@ multipath for 0.05–0.18 W more, and 0.6–1.6 points fewer than always duplica
 from the benchmark's `_mechanisms.csv` by `node scripts/tradeoff-chart.js`. E is left out (its C2 numbers equal A's)
 and so is F (no C2 traffic).
 
+**Reliability per extra watt.** Divide what a stack gains in critical delivery by the radio power it adds over its
+neighbour on the power axis. These are paired means; the benchmark writes them to `_efficiency.csv`.
+
+| Scenario | FlexiPath over reactive multipath | Always duplicate over FlexiPath |
+| --- | --- | --- |
+| A | +0.64 pp for +0.11 W = **5.7 pp/W** | +1.00 pp for +2.08 W = **0.5 pp/W** |
+| B | +0.79 pp for +0.11 W = **7.1 pp/W** | +0.83 pp for +1.81 W = **0.5 pp/W** |
+| C | +0.70 pp for +0.11 W = **6.2 pp/W** | +1.03 pp for +1.54 W = **0.7 pp/W** |
+| D | +1.22 pp for +0.05 W = **24.5 pp/W** | +0.77 pp for +1.39 W = **0.6 pp/W** |
+| G | +0.87 pp for +0.14 W = **6.2 pp/W** | +0.55 pp for +1.86 W = **0.3 pp/W** |
+| H | +0.73 pp for +0.18 W = **4.0 pp/W** | +1.62 pp for +1.82 W = **0.9 pp/W** |
+
+Spent the FlexiPath way, an extra watt buys 4–7 points of critical delivery. In D it buys 24.5, because there FlexiPath
+draws only 0.05 ± 0.02 W more than reactive multipath. Spent on permanent duplication, the same watt buys 0.3–0.9
+points. That makes FlexiPath's watts 4.5 to 21 times more productive (44 times in D). A ratio is only as certain as its
+two differences; their 95 % confidence intervals are in
+[docs/existing-mechanisms.md](docs/existing-mechanisms.md).
+
 ### The hover rule: piloted vs waypoint flight
 
 "Kept C2" depends on how long a drone tolerates C2 silence before it hovers. 3GPP TS 22.125 (§7.2, Table 7.2-1, "KPIs
@@ -517,7 +535,7 @@ npm run dev          # landing page http://localhost:5173 · simulator http://lo
 | --- | --- |
 | `npm run dev` | Vite dev server with the full HUD |
 | `npm run build` / `npm run preview` | Production bundle in `dist/` |
-| `npm run benchmark` | Paired experiments → `results/benchmark_*.json`, per-run `.csv`, `_comparison.csv`, `_mechanisms.csv`, `_ablations.csv` and `_prediction.csv` (`--quick`, `--seeds 10`, `--speeds 60`, `--scenarios A,D`, `--no-failsafe`, `--baselines mptcp,redundant` or `none`, `--ablations fpNoPred,fpNoBurst,fpNoMap` or `none`, `--seed-block dev` or `test`, `--failsafe-ms 1000` for the waypoint-flight hover rule) |
+| `npm run benchmark` | Paired experiments → `results/benchmark_*.json`, per-run `.csv`, `_comparison.csv`, `_mechanisms.csv`, `_efficiency.csv` (critical delivery per extra watt), `_ablations.csv` and `_prediction.csv` (`--quick`, `--seeds 10`, `--speeds 60`, `--scenarios A,D`, `--no-failsafe`, `--baselines mptcp,redundant` or `none`, `--ablations fpNoPred,fpNoBurst,fpNoMap` or `none`, `--seed-block dev` or `test`, `--failsafe-ms 1000` for the waypoint-flight hover rule) |
 | `node scripts/tradeoff-chart.js <_mechanisms.csv>` | Redraw `public/landing/tradeoff.svg` (reliability vs radio power) from a default benchmark |
 | `node scripts/handover-probe.js` | Measure one real network change on your own laptop ([Real-world check](#real-world-check-one-network-change-on-your-own-laptop)) |
 | `npm run models` | Regenerate the six GLB assets with headless Blender (`blender` on `PATH`) |

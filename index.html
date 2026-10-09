@@ -518,11 +518,12 @@
               height="470"
               loading="lazy"
               class="block h-auto w-full"
-              alt="Scatter chart of critical packets delivered against mean radio power in scenarios A–D, G and H. Always duplicate: 99.0–100 % at 2.65–3.39 W. FlexiPath: 98.2–99.0 % at 1.25–1.39 W. Reactive multipath: 97.0–98.3 % at 1.20–1.21 W. The legacy OS is below the chart at 77–85 %."
+              alt="Scatter chart of critical packets delivered against mean radio power in scenarios A–D, G and H. Always duplicate: 99.0–100 % at 2.65–3.39 W. FlexiPath: 98.2–99.0 % at 1.25–1.39 W. Reactive multipath: 97.0–98.3 % at 1.20–1.21 W. The legacy OS is below the chart at 77–85 %. A callout gives the critical delivery gained per extra watt: 4.0 to 24.5 points for FlexiPath over reactive multipath, 0.3 to 0.9 points for always duplicate over FlexiPath."
             />
             <figcaption class="px-2 pt-2 pb-1 text-[12.5px] leading-snug text-slate-500">
               Every scenario, every stack: FlexiPath delivers almost what permanent duplication does, at about the radio
-              power of reactive multipath.
+              power of reactive multipath. Each extra watt buys 4–7 points of critical delivery the FlexiPath way, and only
+              0.3–0.9 points spent on permanent duplication.
             </figcaption>
           </figure>
 
@@ -531,14 +532,16 @@
               <h3 class="text-[15px] font-bold text-slate-900">Against reactive multipath</h3>
               <p class="mt-2 text-[14.5px] leading-relaxed text-slate-600">
                 FlexiPath loses 25–40 % fewer critical packets, raises voice quality (MOS) by 0.07–0.10 and acts 1.3–4.6 s
-                before the failure instead of 0.3–0.5 s after, for about 0.1 W more radio power.
+                before the failure instead of 0.3–0.5 s after, for about 0.1 W more radio power: 4–7 points of critical
+                delivery per extra watt (24.5 in scenario D).
               </p>
             </div>
             <div class="lp-reveal rounded-2xl border border-slate-200 bg-white p-6">
               <h3 class="text-[15px] font-bold text-slate-900">Against always duplicate</h3>
               <p class="mt-2 text-[14.5px] leading-relaxed text-slate-600">
                 Permanent duplication delivers the most critical packets, 99–100 %, but draws 2.1–2.6× FlexiPath’s radio
-                power and copies 49–100 % of protected bytes, against FlexiPath’s ≈ 1 %. When Wi-Fi and 5G die together
+                power and copies 49–100 % of protected bytes, against FlexiPath’s ≈ 1 %. Each extra watt it draws buys only
+                0.3–0.9 points of critical delivery. When Wi-Fi and 5G die together
                 (scenario G), its two copies die together too: it kept C2 on 8 of 20 flights, FlexiPath on 20 of 20 (piloted-flight
                 hover rule, below).
               </p>

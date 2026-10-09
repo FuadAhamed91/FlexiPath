@@ -429,6 +429,43 @@ export class ExperimentRunner {
     });
   }
 
+  /**
+   * Reliability per extra watt, between neighbours on the power axis: the paired mean gain in critical delivery (pp)
+   * divided by the paired mean extra radio power (W). FlexiPath over reactive multipath, and always duplicate over
+   * FlexiPath. Needs the `mptcp` and `redundant` baselines; scenarios without C2 traffic (F) are left out.
+   */
+  static efficiency(results) {
+    const out = {};
+    for (const [scenario, table] of Object.entries(results.mechanisms ?? {})) {
+      const delivery = table.find((m) => m.key === 'criticalDeliveryPct');
+      const power = table.find((m) => m.key === 'meanPowerW');
+      if (!delivery?.engines.flexipath || !power) continue;
+      const step = (gainPp, extraW) =>
+        Number.isFinite(gainPp) && Number.isFinite(extraW) && extraW > 0 ? { gainPp, extraW, ppPerW: gainPp / extraW } : null;
+      // `diff` holds FlexiPath − engine, so the step from FlexiPath up to always duplicate flips its sign.
+      const row = {
+        flexipathOverReactive: step(delivery.diff.mptcp?.mean, power.diff.mptcp?.mean),
+        duplicateOverFlexipath: step(-delivery.diff.redundant?.mean, -power.diff.redundant?.mean),
+      };
+      if (row.flexipathOverReactive || row.duplicateOverFlexipath) out[scenario] = row;
+    }
+    return out;
+  }
+
+  /** Reliability per extra watt as flat CSV rows (one per scenario). */
+  static efficiencyCSV(results) {
+    const rows = Object.entries(ExperimentRunner.efficiency(results)).map(([scenario, e]) => ({
+      scenario,
+      fp_over_mp_delivery_pp: e.flexipathOverReactive?.gainPp ?? null,
+      fp_over_mp_power_w: e.flexipathOverReactive?.extraW ?? null,
+      fp_over_mp_pp_per_w: e.flexipathOverReactive?.ppPerW ?? null,
+      rd_over_fp_delivery_pp: e.duplicateOverFlexipath?.gainPp ?? null,
+      rd_over_fp_power_w: e.duplicateOverFlexipath?.extraW ?? null,
+      rd_over_fp_pp_per_w: e.duplicateOverFlexipath?.ppPerW ?? null,
+    }));
+    return toCSV(rows);
+  }
+
   /** One CSV row per run with every engine side by side (fp_, lg_, then mp_ / rd_ for the baselines). */
   static toCSV(results) {
     const rows = results.runs.map((r) => {

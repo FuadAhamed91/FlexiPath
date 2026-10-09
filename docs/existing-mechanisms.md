@@ -173,6 +173,14 @@ Paired differences have 95 % confidence intervals, over 20 pairs per scenario:
   - MOS: −0.08 (A–D), −0.06 (G), −0.19 (H).
   - Radio power: −2.08 ± 0.01 W (A) to −1.39 ± 0.10 W (D), a reduction of 52–61 %; −1.86 W in G.
   - Flights that kept C2 in G: +60 ± 24 points (20 of 20 against 8 of 20).
+- **Reliability per extra watt** is the critical delivery gained divided by the radio power added, from the paired means
+  above (benchmark `_efficiency.csv`):
+  - FlexiPath over reactive multipath: 4.0–7.1 pp/W, and 24.5 pp/W in D, where the power difference is only
+    0.05 W.
+  - Always duplicate over FlexiPath: 0.3–0.9 pp/W.
+
+  So a watt spent the FlexiPath way buys 4.5–21× more critical delivery than one spent on permanent duplication, and
+  44× in D.
 
 These hold on a held-out block of seeds never used while building or tuning FlexiPath (`--seed-block test`): critical
 delivery against reactive multipath +0.58 to +1.09 pp, against always duplicate −0.47 to −1.57 pp, and FlexiPath
@@ -190,7 +198,7 @@ again kept C2 on every flight. The README section *Held-out seeds* has the table
    The ablation (README, *Ablation: what each part contributes*) shows where this comes from: switching trend
    prediction off costs 10–30 critical packets per flight in A–E, while switching the 400 ms burst off changes nothing
    measurable in this model (it saves 0.02–0.04 W).
-3. **Permanent duplication is the most reliable, and the most expensive.** Always duplicate delivers 99.0–100 % with no gaps. It costs 2.65–3.39 W (2.1–2.6× FlexiPath) and duplicates 49–100 % of protected bytes, against FlexiPath's 0.9–1.4 %. FlexiPath keeps 98–99 % of protected packets at less than half of that power.
+3. **Permanent duplication is the most reliable, and the most expensive.** Always duplicate delivers 99.0–100 % with no gaps. It costs 2.65–3.39 W (2.1–2.6× FlexiPath) and duplicates 49–100 % of protected bytes, against FlexiPath's 0.9–1.4 %. FlexiPath keeps 98–99 % of protected packets at less than half of that power. Per extra watt, duplication buys 0.3–0.9 points of critical delivery over FlexiPath. FlexiPath buys 4–7 points over reactive multipath, and 24.5 in D.
 4. **A shared dead zone defeats both existing designs (G).** When Wi-Fi and 5G die at the same place, reactive multipath (a 0.35 s gap) hovers on every flight under the piloted rule, and always duplicate, whose two copies die together, on 12 of 20. Under the waypoint rule both keep C2, and FlexiPath's 0 s gap against their 0.39 s and 0.21 s (means) is what remains. FlexiPath's coverage map sees the zone 8 s ahead, so the satellite is warm and validated and the switch happens before the shadow: 0 s gap and C2 kept on all 20 flights. The cost is 7.5 Mbps less mean throughput than flying without the map. An out-of-date map (H) costs 21.8 Mbps for a needless move and does not help with a new shadow; fast failover still keeps C2 there.
 
 FlexiPath sits between the two existing designs: near-redundant reliability at near-reactive cost, and ahead of both where coverage fails in a known place.
