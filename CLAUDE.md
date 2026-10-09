@@ -23,7 +23,7 @@ documents the model rules, parameters and published results; `docs/existing-mech
 npm run dev          # Vite dev server: landing page http://localhost:5173, simulator /simulator.html
 npm run build        # production bundle → dist/ (base './', sourcemaps on)
 npm run preview      # serve dist/ on :4173
-npm run benchmark    # headless paired experiments in Node → results/benchmark_<stamp>.{json,csv} + _comparison / _mechanisms / _ablations / _prediction CSVs
+npm run benchmark    # headless paired experiments in Node → results/benchmark_<stamp>.{json,csv} + _comparison / _mechanisms / _efficiency / _ablations / _prediction CSVs
 npm run models       # regenerate public/models/*.glb (needs `blender` on PATH)
 ```
 
