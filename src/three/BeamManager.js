@@ -43,9 +43,11 @@ const BEAM_FRAG = /* glsl */ `
     float dash = mix(1.0, step(0.45, fract(along * 26.0 - uTime * 0.6)), uDash);
     float pulseWave = 0.5 + 0.5 * sin(uTime * 8.0 - along * 16.0);
     vec3 col = mix(uColor, uPulseColor, uPulse * (0.55 + 0.45 * pulseWave));
-    float core = pow(vFacing, 1.5);
-    float a = uIntensity * ends * dash * uFlicker * (0.28 + 0.72 * streak + uPulse * 0.45 * pulseWave) * (0.35 + 0.65 * core);
-    gl_FragColor = vec4(col * (1.4 + 2.2 * streak + uPulse * 1.2), a);
+    // With MSAA a fragment can be shaded just outside its triangle, where vFacing extrapolates below 0: pow() of a
+    // negative is NaN, and the bloom pass would smear one NaN pixel over the whole frame. Clamp before pow.
+    float core = pow(clamp(vFacing, 0.0, 1.0), 1.5);
+    float a = clamp(uIntensity * ends * dash * uFlicker * (0.28 + 0.72 * streak + uPulse * 0.45 * pulseWave) * (0.35 + 0.65 * core), 0.0, 1.0);
+    gl_FragColor = vec4(max(col * (1.4 + 2.2 * streak + uPulse * 1.2), 0.0), a);
   }
 `;
 

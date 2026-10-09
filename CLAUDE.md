@@ -154,6 +154,10 @@ vehicles, nodes, beams, particles }` in the console.
   awaits the GLB loads → beams and particles. Each animation frame: `engine.advance(dt)` → each manager's
   `update(render, snapshot, …)` → camera → render → `dashboard.frame(now)`. Visual animation runs on wall-clock time
   (it keeps moving while paused); HUD values come from the latest 10 Hz snapshot.
+- Post-processing (`SceneManager`): RenderPass → UnrealBloom → SMAA → Output. The scene renders into the composer's
+  target, so the renderer's `antialias` flag never reaches it; SMAA does the anti-aliasing (4× MSAA doubled the frame
+  time of the busy views). Custom shaders must never output NaN, e.g. clamp before `pow`: the bloom pass smears a
+  single NaN pixel over the whole frame. That is why the beam shader clamps `vFacing`.
 - The HUD and the twin hold no simulation state. Anything derived belongs in the engine and its snapshot, not in UI
   code.
 - Radio shadows are drawn per scenario: `EnvironmentManager.setScenario()` (called from `main.js` at start and on every

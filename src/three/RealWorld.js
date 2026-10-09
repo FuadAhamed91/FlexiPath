@@ -241,19 +241,166 @@ function buildRocks(rng, height, roadZ) {
   return inst;
 }
 
-/** Date palms as two instanced meshes (trunks, fronds) at spots {x, y, z, s, yaw, lean}. */
-function palmGroup(spots) {
-  const trunk = new THREE.CylinderGeometry(0.14, 0.24, 4.4, 6, 4);
-  trunk.translate(0, 2.2, 0);
+const PALM_H = 4.4; // trunk height; the crown sits on top
+const PALM_BEND = 0.32; // how far the trunk curves out by the top
+
+/** Bark: leaf-scar rings over warm grey-brown, darker in the grooves, a little uneven. */
+function barkTexture(rng) {
+  const tex = canvasTexture(64, 128, (g, w, h) => {
+    g.fillStyle = '#7a6550';
+    g.fillRect(0, 0, w, h);
+    for (let y = 0; y < h; y += 8) {
+      const tilt = rng.range(-2, 2);
+      g.strokeStyle = 'rgba(38,28,20,0.85)';
+      g.lineWidth = 2.5;
+      g.beginPath();
+      g.moveTo(0, y + 6);
+      g.lineTo(w, y + 6 + tilt);
+      g.stroke();
+      g.fillStyle = 'rgba(160,138,110,0.35)';
+      g.fillRect(0, y + 1, w, 2);
+    }
+    const img = g.getImageData(0, 0, w, h);
+    for (let i = 0; i < img.data.length; i += 4) {
+      const n = (rng.next() - 0.5) * 30;
+      img.data[i] += n;
+      img.data[i + 1] += n;
+      img.data[i + 2] += n;
+    }
+    g.putImageData(img, 0, 0);
+  });
+  tex.repeat.set(1, 4);
+  return tex;
+}
+
+/** One pinnate frond (u across, v along): leaflets angled towards the tip either side of a pale rachis, cut out by alpha. */
+function frondTexture(rng) {
+  const tex = canvasTexture(128, 512, (g, w, h) => {
+    g.clearRect(0, 0, w, h);
+    for (let y = h - 6; y > 6; y -= 7) {
+      const t = 1 - y / h; // 0 at the base, 1 at the tip
+      const green = [52 + 70 * t + rng.range(-8, 8), 92 + 46 * t + rng.range(-8, 8), 40 + 16 * t];
+      g.strokeStyle = `rgb(${green.map(Math.round).join(',')})`;
+      g.lineWidth = 3.2;
+      for (const side of [-1, 1]) {
+        g.beginPath();
+        g.moveTo(w / 2, y);
+        g.quadraticCurveTo(w / 2 + side * w * 0.25, y - 10, w / 2 + side * (w / 2 - 3), y - 30 - rng.range(0, 6));
+        g.stroke();
+      }
+    }
+    g.strokeStyle = '#a49a62';
+    g.lineWidth = 4;
+    g.beginPath();
+    g.moveTo(w / 2, h);
+    g.lineTo(w / 2, 0);
+    g.stroke();
+  });
+  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
+  return tex;
+}
+
+/**
+ * One frond as a folded ribbon along an arc: it leaves the crown at `rise` radians above horizontal and bends down by
+ * `droop` radians by the tip; it is widest past the middle and folded into a shallow V along the rachis.
+ */
+function frondGeometry(length, rise, droop) {
+  const N = 14;
+  const pos = [];
+  const uv = [];
+  const idx = [];
+  let x = 0;
+  let y = 0;
+  for (let i = 0; i <= N; i++) {
+    const t = i / N;
+    const width = 0.05 + 1.05 * Math.sin(Math.PI * Math.min(1, t ** 0.8)) * (1 - 0.3 * t);
+    const fold = 0.22 * width;
+    for (const [side, u] of [
+      [-1, 0],
+      [0, 0.5],
+      [1, 1],
+    ]) {
+      pos.push(x, y + (side ? fold : 0), (side * width) / 2);
+      uv.push(u, t);
+    }
+    if (i < N) {
+      const a = rise - (rise + droop) * ((i + 0.5) / N) ** 1.5;
+      x += (length / N) * Math.cos(a);
+      y += (length / N) * Math.sin(a);
+      const o = i * 3;
+      idx.push(o, o + 3, o + 1, o + 1, o + 3, o + 4, o + 1, o + 4, o + 2, o + 2, o + 4, o + 5);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  return g;
+}
+
+/** A crown of 18 fronds in three tiers: young ones up, mature ones arching out, old ones hanging down. */
+function crownGeometry(rng) {
+  const tiers = [
+    { n: 5, rise: [0.95, 1.25], droop: [0.2, 0.5], len: [2.2, 2.7] },
+    { n: 7, rise: [0.45, 0.7], droop: [1.0, 1.4], len: [3.0, 3.5] },
+    { n: 6, rise: [0.05, 0.25], droop: [1.5, 2.0], len: [2.9, 3.3] },
+  ];
   const fronds = [];
-  for (let i = 0; i < 9; i++) {
-    const f = new THREE.ConeGeometry(0.34, 2.9, 4, 1);
-    f.scale(1, 1, 0.22);
-    f.translate(0, 1.45, 0);
-    f.rotateZ(i % 2 ? -1.75 : -1.3); // arch out, alternate fronds droop
-    f.rotateY((i / 9) * Math.PI * 2);
-    f.translate(0, 4.35, 0);
-    fronds.push(f);
+  let k = 0;
+  for (const tier of tiers) {
+    for (let i = 0; i < tier.n; i++, k++) {
+      const f = frondGeometry(rng.range(...tier.len), rng.range(...tier.rise), rng.range(...tier.droop));
+      f.rotateX(rng.range(-0.25, 0.25)); // a little twist about the rachis
+      f.rotateY(k * 2.39996 + rng.range(-0.15, 0.15)); // golden-angle spiral, so fronds never stack
+      f.translate(PALM_BEND * 1.08, PALM_H + 0.25, 0); // on the curved trunk's top
+      fronds.push(f);
+    }
+  }
+  return mergeGeometries(fronds);
+}
+
+/** A gently curved, tapering trunk with a darker boot of old frond bases under the crown. */
+function trunkGeometry() {
+  const trunk = new THREE.CylinderGeometry(0.13, 0.21, PALM_H, 10, 8);
+  trunk.translate(0, PALM_H / 2, 0);
+  const boot = new THREE.CylinderGeometry(0.17, 0.26, 0.6, 10, 1);
+  boot.translate(0, PALM_H + 0.05, 0);
+  const g = mergeGeometries([trunk, boot]);
+  const pos = g.attributes.position;
+  for (let i = 0; i < pos.count; i++) pos.setX(i, pos.getX(i) + PALM_BEND * (pos.getY(i) / PALM_H) ** 2);
+  g.computeVertexNormals();
+  return g;
+}
+
+/** Warm landscape uplight: light that fades up from the ground (`reach` units), added in the shader. */
+function withPalmUplight(material, strength, reach) {
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.uUp = { value: new THREE.Color('#ffb36b').multiplyScalar(strength) };
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying float vLocalY;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvLocalY = transformed.y;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>\nuniform vec3 uUp;\nvarying float vLocalY;`)
+      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\ntotalEmissiveRadiance += uUp * diffuseColor.rgb * exp(-vLocalY / ${reach.toFixed(2)});`);
+  };
+  return material;
+}
+
+/**
+ * Date palms at spots {x, y, z, s, yaw, lean} as instanced trunks and crowns. Boulevard palms (`uplit`) stand in a
+ * warm pool from a ground uplight that also lights the trunk and the underside of the crown.
+ */
+function palmGroup(spots, { uplit = false } = {}) {
+  // Their own stream: the palms' shape and textures never shift anything else in the realistic world.
+  const rng = new Random('flexipath-real-palms');
+  const bark = barkTexture(rng);
+  const frond = frondTexture(rng);
+  const trunkMat = new THREE.MeshStandardMaterial({ map: bark, roughness: 0.95 });
+  const crownMat = new THREE.MeshStandardMaterial({ map: frond, alphaTest: 0.45, side: THREE.DoubleSide, roughness: 0.75, emissive: '#10200c' });
+  if (uplit) {
+    withPalmUplight(trunkMat, 0.9, 1.6);
+    withPalmUplight(crownMat, 0.55, 3.2);
   }
   const g = new THREE.Group();
   const m = new THREE.Matrix4();
@@ -261,9 +408,22 @@ function palmGroup(spots) {
   const e = new THREE.Euler();
   const p = new THREE.Vector3();
   const sc = new THREE.Vector3();
-  for (const [geo, color] of [[trunk, '#5b4838'], [mergeGeometries(fronds), '#3f7048']]) {
-    const inst = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({ color, roughness: 0.9 }), spots.length);
+  const parts = [
+    [trunkGeometry(), trunkMat],
+    [crownGeometry(rng), crownMat],
+  ];
+  for (const [geo, mat] of parts) {
+    const inst = new THREE.InstancedMesh(geo, mat, spots.length);
     spots.forEach((o, i) => inst.setMatrixAt(i, m.compose(p.set(o.x, o.y, o.z), q.setFromEuler(e.set(o.lean, o.yaw, o.lean)), sc.setScalar(o.s))));
+    g.add(inst);
+  }
+  if (uplit) {
+    const pool = new THREE.CircleGeometry(1.7, 24);
+    pool.rotateX(-Math.PI / 2);
+    pool.translate(0, 0.05, 0);
+    const glow = new THREE.MeshBasicMaterial({ map: radialTexture(), color: '#ffab5e', transparent: true, opacity: 0.28, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
+    const inst = new THREE.InstancedMesh(pool, glow, spots.length);
+    spots.forEach((o, i) => inst.setMatrixAt(i, m.compose(p.set(o.x, o.y, o.z), q.identity(), sc.setScalar(1))));
     g.add(inst);
   }
   return g;
@@ -298,7 +458,7 @@ function buildBoulevardPalms(path, rng) {
       spots.push({ x: f.x, y: 0, z: f.z, s: rng.range(0.85, 1.05), yaw: rng.range(0, Math.PI * 2), lean: rng.range(-0.05, 0.05) });
     }
   }
-  return palmGroup(spots);
+  return palmGroup(spots, { uplit: true });
 }
 
 function signTexture(title, sub, color) {
