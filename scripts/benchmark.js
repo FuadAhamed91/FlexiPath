@@ -10,6 +10,7 @@
  *   npm run benchmark -- --ablations none               (no FlexiPath ablations)
  *   npm run benchmark -- --seed-block test              (held-out seeds, never used while tuning)
  *   npm run benchmark -- --failsafe-ms 1000             (waypoint-flight hover rule instead of the default 300 ms)
+ *   npm run benchmark -- --wake-ms 260                  (sensitivity: a sleeping modem takes 260 ms to wake, not 100 ms)
  *
  * Writes results/benchmark_<stamp>.json, .csv (per-run rows, every engine side by side),
  * _comparison.csv (Metric | Legacy | FlexiPath | Difference with 95 % CI), _prediction.csv (precision,
@@ -23,6 +24,8 @@ import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ExperimentRunner, EXPERIMENT_SCENARIOS, SCENARIOS, BASELINE_ENGINES, ABLATION_ENGINES, SEED_BLOCKS, seedsFor } from '../src/simulation/ExperimentRunner.js';
 import { ENGINES, FAILSAFE_OUTAGE_S } from '../src/simulation/SimulationEngine.js';
+import { POWER_PARAMS } from '../src/simulation/PowerModel.js';
+import { MULTIPATH_PARAMS } from '../src/simulation/MultipathController.js';
 import { toJSON, timestampedName } from '../src/utils/Export.js';
 
 const args = process.argv.slice(2);
@@ -52,8 +55,21 @@ if (!(failSafeMs > 0)) {
   process.exit(1);
 }
 const failSafeS = failSafeMs / 1000;
-// Non-default thresholds get their own file names, so their CSVs are never mistaken for the published ones.
-const fsTag = failSafeS === FAILSAFE_OUTAGE_S ? '' : `_failsafe${failSafeMs}ms`;
+// Time a sleeping (DRX) modem needs before it can carry traffic, for every multipath stack. Default 100 ms; 260 ms is
+// the LTE idle → connected promotion measured by Huang et al. (README, "Checked against published measurements").
+const defaultWakeMs = POWER_PARAMS.wakeLatencyS * 1000;
+const wakeMs = Number(opt('wake-ms', defaultWakeMs));
+if (!(wakeMs >= 0)) {
+  console.error(`--wake-ms needs a number of milliseconds (0 or more)`);
+  process.exit(1);
+}
+if (wakeMs !== defaultWakeMs) {
+  // FlexiPath reads POWER_PARAMS at run time; the baselines copy MULTIPATH_PARAMS when they are built.
+  POWER_PARAMS.wakeLatencyS = wakeMs / 1000;
+  MULTIPATH_PARAMS.wakeLatencyS = wakeMs / 1000;
+}
+// Non-default settings get their own file names, so their CSVs are never mistaken for the published ones.
+const fsTag = (failSafeS === FAILSAFE_OUTAGE_S ? '' : `_failsafe${failSafeMs}ms`) + (wakeMs === defaultWakeMs ? '' : `_wake${wakeMs}ms`);
 const outDir = resolve(dirname(fileURLToPath(import.meta.url)), '..', opt('out', 'results'));
 const baselineArg = opt('baselines', BASELINE_ENGINES.join(','));
 const baselines = baselineArg === 'none' ? [] : baselineArg.split(',');
@@ -75,6 +91,7 @@ const total = runner.plan.length;
 console.log(`FlexiPath experiments · ${total} paired runs (${seeds.length} seeds × ${speeds.length} speeds × ${scenarios.length} scenarios)`);
 console.log(`Seeds: ${SEED_BLOCKS[seedBlock].label} · ${seeds.join(', ')}`);
 console.log(failSafe ? `Fail-safe: hover when C2 is silent > ${failSafeMs} ms` : 'Fail-safe: off');
+if (wakeMs !== defaultWakeMs) console.log(`Modem wake: ${wakeMs} ms (default ${defaultWakeMs} ms)`);
 console.log('All values are measured SIMULATION results (model, not hardware).');
 
 const results = await runner.run({
