@@ -194,14 +194,14 @@ vehicles, nodes, beams, particles }` in the console.
   A new Advanced panel needs a tab.
 - The guided demo (`GuidedDemo.js`, `D`, `?demo=1`) flies the full `mission` scenario (seed 2026, 60 km/h: three
   handovers, dock → Wi-Fi → 5G → LEO) and owns the tour layer (`refs.tour`: a fixed card over the lower part of the
-  twin and a ring around the panel a caption talks about, `refs.loop` / `decision` / `pill` / `glance` / `lanes`, the
-  Advanced mode button and `refs.chartsBtn`). It is never scripted: one orientation beat on the dock, then engine
-  events pause the simulation for a hold that grows with the caption's length and resume (`_beat` / `_release`); a
-  beat can chain another with `then` and adjust the view with `onShow` / `onRelease` (the "more numbers" pair switches
-  to the Advanced view and Charts, then back). Each kind of moment is explained in full the first time (with what the
-  ringed panel shows) and briefly afterwards (`short`); caption-only beats never replace a held card.
-  `Dashboard.togglePause` reports the visitor's own pauses to `demo.onUserPause`, which turns a timed hold into an
-  open one; `→` / Enter continue. Keep captions to two or three sentences and the pauses to the real moments.
+  twin and a ring around the panel a card talks about). It is never scripted: one orientation card on the dock, then
+  engine events pause the simulation (`_moment`) and **nothing resumes by itself**: the visitor resumes, or walks the
+  dashboards first (`_dashboardCards`: the five Mission panels, the seven Advanced tabs, the charts, one card per
+  panel, each with its live numbers from the snapshot and an `onShow` that switches view / tab / charts); the last
+  card resumes and `_missionView` restores the Mission view. Captions while the flight runs (`_caption`) never
+  replace a paused card. `Dashboard.togglePause` reports the visitor's own pauses to `demo.onUserPause` (Hold flight,
+  the play button and Space all pause the same way); `→` / Enter next, `←` back. Keep the moment captions to two or
+  three sentences and the pauses to the real moments; a walk card reads its panel, it does not explain the model.
 - Lucide: an `<i data-lucide="name">` renders only if the icon is imported and added to `ICONS` in `Dashboard.js`,
   and `renderIcons(subtree)` runs after the HTML is injected.
 - Chart.js is tree-shaken: `BaseTimeSeriesChart.js` registers only the components it uses; register any new

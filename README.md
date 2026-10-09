@@ -75,11 +75,12 @@ The **Charts** button opens six 60 s charts under the twin: throughput, latency,
 HoL stall**. They record the whole run while hidden. The **guided demo** (`D`, `?demo=1`) flies the full mission
 (dock → Wi-Fi → 5G → LEO, three handovers) and pauses the simulation at each real moment — the prediction, the
 replication burst, the switch, the legacy interruption and its recovery — with a short caption of what is happening,
-built from the decision record and the measured values of that tick, and a ring on the dashboard panel where it shows
-together with what that panel is; then it resumes. Each kind of moment is explained in full the first time and briefly
-afterwards; after the second handover it points at the Advanced view and its Charts button, where the rest of the
-numbers live. The visitor can hold the flight at any time (the card's Hold button, the play button or Space) and
-continue when ready. It ends with the result of the mission and a button for 10 paired trials. **Experiments** (`X`) runs paired trials and shows the
+built from the decision record and the measured values of that tick, and a ring on the dashboard panel where it
+shows. Nothing resumes by itself: from a paused moment the visitor resumes the flight, or first walks through every
+dashboard — the five Mission panels, then the Advanced view tab by tab, then the six charts — one card per panel,
+each ringing that panel and reading its live numbers at that moment; the last card resumes the flight. Hold flight,
+the play button and Space pause the running flight the same way. It ends with the result of the mission and a button
+for 10 paired trials. **Experiments** (`X`) runs paired trials and shows the
 existing-mechanisms comparison on the same runs.
 
 ## Measured results (simulation)
@@ -550,7 +551,7 @@ Simulator URL parameters (on `simulator.html`; a link to the site root that carr
 simulator): `?scenario=A&seed=2026&speed=90&mode=advanced&focus=legacy&camera=overview&paused=1`, `intro=0` skips
 the intro screen, `demo=1` starts the guided demo, `models=procedural` forces the built-in primitive models, `look=twin` starts in the neon digital-twin look.
 
-Keys: `Space` pause · `M` mission / advanced · `D` guided demo (`→` continues a paused moment) · `X` experiments · `I` why FlexiPath? · `F` Wi-Fi fade ·
+Keys: `Space` pause · `M` mission / advanced · `D` guided demo (`→` next, `←` back) · `X` experiments · `I` why FlexiPath? · `F` Wi-Fi fade ·
 `G` 5G outage · `R` reset · `1`/`2` focus · `C` camera · `V` ghost drone · `T` theatre · `L` real / twin look · `E` export JSON.
 
 ### Exports

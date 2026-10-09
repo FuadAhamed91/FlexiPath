@@ -1482,19 +1482,6 @@ body {
   font-weight: 700;
   color: var(--ui-text);
 }
-.tour-card .bar {
-  margin-top: 9px;
-  height: 2px;
-  border-radius: 2px;
-  background: var(--ui-line);
-  overflow: hidden;
-}
-.tour-card .bar span {
-  display: block;
-  height: 100%;
-  width: 0;
-  background: #16a34a;
-}
 .intro-overlay {
   position: absolute;
   inset: 0;
