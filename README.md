@@ -72,9 +72,12 @@ pick one group at a time, and the page remembers the choice:
 | **Controls** · **Log** | Simulation controls, fault injection and exports · the event log |
 
 The **Charts** button opens six 60 s charts under the twin: throughput, latency, loss, MOS, **radio power** and **bulk
-HoL stall**. They record the whole run while hidden. **Guided demo** (`D`) replays scenario A and captions each real
-decision as it happens; **Experiments** (`X`) runs paired trials and shows the existing-mechanisms comparison on the
-same runs.
+HoL stall**. They record the whole run while hidden. The **guided tour** (`D`, `?demo=1`) is the onboarding: it
+holds scenario A at T+0 and spotlights each part of the twin and the HUD, asking the visitor to press the real
+controls (legend, camera, details, steps, play); then it flies scenario A and pauses the simulation at each real
+decision, captioning it from the decision record and pointing at the panel where it shows (the visitor can hold the
+flight at any time); after the run it walks through the Advanced view tab by tab and ends in the Experiments window.
+**Experiments** (`X`) runs paired trials and shows the existing-mechanisms comparison on the same runs.
 
 ## Measured results (simulation)
 
@@ -542,9 +545,9 @@ npm run dev          # landing page http://localhost:5173 · simulator http://lo
 
 Simulator URL parameters (on `simulator.html`; a link to the site root that carries any of them is forwarded to the
 simulator): `?scenario=A&seed=2026&speed=90&mode=advanced&focus=legacy&camera=overview&paused=1`, `intro=0` skips
-the intro screen, `demo=1` starts the guided demo, `models=procedural` forces the built-in primitive models, `look=twin` starts in the neon digital-twin look.
+the intro screen, `demo=1` starts the guided tour, `models=procedural` forces the built-in primitive models, `look=twin` starts in the neon digital-twin look.
 
-Keys: `Space` pause · `M` mission / advanced · `D` guided demo · `X` experiments · `I` why FlexiPath? · `F` Wi-Fi fade ·
+Keys: `Space` pause · `M` mission / advanced · `D` guided tour (`→` next, `←` back) · `X` experiments · `I` why FlexiPath? · `F` Wi-Fi fade ·
 `G` 5G outage · `R` reset · `1`/`2` focus · `C` camera · `V` ghost drone · `T` theatre · `L` real / twin look · `E` export JSON.
 
 ### Exports
