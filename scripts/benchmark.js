@@ -15,7 +15,8 @@
  * Writes results/benchmark_<stamp>.json, .csv (per-run rows, every engine side by side),
  * _comparison.csv (Metric | Legacy | FlexiPath | Difference with 95 % CI), _prediction.csv (precision,
  * recall and lead time of FlexiPath's early moves), and — with the baselines modelled on existing
- * mechanisms (default: reactive multipath + always duplicate) — _mechanisms.csv, and — with the
+ * mechanisms (default: reactive multipath + always duplicate) — _mechanisms.csv and _efficiency.csv (critical delivery
+ * gained per extra watt of radio power, between neighbouring stacks), and — with the
  * ablations (default: no trend prediction, no burst, no coverage map) — _ablations.csv.
  * All numbers are measured simulation results, not real-world measurements.
  */
@@ -135,6 +136,18 @@ if (results.mechanisms) {
   }
 }
 
+// Reliability per extra watt, between neighbours on the power axis (needs the baselines).
+const efficiency = ExperimentRunner.efficiency(results);
+if (Object.keys(efficiency).length) {
+  console.log('\nReliability per extra watt: paired gain in critical delivery (pp) ÷ paired extra radio power (W)');
+  const cell = (st) => (st ? `${st.gainPp >= 0 ? '+' : ''}${fmt(st.gainPp)} pp for +${fmt(st.extraW)} W = ${fmt(st.ppPerW, 1)} pp/W` : '—');
+  const effRows = {};
+  for (const [scenario, e] of Object.entries(efficiency)) {
+    effRows[scenario] = { 'FlexiPath over reactive multipath': cell(e.flexipathOverReactive), 'Always duplicate over FlexiPath': cell(e.duplicateOverFlexipath) };
+  }
+  console.table(effRows);
+}
+
 // Ablations, same runs: FlexiPath | FlexiPath with one part switched off.
 const ablPick = ['c2KeptPct', 'interruptionS', 'criticalDeliveryPct', 'criticalLost', 'meanMos', 'actionVsFailureS', 'meanPowerW', 'seamlessHandovers'];
 if (results.ablation) {
@@ -179,6 +192,11 @@ if (results.mechanisms) {
   const mechPath = resolve(outDir, timestampedName(`benchmark${fsTag}_mechanisms`, 'csv'));
   writeFileSync(mechPath, ExperimentRunner.mechanismsCSV(results));
   written.push(mechPath);
+}
+if (Object.keys(efficiency).length) {
+  const effPath = resolve(outDir, timestampedName(`benchmark${fsTag}_efficiency`, 'csv'));
+  writeFileSync(effPath, ExperimentRunner.efficiencyCSV(results));
+  written.push(effPath);
 }
 if (results.ablation) {
   const ablPath = resolve(outDir, timestampedName(`benchmark${fsTag}_ablations`, 'csv'));

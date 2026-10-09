@@ -6,7 +6,8 @@
  *
  * Reads the _mechanisms.csv of a default `npm run benchmark` and writes public/landing/tradeoff.svg, which the
  * README and the landing page show. Re-run it whenever the published results change.
- * E is left out (its C2 numbers equal A's) and so is F (no C2 traffic).
+ * E is left out (its C2 numbers equal A's) and so is F (no C2 traffic). The callout gives the reliability per extra
+ * watt, the paired figures `npm run benchmark` also writes to _efficiency.csv.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
@@ -60,6 +61,19 @@ const points = STACKS.map((s) => ({
   pts: SCENARIOS.map((sc) => ({ sc, w: value(sc, 'meanPowerW', s.id), pct: value(sc, 'criticalDeliveryPct', s.id) })),
 }));
 const range = (arr) => [Math.min(...arr), Math.max(...arr)];
+// Paired mean difference FlexiPath − engine, as the mechanisms CSV reports it.
+const paired = (scenario, metric, engine) => {
+  const row = rows.find((r) => r.scenario === scenario && r.metric === metric);
+  const v = Number(row?.[`fp_minus_${engine}`]);
+  if (!Number.isFinite(v)) throw new Error(`missing fp_minus_${engine} for ${metric} in ${scenario}`);
+  return v;
+};
+// Critical delivery gained per extra watt: FlexiPath over reactive multipath, always duplicate over FlexiPath.
+const perWatt = SCENARIOS.map((sc) => ({
+  sc,
+  fpOverMp: paired(sc, 'criticalDeliveryPct', 'mptcp') / paired(sc, 'meanPowerW', 'mptcp'),
+  rdOverFp: paired(sc, 'criticalDeliveryPct', 'redundant') / paired(sc, 'meanPowerW', 'redundant'),
+}));
 
 // Plot frame. Legacy sits far below the y range and is reported in a note instead of a marker.
 const W = 800;
@@ -105,11 +119,24 @@ for (const s of points) {
 const lg = points.find((s) => s.id === 'legacy');
 const [lgP0, lgP1] = range(lg.pts.map((p) => p.pct));
 const [lgW0, lgW1] = range(lg.pts.map((p) => p.w));
+const [fpW0, fpW1] = range(perWatt.map((e) => e.fpOverMp));
+const [rdW0, rdW1] = range(perWatt.map((e) => e.rdOverFp));
+const color = (id) => STACKS.find((x) => x.id === id).color;
+// Callout in the empty lower right of the plot, clear of the cluster labels and the legacy note.
+const box = { x: px(1.85), y: py(98.05), w: px(3.55) - px(1.85), h: 78 };
+const callout = [
+  `<rect x="${box.x}" y="${box.y}" width="${box.w}" height="${box.h}" rx="10" fill="#f8fafc" stroke="#cbd5e1"/>`,
+  `<text x="${box.x + 14}" y="${box.y + 22}" class="lab">Critical delivery gained per extra watt</text>`,
+  `<circle cx="${box.x + 19}" cy="${box.y + 41}" r="4.5" fill="${color('flexipath')}"/>`,
+  `<text x="${box.x + 30}" y="${box.y + 45}" class="sub">FlexiPath over reactive multipath: <tspan class="big">+${f1(fpW0)} to +${f1(fpW1)} points</tspan></text>`,
+  `<circle cx="${box.x + 19}" cy="${box.y + 61}" r="4.5" fill="${color('redundant')}"/>`,
+  `<text x="${box.x + 30}" y="${box.y + 65}" class="sub">Always duplicate over FlexiPath: <tspan class="big">+${f1(rdW0)} to +${f1(rdW1)} points</tspan></text>`,
+];
 const lgText = `Legacy OS (below the chart): ${f1(lgP0)}–${f1(lgP1)} % at ${f2(lgW0) === f2(lgW1) ? f2(lgW0) : `${f2(lgW0)}–${f2(lgW1)}`} W`;
 
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-labelledby="t d">
   <title id="t">Reliability vs radio power</title>
-  <desc id="d">Critical (C2) packets delivered against mean radio power for always duplicate, FlexiPath and reactive multipath in scenarios A–D, G and H. Measured simulation results, means of 20 paired flights per scenario.</desc>
+  <desc id="d">Critical (C2) packets delivered against mean radio power for always duplicate, FlexiPath and reactive multipath in scenarios A–D, G and H. Measured simulation results, means of 20 paired flights per scenario. A callout gives the critical delivery gained per extra watt between neighbouring stacks.</desc>
   <style>
     text { font-family: Inter, 'Segoe UI', system-ui, -apple-system, sans-serif; fill: #0f172a; }
     .h { font-size: 19px; font-weight: 700; }
@@ -121,6 +148,7 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" wid
     .sub { font-size: 11.5px; fill: #475569; }
     .note { font-size: 11.5px; fill: #b91c1c; }
     .tag { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; fill: #0e7490; }
+    .big { font-weight: 700; fill: #0f172a; }
   </style>
   <rect width="${W}" height="${H}" rx="14" fill="#ffffff"/>
   <text x="${M.l}" y="36" class="h">Reliability vs radio power</text>
@@ -132,6 +160,7 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" wid
   <text x="${M.l + 10}" y="${M.t + 18}" class="sub">↖ better: more delivered, less power</text>
   ${marks.join('\n  ')}
   ${labels.join('\n  ')}
+  ${callout.join('\n  ')}
   <text x="${M.l + 10}" y="${H - M.b - 10}" class="note">↓ ${lgText}</text>
   <text x="${(M.l + W - M.r) / 2}" y="${H - 14}" text-anchor="middle" class="ax">Mean radio power (W)</text>
   <text transform="translate(18 ${(M.t + H - M.b) / 2}) rotate(-90)" text-anchor="middle" class="ax">Critical packets delivered (%)</text>
@@ -139,6 +168,8 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" wid
 `;
 writeFileSync(out, svg);
 console.log(`wrote ${out}`);
+console.log(`per extra watt · FlexiPath over reactive: ${perWatt.map((e) => `${e.sc} ${f1(e.fpOverMp)}`).join(' · ')}`);
+console.log(`per extra watt · duplicate over FlexiPath: ${perWatt.map((e) => `${e.sc} ${f1(e.rdOverFp)}`).join(' · ')}`);
 for (const s of points) {
   console.log(`${s.label.padEnd(20)} ${s.pts.map((p) => `${p.sc} ${f2(p.pct)}% ${f2(p.w)}W`).join(' · ')}`);
 }
