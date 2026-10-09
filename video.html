@@ -36,15 +36,15 @@
             controls
             playsinline
             preload="metadata"
-            poster="./landing/simulator-mission-1200.webp"
-            width="2400"
-            height="1350"
+            poster="./video/flexipath-two-minutes.jpg"
+            width="1920"
+            height="1080"
           >
             <source src="./video/flexipath-two-minutes.mp4" type="video/mp4" />
           </video>
         </figure>
         <p id="video-note" class="mt-4 hidden rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[14px] text-amber-900">
-          The video file is not published yet. The guided demo below walks through the same flight live, pausing at each
+          The video could not load. The guided demo below walks through the same flight live, pausing at each
           real decision.
         </p>
 
@@ -56,7 +56,7 @@
       </div>
     </main>
     <script>
-      // Until the MP4 is published the player would show an empty frame: say so and point at the guided demo.
+      // If the MP4 fails to load, the player would show an empty frame: say so and point at the guided demo.
       (function () {
         var v = document.getElementById('video');
         var note = document.getElementById('video-note');
