@@ -661,12 +661,15 @@ drone.
 **Two looks** (`L`, the **Real / Twin** button, or `?look=twin`). Both show the same network layer: drones, beams,
 packets, coverage rings and labels. The world around it changes.
 - **Real** (default) is a moonlit night (`RealWorld.js`):
-  - a city on the twin's plots (`RealCity.js`):
-    - glass towers with reflective curtain walls, podiums, setbacks, LED crowns and spires;
+  - a city on the twin's plots and its own infill (`RealCity.js`), rising to a downtown skyline behind zone 2:
+    - glass towers (blue-black or bronze) with reflective curtain walls, podiums, setbacks, LED crowns and spires;
     - office slabs with ribbon windows;
     - sand-coloured residential blocks with balconies;
     - lit shopfronts along the street;
-    - low-rise blocks on the camera side;
+    - low-rise blocks on the camera side, and a city edge behind the dock;
+    - red aviation lights on the tall towers and lit helipads on a few roofs;
+  - the city beyond the city (`RealSkyline.js`): a distant skyline with lit windows, street lights on the far ground
+    and a warm light-pollution glow over the horizon, none over the desert;
   - windows lit floor by floor, with dim night lighting behind the rest so every facade shows its grid;
   - a tarmac road with lane markings, pavements, street lights and palms through zones 1–3;
   - ground that turns to desert sand in zone 4, with dunes, the ridge that shadows 5G, date palms and rocks;
@@ -702,7 +705,7 @@ FlexiPath/
     │                                   (existing-mechanism baselines), DecisionTrace,
     │                                   PowerModel, ReorderingBuffer, RelayTunnelModel, QoEModel, ExperimentRunner
     ├── three/                          SceneManager, VehicleManager, NetworkNodeManager, BeamManager,
-    │                                   PacketParticleManager, EnvironmentManager, RealWorld + RealCity (realistic look)
+    │                                   PacketParticleManager, EnvironmentManager, RealWorld + RealCity + RealSkyline (realistic look)
     ├── ui/                             Dashboard, SystemLoop, PredictionPanel, DecisionPanel, TrafficPanel,
     │                                   EngineeringPanel, ComparisonLanes, PredictionInternals, TunnelPanel,
     │                                   ExperimentPanel, GuidedDemo, InfoContent, TelemetryPanel, FlowInspector,

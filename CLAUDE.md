@@ -229,14 +229,20 @@ vehicles, nodes, beams, particles }` in the console.
   `buildDrone()` mesh names in step.
 - `RealWorld.js` builds the realistic world once, procedurally (canvas textures, merged or instanced geometry, no
   image files), from the route, the twin city's plots (`EnvironmentManager.cityBoxes`) and the dock pad frames. It
-  uses its own `Random('flexipath-real')`. `RealCity.js` turns the plots (plus low-rise plots on the camera side) into
-  buildings:
-  - one canvas-painted facade tile per type (curtain wall, ribbon, punched) with colour, emissive and
-    roughness / metalness maps;
+  uses its own `Random('flexipath-real')`. `RealCity.js` turns the plots into buildings. On top of the twin's plots it
+  adds low-rise plots on the camera side and its own infill (`infillPlots`): rows 1–6 behind the street, a downtown
+  skyline in zone 2, low-rise rows on the camera side, and a city edge behind the dock. The infill has its own random
+  stream (`flexipath-real-city-infill`) so the twin's buildings keep their look. Each building gets:
+  - one canvas-painted facade tile per type (curtain wall, bronze curtain wall, ribbon, punched) with colour, emissive
+    and roughness / metalness maps;
   - world-scale UVs with a whole-storey offset per building;
   - one merged mesh per material;
   - a night environment map for the glass;
   - an `onBeforeCompile` uplight (street-light spill fading with height).
-  Keep tall buildings off the camera side (+Z): the chase and cinematic cameras look across it. Anything that belongs only to the neon world goes into
+
+  Aviation lights and helipads come from the recorded tower tops, without random draws. `RealSkyline.js` adds the
+  distant skyline, the far street-light points and the horizon glow band, on its own stream
+  (`flexipath-real-skyline`). New random consumers in the realistic world get their own `Random` label, so existing
+  objects keep their look. Keep tall buildings off the camera side (+Z): the chase and cinematic cameras look across it. Anything that belongs only to the neon world goes into
   `EnvironmentManager.twin`; labels and the sky dome are shared.
 - The drones' corridor passes under the gantries' signs (`GANTRY_Y`); keep that clearance if either height changes.

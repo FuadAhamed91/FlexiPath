@@ -7,8 +7,13 @@
  *   • office slabs: concrete spandrels and glass ribbon windows, lit floor by floor
  *   • residential blocks: sand-coloured concrete, framed windows, balconies, warm lights
  *   • lit shopfronts with signs along the street, parapets and rooftop plant on every roof
+ *   • red aviation lights on the tall towers and a few lit rooftop helipads
  * Each facade type is one canvas-painted tile (colour, emissive, roughness/metalness) mapped at a fixed world
  * scale, so storeys line up across a building; each material is one merged mesh (one draw call).
+ *
+ * Besides the twin's plots, the realistic look fills in its own plots (`infillPlots`): rows behind the street rising
+ * to a downtown skyline in zone 2, low-rise rows on the camera side and a city edge behind the dock. They come from
+ * their own random stream, so the buildings on the twin's plots look exactly as before.
  */
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -20,6 +25,7 @@ const SHOP_H = 0.95; // shopfront band
 const SHOP_W = 1.6; // one shop
 const FACADES = {
   curtain: { cols: 8, cellW: 0.75, px: 128 },
+  bronze: { cols: 8, cellW: 0.75, px: 128 }, // the curtain wall in bronze-tinted glass
   ribbon: { cols: 4, cellW: 1.5, px: 256 },
   punched: { cols: 6, cellW: 0.9, px: 128 },
 };
@@ -107,8 +113,9 @@ function paintFacade(kind, rng) {
   e.fillRect(0, 0, W, H);
   const mr = (rough, metal) => `rgb(0,${rough},${metal})`;
 
-  if (kind === 'curtain') {
-    c.fillStyle = '#353c46'; // slim dark aluminium mullions
+  if (kind === 'curtain' || kind === 'bronze') {
+    const bronze = kind === 'bronze';
+    c.fillStyle = bronze ? '#3d362e' : '#353c46'; // slim dark aluminium (or bronze) mullions
     c.fillRect(0, 0, W, H);
     m.fillStyle = mr(140, 220);
     m.fillRect(0, 0, W, H);
@@ -119,12 +126,12 @@ function paintFacade(kind, rng) {
       for (let k = 0; k < cols; k++) {
         const x = k * px + 2;
         const pw = px - 4;
-        // Blue-black glass, each pane a little different, with the city's lights faintly reflected in it.
+        // Blue-black (or bronze) glass, each pane a little different, with the city's lights faintly reflected in it.
         const lift = rng.next() * 0.08;
         const pane = c.createLinearGradient(x, y + 2, x + pw * 0.6, y + 2 + ph);
-        pane.addColorStop(0, `rgb(${30 + 60 * lift},${44 + 70 * lift},${62 + 90 * lift})`);
-        pane.addColorStop(0.55, '#0c141e');
-        pane.addColorStop(1, '#070b11');
+        pane.addColorStop(0, bronze ? `rgb(${62 + 80 * lift},${46 + 60 * lift},${30 + 40 * lift})` : `rgb(${30 + 60 * lift},${44 + 70 * lift},${62 + 90 * lift})`);
+        pane.addColorStop(0.55, bronze ? '#1c140d' : '#0c141e');
+        pane.addColorStop(1, bronze ? '#0e0a07' : '#070b11');
         c.fillStyle = pane;
         c.fillRect(x, y + 2, pw, ph);
         if (rng.next() < 0.35) {
@@ -133,7 +140,7 @@ function paintFacade(kind, rng) {
             c.fillRect(x + rng.next() * (pw - 4), y + 2 + ph * (0.35 + 0.6 * rng.next()), 2 + rng.next() * 3, 2);
           }
         }
-        c.fillStyle = '#141b25'; // spandrel panel
+        c.fillStyle = bronze ? '#231b14' : '#141b25'; // spandrel panel
         c.fillRect(x, y + 4 + ph, pw, ch - ph - 6);
         m.fillStyle = mr(18, 190);
         m.fillRect(x, y + 2, pw, ph);
@@ -322,7 +329,7 @@ function nightEnvironment(renderer, rng) {
  * The four walls of a block, outward-facing, with u running left → right as seen from outside (in cells of the
  * facade tile, from `u`) and v = `v` + absolute height / tile height, so storeys line up between tiers.
  */
-function walls(x0, x1, z0, z1, y0, y1, tileW, tileH, { u: uOff = 0, v: vOff = 0, outset = 0 } = {}) {
+export function walls(x0, x1, z0, z1, y0, y1, tileW, tileH, { u: uOff = 0, v: vOff = 0, outset = 0 } = {}) {
   x0 -= outset;
   x1 += outset;
   z0 -= outset;
@@ -357,7 +364,7 @@ function walls(x0, x1, z0, z1, y0, y1, tileW, tileH, { u: uOff = 0, v: vOff = 0,
   return g;
 }
 
-function roof(x0, x1, z0, z1, y) {
+export function roof(x0, x1, z0, z1, y) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute([x0, y, z1, x1, y, z1, x1, y, z0, x0, y, z0], 3));
   g.setAttribute('normal', new THREE.Float32BufferAttribute([0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0], 3));
@@ -436,7 +443,8 @@ function planBuilding(out, b, rng) {
   if (b.h >= 15) {
     // Tower: podium with shops, inset shaft, optional setback, crown and spire.
     const glass = rng.next() < 0.68;
-    const kind = glass ? 'curtain' : 'ribbon';
+    // A third of the glass towers in bronze glass, picked from the plot position (no random draw).
+    const kind = glass ? (Math.abs(Math.round(b.x * 3.7 + b.z * 1.3)) % 3 === 0 ? 'bronze' : 'curtain') : 'ribbon';
     const podium = Math.round((1.6 + rng.next()) / FLOOR_H) * FLOOR_H;
     add('ribbon', x0, x1, z0, z1, 0, podium);
     if (street) shops(x0, x1, z0, z1);
@@ -467,11 +475,15 @@ function planBuilding(out, b, rng) {
       const list = warmLeds ? out.ledWarm : out.led;
       for (const [cx, cz] of [[sx0, sz0], [sx1, sz0], [sx0, sz1], [sx1, sz1]]) list.push(box(0.05, mid - podium, 0.05, cx, podium, cz));
     }
+    let spireTop = null;
     if (top > 24 && rng.next() < 0.35) {
       const spire = new THREE.CylinderGeometry(0.05, 0.16, 3 + rng.next() * 4, 8);
       spire.translate((tx0 + tx1) / 2, top + spire.parameters.height / 2, (tz0 + tz1) / 2);
       out.roof.push(spire);
+      spireTop = top + spire.parameters.height;
     }
+    // Recorded without drawing from rng, so the rooftop extras never change a building's own look.
+    out.tops.push({ x0: tx0, x1: tx1, z0: tz0, z1: tz1, y: top, spireTop });
   } else {
     // Mid / low-rise block, shops on the street side.
     const kind = rng.next() < (b.h >= 8 ? 0.45 : 0.25) ? 'ribbon' : 'punched';
@@ -499,15 +511,160 @@ function streetSidePlots(roadZ, rng, maxX) {
   return plots;
 }
 
+const lerp = (a, b, t) => a + (b - a) * t;
+const smooth = (e0, e1, x) => THREE.MathUtils.smoothstep(x, e0, e1);
+
+/**
+ * Extra plots for the realistic look only (the neon twin keeps its own). Three groups, each clear of the twin's plots,
+ * the network masts and the dock:
+ *   • the far (−Z) side, rows 1–6 behind the street, rising to a downtown skyline behind zone 2;
+ *   • the camera (+Z) side, low-rise rows behind the shops (≤ 4.8 units, under the chase and cinematic cameras);
+ *   • a city edge behind the dock, where the road begins.
+ * Row 0 on the far side is left as the twin placed it, so nothing new stands near the cameras' orbit.
+ */
+function infillPlots(taken, rng, maxX, roadZ) {
+  const plots = [];
+  const keepOut = [
+    { x: 22, z: -14, r: 9 }, // Wi-Fi pole
+    { x: 125, z: -22, r: 14 }, // 5G mast
+    { x: -3, z: 0, r: 12 }, // dock apron
+  ];
+  const fits = (p) =>
+    !keepOut.some((k) => Math.hypot(k.x - p.x, k.z - p.z) < k.r + Math.max(p.w, p.d) / 2) &&
+    !taken.some((b) => Math.abs(b.x - p.x) < (b.w + p.w) / 2 + 1.1 && Math.abs(b.z - p.z) < (b.d + p.d) / 2 + 1.1) &&
+    !plots.some((b) => Math.abs(b.x - p.x) < (b.w + p.w) / 2 + 1.1 && Math.abs(b.z - p.z) < (b.d + p.d) / 2 + 1.1);
+  const add = (p) => {
+    if (fits(p)) plots.push(p);
+  };
+  // 0 → 1 → 0 across zone 2, the downtown core; 1 → 0 where the city ends at the desert.
+  const downtown = (x) => smooth(28, 48, x) * (1 - smooth(88, 110, x));
+  const cityFade = (x) => 1 - smooth(maxX - 24, maxX, x);
+
+  for (let row = 1; row <= 6; row++) {
+    const back = row >= 3;
+    for (let x = -88; x < maxX - 2; x += rng.range(5, 7.5)) {
+      const dt = downtown(x);
+      if (rng.next() > (0.6 + 0.28 * dt) * (0.55 + 0.45 * cityFade(x))) continue;
+      const [b0, b1] = back ? [6, 17] : [5, 13];
+      const [d0, d1] = back ? [16, 44] : [12, 30];
+      const h = rng.range(lerp(b0, d0, dt), lerp(b1, d1, dt)) * (row >= 5 ? 1.1 : 1) * (0.5 + 0.5 * cityFade(x));
+      add({ x, z: roadZ(x) - (16 + row * 11 + rng.range(0, 4)), w: rng.range(3.6, 7), d: rng.range(4, 7.5), h });
+    }
+  }
+  for (let row = 0; row < 3; row++) {
+    for (let x = -88; x < maxX - 2; x += rng.range(5, 8)) {
+      if (rng.next() > 0.7 * cityFade(x)) continue;
+      add({ x, z: roadZ(x) + 29 + row * 10 + rng.range(0, 3), w: rng.range(3.8, 7), d: rng.range(4, 7), h: rng.range(1.8, 4.8) });
+    }
+  }
+  for (let x = -92; x < -34; x += rng.range(6, 8)) {
+    for (let z = -12; z <= 12; z += rng.range(8.5, 11)) {
+      if (rng.next() > 0.75) continue;
+      add({ x, z: z + rng.range(-1.5, 1.5), w: rng.range(4, 7), d: rng.range(4, 7), h: rng.range(4, 12) });
+    }
+  }
+  return plots;
+}
+
+/** A rooftop helipad decal: dark deck, a yellow touchdown ring, a white H and an amber edge stripe. */
+function paintHelipad() {
+  const S = 256;
+  const [cc, c] = canvas(S, S);
+  const [ec, e] = canvas(S, S);
+  c.fillStyle = '#26292e';
+  c.fillRect(0, 0, S, S);
+  e.fillStyle = '#000';
+  e.fillRect(0, 0, S, S);
+  for (const [g, glow] of [
+    [c, 1],
+    [e, 0.55],
+  ]) {
+    g.lineWidth = 12;
+    g.strokeStyle = `rgba(242,196,64,${glow})`;
+    g.beginPath();
+    g.arc(S / 2, S / 2, S * 0.38, 0, Math.PI * 2);
+    g.stroke();
+    g.fillStyle = `rgba(240,244,248,${glow})`;
+    g.fillRect(S * 0.36, S * 0.3, S * 0.07, S * 0.4); // H
+    g.fillRect(S * 0.57, S * 0.3, S * 0.07, S * 0.4);
+    g.fillRect(S * 0.36, S * 0.47, S * 0.28, S * 0.06);
+  }
+  c.strokeStyle = '#c98a2c';
+  c.lineWidth = 6;
+  c.strokeRect(3, 3, S - 6, S - 6);
+  const map = texture(cc, true);
+  const emissiveMap = texture(ec, true);
+  for (const t of [map, emissiveMap]) t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+  return { map, emissiveMap };
+}
+
+/**
+ * Rooftop extras, decided from the recorded tower tops without any random draws: red aviation lights on every
+ * tower above 22 units (and on spire tips), and helipads on four of the tallest flat roofs, spread along the road.
+ */
+function rooftopExtras(out) {
+  for (const t of out.tops) {
+    if (t.y < 22) continue;
+    const s = 0.16;
+    for (const [x, z] of [
+      [t.x0 + 0.18, t.z0 + 0.18],
+      [t.x1 - 0.18, t.z0 + 0.18],
+      [t.x0 + 0.18, t.z1 - 0.18],
+      [t.x1 - 0.18, t.z1 - 0.18],
+    ]) {
+      out.aviation.push(box(s, s, s, x, t.y + 0.3, z));
+    }
+    if (t.spireTop) out.aviation.push(box(s * 1.3, s * 1.3, s * 1.3, (t.x0 + t.x1) / 2, t.spireTop - 0.05, (t.z0 + t.z1) / 2));
+  }
+  const pads = [];
+  const candidates = out.tops
+    .filter((t) => !t.spireTop && t.y >= 16 && t.x1 - t.x0 >= 3 && t.z1 - t.z0 >= 3 && (t.z0 + t.z1) / 2 > -75)
+    .sort((a, b) => b.y - a.y);
+  for (const t of candidates) {
+    const cx = (t.x0 + t.x1) / 2;
+    if (pads.length >= 4) break;
+    if (pads.some((p) => Math.abs(p.cx - cx) < 18)) continue;
+    pads.push({ ...t, cx });
+  }
+  for (const t of pads) {
+    const cz = (t.z0 + t.z1) / 2;
+    const size = Math.min(t.x1 - t.x0, t.z1 - t.z0) - 0.5;
+    const deckY = t.y + 0.9; // a raised deck clears the rooftop plant
+    out.roof.push(box(size + 0.3, 0.12, size + 0.3, t.cx, deckY - 0.12, cz));
+    for (const [dx, dz] of [
+      [-1, -1],
+      [1, -1],
+      [-1, 1],
+      [1, 1],
+    ]) {
+      out.roof.push(box(0.12, 0.8, 0.12, t.cx + (dx * size) / 2.4, t.y, cz + (dz * size) / 2.4));
+    }
+    const pad = new THREE.PlaneGeometry(size, size);
+    pad.rotateX(-Math.PI / 2);
+    pad.translate(t.cx, deckY + 0.005, cz);
+    out.helipad.push(pad);
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      out.padLight.push(box(0.12, 0.08, 0.12, t.cx + Math.cos(a) * size * 0.47, deckY, cz + Math.sin(a) * size * 0.47));
+    }
+  }
+}
+
 /**
  * @param {{boxes: Array<{x:number,z:number,w:number,d:number,h:number}>, rng: object, renderer: THREE.WebGLRenderer,
  *          maxX: number, roadZ: (x:number) => number}} opts
  */
-export function buildRealCity({ boxes, rng, renderer, maxX, roadZ }) {
+export function buildRealCity({ boxes, rng, infillRng, renderer, maxX, roadZ }) {
   const env = nightEnvironment(renderer, rng);
-  const out = { curtain: [], ribbon: [], punched: [], shop: [], roof: [], led: [], ledWarm: [] };
-  for (const b of boxes) if (b.x <= maxX) planBuilding(out, b, rng);
-  for (const b of streetSidePlots(roadZ, rng, maxX)) planBuilding(out, b, rng);
+  const out = { curtain: [], bronze: [], ribbon: [], punched: [], shop: [], roof: [], led: [], ledWarm: [], aviation: [], helipad: [], padLight: [], tops: [] };
+  const twinPlots = boxes.filter((b) => b.x <= maxX);
+  for (const b of twinPlots) planBuilding(out, b, rng);
+  const streetPlots = streetSidePlots(roadZ, rng, maxX);
+  for (const b of streetPlots) planBuilding(out, b, rng);
+  // The realistic look's own plots, on their own stream: the twin's buildings above keep their exact look.
+  for (const b of infillPlots([...twinPlots, ...streetPlots], infillRng, maxX, roadZ)) planBuilding(out, b, infillRng);
+  rooftopExtras(out);
+  delete out.tops;
 
   const facadeMat = (tex, envMapIntensity, uplight) =>
     withUplight(
@@ -543,7 +700,12 @@ export function buildRealCity({ boxes, rng, renderer, maxX, roadZ }) {
     roof: new THREE.MeshStandardMaterial({ color: '#46494e', roughness: 0.9, metalness: 0.15, envMap: env, envMapIntensity: 0.2 }),
     led: new THREE.MeshStandardMaterial({ color: '#0b0d10', emissive: '#d9e6ff', emissiveIntensity: 2.4 }),
     ledWarm: new THREE.MeshStandardMaterial({ color: '#0b0d10', emissive: '#ffd6a0', emissiveIntensity: 2.2 }),
+    aviation: new THREE.MeshStandardMaterial({ color: '#2a0505', emissive: '#ff2b2b', emissiveIntensity: 3.2 }),
+    helipad: new THREE.MeshStandardMaterial({ ...paintHelipad(), emissive: '#ffffff', emissiveIntensity: 0.9, roughness: 0.85 }),
+    padLight: new THREE.MeshStandardMaterial({ color: '#06200f', emissive: '#4dff8a', emissiveIntensity: 2.6 }),
   };
+  // Painted last, so the textures above keep their random draws (and their look).
+  materials.bronze = facadeMat(paintFacade('bronze', rng), 1.6, 0.7);
   const city = new THREE.Group();
   city.name = 'RealCity';
   for (const [key, geos] of Object.entries(out)) {
