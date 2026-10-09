@@ -2,14 +2,16 @@
  * RealCity.js — the realistic look's city: glass towers, office slabs, residential blocks and shopfronts.
  *
  * Built on the twin city's plots (EnvironmentManager.cityBoxes), with seeded variety:
- *   • glass towers: reflective curtain walls (a night-sky + city-glow environment map), a podium,
- *     setbacks, LED crown lines and the odd spire
- *   • office slabs: concrete spandrels and glass ribbon windows, lit floor by floor
- *   • residential blocks: sand-coloured concrete, framed windows, balconies, warm lights
+ *   • towers in blue, bronze, teal or silver glass (reflecting a night-sky + city-glow environment map) or stone, on a
+ *     stone podium: round towers, twin towers, stepped and classic shafts, with LED crowns, spires or pyramid caps
+ *   • office slabs in concrete, granite or limestone with glass ribbon windows, lit floor by floor
+ *   • residential blocks in sand, white or terracotta render, framed windows, balconies, warm lights; L-shaped,
+ *     terraced, or two neighbours of different heights on one plot
  *   • lit shopfronts with signs along the street, parapets and rooftop plant on every roof
  *   • red aviation lights on the tall towers and a few lit rooftop helipads
- * Each facade type is one canvas-painted tile (colour, emissive, roughness/metalness) mapped at a fixed world
- * scale, so storeys line up across a building; each material is one merged mesh (one draw call).
+ * Each facade style is one canvas-painted tile (colour, emissive, roughness/metalness) mapped at a fixed world scale,
+ * so storeys line up across a building; each material is one merged mesh (one draw call). Every building also gets its
+ * own wall tint (vertex colour) and window light level and colour (`aGlow`), so no two read the same.
  *
  * Besides the twin's plots, the realistic look fills in its own plots (`infillPlots`): rows behind the street rising
  * to a downtown skyline in zone 2, low-rise rows on the camera side and a city edge behind the dock. They come from
@@ -23,12 +25,35 @@ const ROWS = 16; // storeys per texture tile
 const TILE_H = FLOOR_H * ROWS;
 const SHOP_H = 0.95; // shopfront band
 const SHOP_W = 1.6; // one shop
-const FACADES = {
+/** Tile layout per facade type: window columns, cell width (world units) and canvas pixels per column. */
+const LAYOUT = {
   curtain: { cols: 8, cellW: 0.75, px: 128 },
-  bronze: { cols: 8, cellW: 0.75, px: 128 }, // the curtain wall in bronze-tinted glass
   ribbon: { cols: 4, cellW: 1.5, px: 256 },
   punched: { cols: 6, cellW: 0.9, px: 128 },
 };
+/**
+ * Facade styles: `type` picks the painter and tile layout, the palette the look. Each style is one texture set and one
+ * merged mesh; every building also gets its own wall tint and window light level (vertex attributes), so two
+ * buildings in the same style still differ.
+ */
+const STYLES = {
+  // Curtain walls: pane = glass height per storey, fin = mullion width (px), dark / full = share of dark / fully lit floors.
+  glassBlue: { type: 'curtain', mullion: '#353c46', glass: [30, 44, 62], mid: '#0c141e', low: '#070b11', spandrel: '#141b25', env: 1.8 },
+  glassBronze: { type: 'curtain', mullion: '#3d362e', glass: [62, 46, 30], mid: '#1c140d', low: '#0e0a07', spandrel: '#231b14', env: 1.6, pane: 0.84, fin: 6, dark: 0.38, full: 0.2 },
+  glassTeal: { type: 'curtain', mullion: '#2c3b3c', glass: [22, 58, 60], mid: '#09191a', low: '#050e0e', spandrel: '#0f1e1e', env: 1.8, pane: 0.7, fin: 14, dark: 0.22, full: 0.4 },
+  glassSilver: { type: 'curtain', mullion: '#70757e', glass: [78, 86, 98], mid: '#262c34', low: '#151a20', spandrel: '#3d424a', env: 2.1, pane: 0.56, fin: 3, dark: 0.3, full: 0.3 },
+  // Ribbon offices: bandH = window band height per storey.
+  concrete: { type: 'ribbon', wall: '#7a8087', sill: '#6f757c', band: ['#1f2b38', '#080d13'], mullion: '#353c45' },
+  granite: { type: 'ribbon', wall: '#4d5057', sill: '#404349', band: ['#1d2530', '#070a0f'], mullion: '#2a2d33', bandH: 0.42, dark: 0.2, full: 0.42 },
+  limestone: { type: 'ribbon', wall: '#a59c8a', sill: '#8f8676', band: ['#22303b', '#0a1016'], mullion: '#5b554b', bandH: 0.68, dark: 0.34, full: 0.22 },
+  // Punched render: win = window width per cell, lit = share of lit windows.
+  sand: { type: 'punched', wall: '#9b8b76', frame: '#5a5046', balcony: '#7b6f60' },
+  white: { type: 'punched', wall: '#c2bdb3', frame: '#6c6a66', balcony: '#a39f97', win: 0.34, lit: 0.3 },
+  terracotta: { type: 'punched', wall: '#93583e', frame: '#4b3026', balcony: '#7a4c3c', win: 0.56, lit: 0.48 },
+};
+const GLASS = ['glassBlue', 'glassBlue', 'glassBronze', 'glassTeal', 'glassSilver'];
+const STONE = ['concrete', 'granite', 'limestone'];
+const RENDER = ['sand', 'sand', 'white', 'terracotta'];
 const SIGN_COLOURS = ['#ff5a5a', '#3fd2c7', '#ffb547', '#f4f6f8', '#7aa2ff', '#ff7ac8', '#9be15d'];
 
 // ── Canvas painting ─────────────────────────────────────────────────────────
@@ -100,9 +125,10 @@ function litWindow(c, e, x, y, w, h, warm, k, rng) {
   c.fillRect(x, y, w, h);
 }
 
-/** Facade tile → { map, emissiveMap, mrMap } (mrMap: green = roughness, blue = metalness). */
-function paintFacade(kind, rng) {
-  const { cols, px } = FACADES[kind];
+/** Facade tile for one style → { map, emissiveMap, mrMap } (mrMap: green = roughness, blue = metalness). */
+function paintFacade(id, rng) {
+  const st = STYLES[id];
+  const { cols, px } = LAYOUT[st.type];
   const ch = 64;
   const W = cols * px;
   const H = ROWS * ch;
@@ -113,25 +139,26 @@ function paintFacade(kind, rng) {
   e.fillRect(0, 0, W, H);
   const mr = (rough, metal) => `rgb(0,${rough},${metal})`;
 
-  if (kind === 'curtain' || kind === 'bronze') {
-    const bronze = kind === 'bronze';
-    c.fillStyle = bronze ? '#3d362e' : '#353c46'; // slim dark aluminium (or bronze) mullions
+  if (st.type === 'curtain') {
+    c.fillStyle = st.mullion; // slim aluminium mullions
     c.fillRect(0, 0, W, H);
     m.fillStyle = mr(140, 220);
     m.fillRect(0, 0, W, H);
     for (let r = 0; r < ROWS; r++) {
-      const plan = floorPlan(rng, cols);
+      const plan = floorPlan(rng, cols, st.dark ?? 0.28, st.full ?? 0.27);
       const y = r * ch;
-      const ph = Math.round(ch * 0.76) - 2;
+      const ph = Math.round(ch * (st.pane ?? 0.76)) - 2;
+      const fin = st.fin ?? 4;
       for (let k = 0; k < cols; k++) {
-        const x = k * px + 2;
-        const pw = px - 4;
-        // Blue-black (or bronze) glass, each pane a little different, with the city's lights faintly reflected in it.
-        const lift = rng.next() * 0.08;
+        const x = k * px + fin / 2;
+        const pw = px - fin;
+        // Tinted glass, each pane a little different, with the city's lights faintly reflected in it.
+        const lift = 1 + rng.next() * 0.25;
+        const [gr, gg, gb] = st.glass;
         const pane = c.createLinearGradient(x, y + 2, x + pw * 0.6, y + 2 + ph);
-        pane.addColorStop(0, bronze ? `rgb(${62 + 80 * lift},${46 + 60 * lift},${30 + 40 * lift})` : `rgb(${30 + 60 * lift},${44 + 70 * lift},${62 + 90 * lift})`);
-        pane.addColorStop(0.55, bronze ? '#1c140d' : '#0c141e');
-        pane.addColorStop(1, bronze ? '#0e0a07' : '#070b11');
+        pane.addColorStop(0, `rgb(${Math.round(gr * lift)},${Math.round(gg * lift)},${Math.round(gb * lift)})`);
+        pane.addColorStop(0.55, st.mid);
+        pane.addColorStop(1, st.low);
         c.fillStyle = pane;
         c.fillRect(x, y + 2, pw, ph);
         if (rng.next() < 0.35) {
@@ -140,7 +167,7 @@ function paintFacade(kind, rng) {
             c.fillRect(x + rng.next() * (pw - 4), y + 2 + ph * (0.35 + 0.6 * rng.next()), 2 + rng.next() * 3, 2);
           }
         }
-        c.fillStyle = bronze ? '#231b14' : '#141b25'; // spandrel panel
+        c.fillStyle = st.spandrel; // spandrel panel
         c.fillRect(x, y + 4 + ph, pw, ch - ph - 6);
         m.fillStyle = mr(18, 190);
         m.fillRect(x, y + 2, pw, ph);
@@ -150,20 +177,20 @@ function paintFacade(kind, rng) {
         else dimWindow(e, x, y + 2, pw, ph, rng);
       }
     }
-  } else if (kind === 'ribbon') {
-    c.fillStyle = '#7a8087'; // concrete
+  } else if (st.type === 'ribbon') {
+    c.fillStyle = st.wall; // concrete or stone
     c.fillRect(0, 0, W, H);
     grain(c, W, H, rng, 22);
     m.fillStyle = mr(215, 10);
     m.fillRect(0, 0, W, H);
     const half = px / 2;
     for (let r = 0; r < ROWS; r++) {
-      const plan = floorPlan(rng, cols * 2, 0.28, 0.3);
+      const plan = floorPlan(rng, cols * 2, st.dark ?? 0.28, st.full ?? 0.3);
       const y = r * ch + 6;
-      const gh = Math.round(ch * 0.56);
+      const gh = Math.round(ch * (st.bandH ?? 0.56));
       const band = c.createLinearGradient(0, y, 0, y + gh);
-      band.addColorStop(0, '#1f2b38');
-      band.addColorStop(1, '#080d13');
+      band.addColorStop(0, st.band[0]);
+      band.addColorStop(1, st.band[1]);
       c.fillStyle = band;
       c.fillRect(0, y, W, gh);
       m.fillStyle = mr(30, 160);
@@ -171,14 +198,14 @@ function paintFacade(kind, rng) {
       for (let s = 0; s < cols * 2; s++) {
         if (plan.lit[s]) litWindow(c, e, s * half + 2, y, half - 4, gh, plan.warm, plan.k, rng);
         else dimWindow(e, s * half + 2, y, half - 4, gh, rng);
-        c.fillStyle = '#353c45'; // mullion
+        c.fillStyle = st.mullion; // mullion
         c.fillRect(s * half, y, 2, gh);
       }
-      c.fillStyle = '#6f757c'; // sill shadow line
+      c.fillStyle = st.sill; // sill shadow line
       c.fillRect(0, y + gh, W, 2);
     }
   } else {
-    c.fillStyle = '#9b8b76'; // sand-coloured render
+    c.fillStyle = st.wall; // render
     c.fillRect(0, 0, W, H);
     grain(c, W, H, rng, 26);
     m.fillStyle = mr(235, 0);
@@ -188,11 +215,11 @@ function paintFacade(kind, rng) {
       for (let k = 0; k < cols; k++) {
         const x = k * px;
         const y = r * ch;
-        const ww = Math.round(px * 0.46);
+        const ww = Math.round(px * (st.win ?? 0.46));
         const wh = Math.round(ch * 0.56);
         const wx = x + Math.round((px - ww) / 2);
         const wy = y + Math.round(ch * 0.14);
-        c.fillStyle = '#5a5046'; // frame
+        c.fillStyle = st.frame; // frame
         c.fillRect(wx - 3, wy - 3, ww + 6, wh + 6);
         const glass = c.createLinearGradient(0, wy, 0, wy + wh);
         glass.addColorStop(0, '#26303b');
@@ -201,7 +228,7 @@ function paintFacade(kind, rng) {
         c.fillRect(wx, wy, ww, wh);
         m.fillStyle = mr(45, 110);
         m.fillRect(wx, wy, ww, wh);
-        if (rng.next() >= 0.4) dimWindow(e, wx, wy, ww, wh, rng);
+        if (rng.next() >= (st.lit ?? 0.4)) dimWindow(e, wx, wy, ww, wh, rng);
         else {
           const warm = rng.next() < 0.8;
           litWindow(c, e, wx, wy, ww, wh, warm, 0.55 + 0.4 * rng.next(), rng);
@@ -211,7 +238,7 @@ function paintFacade(kind, rng) {
           }
         }
         if (balconies && k % 2 === 0) {
-          c.fillStyle = '#7b6f60'; // balcony slab and railing
+          c.fillStyle = st.balcony; // balcony slab and railing
           c.fillRect(x + 8, wy + wh + 5, px - 16, 6);
           c.fillStyle = 'rgba(40,36,32,0.8)';
           for (let rx = x + 10; rx < x + px - 10; rx += 9) c.fillRect(rx, wy + wh - 9, 2, 14);
@@ -280,22 +307,69 @@ function paintShops(rng) {
 /**
  * Light that isn't modelled as lamps: warm street-light spill and floodlighting that fades up a facade, plus a
  * faint sky fill, so walls read as walls at night instead of black voids. Added in the shader by world height.
+ * The windows' light is scaled per building by the `aGlow` attribute (level and colour), the walls by vertex colour,
+ * and `aAccent` (colour, start height) washes the top of some towers in static architectural light.
  */
 function withUplight(material, strength) {
+  material.vertexColors = true;
   material.onBeforeCompile = (shader) => {
     shader.uniforms.uUpWarm = { value: new THREE.Color('#ffc98f').multiplyScalar(0.4 * strength) };
     shader.uniforms.uSkyFill = { value: new THREE.Color('#9fb3d8').multiplyScalar(0.06 * strength) };
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nvarying float vWorldY;')
-      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWorldY = (modelMatrix * vec4(transformed, 1.0)).y;');
+      .replace('#include <common>', '#include <common>\nvarying float vWorldY;\nattribute vec3 aGlow;\nvarying vec3 vGlow;\nattribute vec4 aAccent;\nvarying vec4 vAccent;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWorldY = (modelMatrix * vec4(transformed, 1.0)).y;\nvGlow = aGlow;\nvAccent = aAccent;');
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform vec3 uUpWarm;\nuniform vec3 uSkyFill;\nvarying float vWorldY;')
+      .replace('#include <common>', '#include <common>\nuniform vec3 uUpWarm;\nuniform vec3 uSkyFill;\nvarying float vWorldY;\nvarying vec3 vGlow;\nvarying vec4 vAccent;')
       .replace(
         '#include <emissivemap_fragment>',
-        '#include <emissivemap_fragment>\ntotalEmissiveRadiance += (diffuseColor.rgb + 0.1) * (uUpWarm * exp(-vWorldY / 2.8) + uSkyFill);',
+        '#include <emissivemap_fragment>\ntotalEmissiveRadiance *= vGlow;\ntotalEmissiveRadiance += vAccent.rgb * smoothstep(vAccent.w, vAccent.w + 4.0, vWorldY);\ntotalEmissiveRadiance += (diffuseColor.rgb + 0.1) * (uUpWarm * exp(-vWorldY / 2.8) + uSkyFill);',
       );
   };
   return material;
+}
+
+const pick = (rng, list) => list[Math.floor(rng.next() * list.length)];
+
+/** Static architectural light for tower tops (a Gulf skyline at night): cool white, teal, blue, violet, amber, magenta. */
+const ACCENTS = ['#a9d6ff', '#a9d6ff', '#4fd1c5', '#5f86ff', '#a98bff', '#ffb46b', '#ff8fd0'];
+const NO_ACCENT = [0, 0, 0, 1e4];
+
+/** A wash that fades in over the top 15–30 % of a tower, in one accent colour, for about a third of the towers. */
+function accentFor(rng, base, top) {
+  if (rng.next() > 0.34) return NO_ACCENT;
+  const c = new THREE.Color(pick(rng, ACCENTS)).multiplyScalar(rng.range(0.16, 0.36));
+  return [c.r, c.g, c.b, top - (top - base) * rng.range(0.15, 0.3)];
+}
+
+/**
+ * One building's look: a wall tint (brightness and a slight warm/cool shift) and a window light level and colour.
+ * Some buildings are bright offices, most are partly lit, some are nearly dark; homes lean warm, offices cool.
+ */
+function buildingLook(rng, residential) {
+  const b = rng.range(0.78, 1.15);
+  const shift = rng.range(-1, 1);
+  const tint = [b * (1 + 0.06 * shift), b, b * (1 - 0.06 * shift)];
+  const roll = rng.next();
+  const level = roll < 0.2 ? rng.range(0.08, 0.25) : roll < 0.4 ? rng.range(0.4, 0.7) : roll < 0.72 ? rng.range(0.8, 1.1) : rng.range(1.25, 1.75);
+  const warm = residential ? rng.range(0.2, 1) : rng.range(-1, 0.6);
+  return { tint, glow: [level * (1 + 0.12 * warm), level * (1 + 0.02 * warm), level * (1 - 0.2 * warm)] };
+}
+
+/** Give every vertex of a facade geometry its building's tint (`color`), window light (`aGlow`) and crown wash (`aAccent`). */
+function stamp(geo, look, accent = NO_ACCENT) {
+  const n = geo.attributes.position.count;
+  const color = new Float32Array(n * 3);
+  const glow = new Float32Array(n * 3);
+  const acc = new Float32Array(n * 4);
+  for (let i = 0; i < n; i++) {
+    color.set(look.tint, i * 3);
+    glow.set(look.glow, i * 3);
+    acc.set(accent, i * 4);
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(color, 3));
+  geo.setAttribute('aGlow', new THREE.BufferAttribute(glow, 3));
+  geo.setAttribute('aAccent', new THREE.BufferAttribute(acc, 4));
+  return geo;
 }
 
 /** Night environment for reflections: dark sky, warm light-pollution glow and distant city lights. */
@@ -379,6 +453,31 @@ function box(w, h, d, x, y, z) {
   return g;
 }
 
+/** A round tower's wall, with the facade tile wrapped at the same world scale as the flat walls. */
+function roundWalls(cx, cz, r, y0, y1, tileW, tileH, { u: uOff = 0, v: vOff = 0 } = {}) {
+  const g = new THREE.CylinderGeometry(r, r, y1 - y0, 32, 1, true);
+  g.translate(cx, (y0 + y1) / 2, cz);
+  const uv = g.attributes.uv;
+  const pos = g.attributes.position;
+  const around = (2 * Math.PI * r) / tileW;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, uOff + uv.getX(i) * around, vOff + pos.getY(i) / tileH);
+  return g;
+}
+
+function disc(cx, cz, r, y) {
+  const g = new THREE.CircleGeometry(r, 32);
+  g.rotateX(-Math.PI / 2);
+  g.translate(cx, y, cz);
+  return g;
+}
+
+/** An open ring (a round parapet or LED band) of height `h` from `y`. */
+function ring(cx, cz, r, y, h) {
+  const g = new THREE.CylinderGeometry(r, r, h, 32, 1, true);
+  g.translate(cx, y + h / 2, cz);
+  return g;
+}
+
 /** Roof slab, parapet, and plant (AC units, tanks, a lift overrun) on a block's roof. */
 function roofTop(out, rng, x0, x1, z0, z1, y, plant = true) {
   const w = x1 - x0;
@@ -423,7 +522,12 @@ function crown(out, x0, x1, z0, z1, y, warm) {
   }
 }
 
-/** One plot → a building: tower (podium, shaft, setback, crown, spire) or a mid/low-rise block. */
+/**
+ * One plot → a building. Towers (h ≥ 15): a stone podium with shops on the street, then a round tower, twin towers,
+ * a stepped tower or a classic shaft, topped by an LED crown, a spire or a pyramid cap. Mid-rises: plain, L-shaped or
+ * terraced. Low-rises: one block or two joined ones of different heights. Every building gets its own style, wall
+ * tint and window light level.
+ */
 function planBuilding(out, b, rng) {
   const x0 = b.x - b.w / 2;
   const x1 = b.x + b.w / 2;
@@ -431,66 +535,165 @@ function planBuilding(out, b, rng) {
   const z1 = b.z + b.d / 2;
   const street = b.street ?? (b.z < 0 && b.z > -26); // first row on the near side lines the street
   const vOff = Math.floor(rng.next() * ROWS) / ROWS; // whole storeys, so neighbours don't repeat each other's floors
-  const add = (kind, ax0, ax1, az0, az1, y0, y1) => {
-    const f = FACADES[kind];
-    const u = Math.floor(rng.next() * f.cols) / f.cols;
-    out[kind].push(walls(ax0, ax1, az0, az1, y0, y1, f.cellW * f.cols, TILE_H, { u, v: vOff }));
+  const snap = (h) => Math.max(FLOOR_H * 3, Math.round(h / FLOOR_H) * FLOOR_H);
+  const block = (style, look, ax0, ax1, az0, az1, y0, y1, accent) => {
+    const L = LAYOUT[STYLES[style].type];
+    const u = Math.floor(rng.next() * L.cols) / L.cols;
+    out[style].push(stamp(walls(ax0, ax1, az0, az1, y0, y1, L.cellW * L.cols, TILE_H, { u, v: vOff }), look, accent));
   };
   const shops = (ax0, ax1, az0, az1) => {
     out.shop.push(walls(ax0, ax1, az0, az1, 0, SHOP_H, SHOP_W * 4, SHOP_H, { u: Math.floor(rng.next() * 4) / 4, outset: 0.02 }));
   };
 
+  /** A tower shaft from y0 to top, with 0–2 setbacks, its roof, lights and cap; records the top for the extras. */
+  const shaft = (style, look, ax0, ax1, az0, az1, y0, top, steps, allowCap) => {
+    let [a0, a1, c0, c1] = [ax0, ax1, az0, az1];
+    let yb = y0;
+    const accent = accentFor(rng, y0, top);
+    const cuts = steps === 2 ? [rng.range(0.5, 0.62), rng.range(0.76, 0.86)] : steps === 1 ? [rng.range(0.62, 0.76)] : [];
+    for (const f of cuts) {
+      const y = snap(top * f);
+      block(style, look, a0, a1, c0, c1, yb, y, accent);
+      roofTop(out, rng, a0, a1, c0, c1, y, false);
+      const jx = (a1 - a0) * 0.13;
+      const jz = (c1 - c0) * 0.13;
+      [a0, a1, c0, c1] = [a0 + jx, a1 - jx, c0 + jz, c1 - jz];
+      yb = y;
+    }
+    block(style, look, a0, a1, c0, c1, yb, top, accent);
+    roofTop(out, rng, a0, a1, c0, c1, top);
+    const glass = STYLES[style].type === 'curtain';
+    const warm = rng.next() < 0.3;
+    if (glass && rng.next() < 0.6) crown(out, a0, a1, c0, c1, top, warm);
+    if (glass && rng.next() < 0.3) {
+      // LED lines up the corners of the lowest tier
+      const list = warm ? out.ledWarm : out.led;
+      const yTop = cuts.length ? snap(top * cuts[0]) : top;
+      for (const [cx, cz] of [
+        [ax0, az0],
+        [ax1, az0],
+        [ax0, az1],
+        [ax1, az1],
+      ]) {
+        list.push(box(0.05, yTop - y0, 0.05, cx, y0, cz));
+      }
+    }
+    const cx = (a0 + a1) / 2;
+    const cz = (c0 + c1) / 2;
+    let tipY = null;
+    const capRoll = rng.next();
+    if (top > 24 && capRoll < 0.3) {
+      const spire = new THREE.CylinderGeometry(0.05, 0.16, 3 + rng.next() * 4, 8);
+      spire.translate(cx, top + spire.parameters.height / 2, cz);
+      out.roof.push(spire);
+      tipY = top + spire.parameters.height;
+    } else if (allowCap && capRoll < 0.52) {
+      // Pyramid cap in brushed metal, sitting inside the parapet
+      const h = rng.range(1.2, 2.8);
+      const cap = new THREE.ConeGeometry(Math.min(a1 - a0, c1 - c0) * 0.62, h, 4, 1);
+      cap.rotateY(Math.PI / 4);
+      cap.translate(cx, top + 0.05 + h / 2, cz);
+      out.cap.push(cap);
+      tipY = top + 0.05 + h;
+    }
+    // Recorded without drawing from rng: the aviation lights and helipads are decided from these afterwards.
+    out.tops.push({ x0: a0, x1: a1, z0: c0, z1: c1, y: top, tipY, round: false });
+  };
+
   if (b.h >= 15) {
-    // Tower: podium with shops, inset shaft, optional setback, crown and spire.
-    const glass = rng.next() < 0.68;
-    // A third of the glass towers in bronze glass, picked from the plot position (no random draw).
-    const kind = glass ? (Math.abs(Math.round(b.x * 3.7 + b.z * 1.3)) % 3 === 0 ? 'bronze' : 'curtain') : 'ribbon';
-    const podium = Math.round((1.6 + rng.next()) / FLOOR_H) * FLOOR_H;
-    add('ribbon', x0, x1, z0, z1, 0, podium);
+    const glass = rng.next() < 0.7;
+    const style = glass ? pick(rng, GLASS) : pick(rng, STONE);
+    const look = buildingLook(rng, false);
+    const podium = snap(1.6 + rng.next());
+    block(pick(rng, STONE), buildingLook(rng, false), x0, x1, z0, z1, 0, podium);
     if (street) shops(x0, x1, z0, z1);
+    roofTop(out, rng, x0, x1, z0, z1, podium, false);
     const ix = b.w * (0.1 + 0.08 * rng.next());
     const iz = b.d * (0.1 + 0.08 * rng.next());
-    const sx0 = x0 + ix;
-    const sx1 = x1 - ix;
-    const sz0 = z0 + iz;
-    const sz1 = z1 - iz;
-    roofTop(out, rng, x0, x1, z0, z1, podium, false);
-    const setback = rng.next() < 0.45;
+    const [sx0, sx1, sz0, sz1] = [x0 + ix, x1 - ix, z0 + iz, z1 - iz];
     const top = b.h;
-    const mid = setback ? Math.round((top * (0.62 + 0.14 * rng.next())) / FLOOR_H) * FLOOR_H : top;
-    add(kind, sx0, sx1, sz0, sz1, podium, mid);
-    let [tx0, tx1, tz0, tz1] = [sx0, sx1, sz0, sz1];
-    if (setback) {
-      const jx = (sx1 - sx0) * 0.14;
-      const jz = (sz1 - sz0) * 0.14;
-      [tx0, tx1, tz0, tz1] = [sx0 + jx, sx1 - jx, sz0 + jz, sz1 - jz];
-      roofTop(out, rng, sx0, sx1, sz0, sz1, mid, false);
-      add(kind, tx0, tx1, tz0, tz1, mid, top);
+    const form = rng.next();
+    if (form < 0.16 && Math.min(sx1 - sx0, sz1 - sz0) >= 3) {
+      // Round glass tower with an LED band and a round parapet
+      const r = Math.min(sx1 - sx0, sz1 - sz0) / 2;
+      const cx = (sx0 + sx1) / 2;
+      const cz = (sz0 + sz1) / 2;
+      const roundStyle = glass ? style : pick(rng, GLASS);
+      const L = LAYOUT.curtain;
+      out[roundStyle].push(stamp(roundWalls(cx, cz, r, podium, top, L.cellW * L.cols, TILE_H, { u: rng.next(), v: vOff }), look, accentFor(rng, podium, top)));
+      out.roof.push(disc(cx, cz, r, top), ring(cx, cz, r - 0.06, top, 0.28));
+      (rng.next() < 0.35 ? out.ledWarm : out.led).push(ring(cx, cz, r + 0.03, top - 0.2, 0.07), ring(cx, cz, r + 0.03, top - 0.5, 0.07));
+      out.tops.push({ x0: cx - r, x1: cx + r, z0: cz - r, z1: cz + r, y: top, tipY: null, round: true });
+    } else if (form < 0.36 && Math.max(sx1 - sx0, sz1 - sz0) >= 5) {
+      // Twin towers on one podium, split along the longer side, one shorter than the other
+      const gap = 0.7;
+      const alongX = sx1 - sx0 >= sz1 - sz0;
+      const mx = (sx0 + sx1) / 2;
+      const mz = (sz0 + sz1) / 2;
+      const parts = alongX
+        ? [
+            [sx0, mx - gap / 2, sz0, sz1],
+            [mx + gap / 2, sx1, sz0, sz1],
+          ]
+        : [
+            [sx0, sx1, sz0, mz - gap / 2],
+            [sx0, sx1, mz + gap / 2, sz1],
+          ];
+      const shorter = snap(top * rng.range(0.72, 0.9));
+      const tops = rng.next() < 0.5 ? [top, shorter] : [shorter, top];
+      parts.forEach(([a0, a1, c0, c1], i) => shaft(style, look, a0, a1, c0, c1, podium, tops[i], rng.next() < 0.3 ? 1 : 0, true));
+    } else {
+      // Stepped (two setbacks) or classic (one or none)
+      const steps = form < 0.6 ? 2 : rng.next() < 0.45 ? 1 : 0;
+      shaft(style, look, sx0, sx1, sz0, sz1, podium, top, steps, true);
     }
-    roofTop(out, rng, tx0, tx1, tz0, tz1, top);
-    const warmLeds = rng.next() < 0.3;
-    if (glass && rng.next() < 0.7) crown(out, tx0, tx1, tz0, tz1, top, warmLeds);
-    if (glass && rng.next() < 0.35) {
-      // LED lines up the shaft's corners
-      const list = warmLeds ? out.ledWarm : out.led;
-      for (const [cx, cz] of [[sx0, sz0], [sx1, sz0], [sx0, sz1], [sx1, sz1]]) list.push(box(0.05, mid - podium, 0.05, cx, podium, cz));
+  } else if (b.h >= 7.5) {
+    const residential = rng.next() < 0.55;
+    const style = residential ? pick(rng, RENDER) : pick(rng, STONE);
+    const look = buildingLook(rng, residential);
+    const h = snap(b.h);
+    const form = rng.next();
+    if (!street && form < 0.3 && b.w >= 4.5) {
+      // L-shape: a full-height block and a lower wing
+      const split = x0 + b.w * rng.range(0.55, 0.68);
+      const h2 = snap(h * rng.range(0.55, 0.8));
+      const [wz0, wz1] = rng.next() < 0.5 ? [z0, z0 + b.d * 0.55] : [z1 - b.d * 0.55, z1];
+      block(style, look, x0, split, z0, z1, 0, h);
+      roofTop(out, rng, x0, split, z0, z1, h);
+      block(style, look, split, x1, wz0, wz1, 0, h2);
+      roofTop(out, rng, split, x1, wz0, wz1, h2);
+    } else if (form < 0.55) {
+      // Terraced: a broad base, then an upper block set back
+      const h1 = snap(h * rng.range(0.55, 0.7));
+      const ix = b.w * rng.range(0.12, 0.2);
+      const iz = b.d * rng.range(0.15, 0.25);
+      block(style, look, x0, x1, z0, z1, 0, h1);
+      roofTop(out, rng, x0, x1, z0, z1, h1, false);
+      block(style, look, x0 + ix, x1 - ix, z0 + iz, z1 - iz, h1, h);
+      roofTop(out, rng, x0 + ix, x1 - ix, z0 + iz, z1 - iz, h);
+    } else {
+      block(style, look, x0, x1, z0, z1, 0, h);
+      roofTop(out, rng, x0, x1, z0, z1, h);
     }
-    let spireTop = null;
-    if (top > 24 && rng.next() < 0.35) {
-      const spire = new THREE.CylinderGeometry(0.05, 0.16, 3 + rng.next() * 4, 8);
-      spire.translate((tx0 + tx1) / 2, top + spire.parameters.height / 2, (tz0 + tz1) / 2);
-      out.roof.push(spire);
-      spireTop = top + spire.parameters.height;
-    }
-    // Recorded without drawing from rng, so the rooftop extras never change a building's own look.
-    out.tops.push({ x0: tx0, x1: tx1, z0: tz0, z1: tz1, y: top, spireTop });
-  } else {
-    // Mid / low-rise block, shops on the street side.
-    const kind = rng.next() < (b.h >= 8 ? 0.45 : 0.25) ? 'ribbon' : 'punched';
-    const h = Math.max(FLOOR_H * 3, Math.round(b.h / FLOOR_H) * FLOOR_H);
-    add(kind, x0, x1, z0, z1, 0, h);
     if (street && rng.next() < 0.75) shops(x0, x1, z0, z1);
-    roofTop(out, rng, x0, x1, z0, z1, h);
+  } else {
+    const residential = rng.next() < 0.75;
+    const style = residential ? pick(rng, RENDER) : pick(rng, STONE);
+    const h = snap(b.h);
+    if (!street && b.w >= 4.6 && rng.next() < 0.35) {
+      // Two neighbours sharing the plot, each in its own style and height (never taller on the camera side)
+      const split = x0 + b.w * rng.range(0.4, 0.6);
+      const h2 = snap(h * rng.range(0.6, b.z > 0 ? 1 : 1.35));
+      const style2 = rng.next() < 0.75 ? pick(rng, RENDER) : pick(rng, STONE);
+      block(style, buildingLook(rng, residential), x0, split, z0, z1, 0, h);
+      roofTop(out, rng, x0, split, z0, z1, h);
+      block(style2, buildingLook(rng, true), split, x1, z0, z1, 0, h2);
+      roofTop(out, rng, split, x1, z0, z1, h2);
+    } else {
+      block(style, buildingLook(rng, residential), x0, x1, z0, z1, 0, h);
+      roofTop(out, rng, x0, x1, z0, z1, h);
+    }
+    if (street && rng.next() < 0.75) shops(x0, x1, z0, z1);
   }
 }
 
@@ -600,25 +803,30 @@ function paintHelipad() {
 
 /**
  * Rooftop extras, decided from the recorded tower tops without any random draws: red aviation lights on every
- * tower above 22 units (and on spire tips), and helipads on four of the tallest flat roofs, spread along the road.
+ * tower above 22 units (on the roof's corners, or around a round roof, and on any spire or cap tip), and helipads on
+ * four of the tallest flat square roofs, spread along the road.
  */
 function rooftopExtras(out) {
   for (const t of out.tops) {
     if (t.y < 22) continue;
     const s = 0.16;
-    for (const [x, z] of [
-      [t.x0 + 0.18, t.z0 + 0.18],
-      [t.x1 - 0.18, t.z0 + 0.18],
-      [t.x0 + 0.18, t.z1 - 0.18],
-      [t.x1 - 0.18, t.z1 - 0.18],
-    ]) {
-      out.aviation.push(box(s, s, s, x, t.y + 0.3, z));
-    }
-    if (t.spireTop) out.aviation.push(box(s * 1.3, s * 1.3, s * 1.3, (t.x0 + t.x1) / 2, t.spireTop - 0.05, (t.z0 + t.z1) / 2));
+    const cx = (t.x0 + t.x1) / 2;
+    const cz = (t.z0 + t.z1) / 2;
+    const r = (t.x1 - t.x0) / 2 - 0.15;
+    const corners = t.round
+      ? [0, 1, 2, 3].map((k) => [cx + r * Math.cos(Math.PI / 4 + (k * Math.PI) / 2), cz + r * Math.sin(Math.PI / 4 + (k * Math.PI) / 2)])
+      : [
+          [t.x0 + 0.18, t.z0 + 0.18],
+          [t.x1 - 0.18, t.z0 + 0.18],
+          [t.x0 + 0.18, t.z1 - 0.18],
+          [t.x1 - 0.18, t.z1 - 0.18],
+        ];
+    for (const [x, z] of corners) out.aviation.push(box(s, s, s, x, t.y + 0.3, z));
+    if (t.tipY) out.aviation.push(box(s * 1.3, s * 1.3, s * 1.3, cx, t.tipY - 0.05, cz));
   }
   const pads = [];
   const candidates = out.tops
-    .filter((t) => !t.spireTop && t.y >= 16 && t.x1 - t.x0 >= 3 && t.z1 - t.z0 >= 3 && (t.z0 + t.z1) / 2 > -75)
+    .filter((t) => !t.tipY && !t.round && t.y >= 16 && t.x1 - t.x0 >= 3 && t.z1 - t.z0 >= 3 && (t.z0 + t.z1) / 2 > -75)
     .sort((a, b) => b.y - a.y);
   for (const t of candidates) {
     const cx = (t.x0 + t.x1) / 2;
@@ -656,7 +864,8 @@ function rooftopExtras(out) {
  */
 export function buildRealCity({ boxes, rng, infillRng, renderer, maxX, roadZ }) {
   const env = nightEnvironment(renderer, rng);
-  const out = { curtain: [], bronze: [], ribbon: [], punched: [], shop: [], roof: [], led: [], ledWarm: [], aviation: [], helipad: [], padLight: [], tops: [] };
+  const out = { shop: [], roof: [], cap: [], led: [], ledWarm: [], aviation: [], helipad: [], padLight: [], tops: [] };
+  for (const id of Object.keys(STYLES)) out[id] = [];
   const twinPlots = boxes.filter((b) => b.x <= maxX);
   for (const b of twinPlots) planBuilding(out, b, rng);
   const streetPlots = streetSidePlots(roadZ, rng, maxX);
@@ -683,10 +892,13 @@ export function buildRealCity({ boxes, rng, infillRng, renderer, maxX, roadZ }) 
       uplight,
     );
   const shopTex = paintShops(rng);
+  // Reflections and uplight per facade type: glass mirrors the night sky, render barely does.
+  const typeLook = { curtain: { uplight: 0.7 }, ribbon: { env: 1.2, uplight: 1 }, punched: { env: 0.35, uplight: 1.2 } };
   const materials = {
-    curtain: facadeMat(paintFacade('curtain', rng), 1.8, 0.7),
-    ribbon: facadeMat(paintFacade('ribbon', rng), 1.2, 1),
-    punched: facadeMat(paintFacade('punched', rng), 0.35, 1.2),
+    ...Object.fromEntries(
+      Object.entries(STYLES).map(([id, st]) => [id, facadeMat(paintFacade(id, rng), st.env ?? typeLook[st.type].env, typeLook[st.type].uplight)]),
+    ),
+    cap: new THREE.MeshStandardMaterial({ color: '#5d636c', metalness: 0.75, roughness: 0.32, envMap: env, envMapIntensity: 1.3 }),
     shop: new THREE.MeshStandardMaterial({
       map: shopTex.map,
       emissiveMap: shopTex.emissiveMap,
@@ -704,8 +916,6 @@ export function buildRealCity({ boxes, rng, infillRng, renderer, maxX, roadZ }) 
     helipad: new THREE.MeshStandardMaterial({ ...paintHelipad(), emissive: '#ffffff', emissiveIntensity: 0.9, roughness: 0.85 }),
     padLight: new THREE.MeshStandardMaterial({ color: '#06200f', emissive: '#4dff8a', emissiveIntensity: 2.6 }),
   };
-  // Painted last, so the textures above keep their random draws (and their look).
-  materials.bronze = facadeMat(paintFacade('bronze', rng), 1.6, 0.7);
   const city = new THREE.Group();
   city.name = 'RealCity';
   for (const [key, geos] of Object.entries(out)) {
