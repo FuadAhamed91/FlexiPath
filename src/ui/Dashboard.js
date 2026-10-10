@@ -50,6 +50,7 @@ import {
   Info,
   SkipForward,
   ChartLine,
+  ChevronLeft,
   ChevronRight,
 } from 'lucide';
 import { TelemetryPanel } from './TelemetryPanel.js';
@@ -121,6 +122,7 @@ const ICONS = {
   Info,
   SkipForward,
   ChartLine,
+  ChevronLeft,
   ChevronRight,
 };
 
@@ -138,7 +140,7 @@ const LOGO = `
 const chartCard = (key, title, unit) => `
   <article class="hud-panel chart-card flex min-h-[148px] flex-col px-3 pt-2 pb-1">
     <header class="flex items-center justify-between gap-2">
-      <h3 class="hud-title truncate">${title} <span class="font-mono text-[9px] tracking-normal text-slate-400 normal-case">${unit}</span></h3>
+      <h3 class="hud-title truncate" title="${title} · ${unit}">${title} <span class="font-mono text-[9px] tracking-normal text-slate-400 normal-case">${unit}</span></h3>
       <div class="num flex shrink-0 gap-2.5 text-[10.5px] font-semibold">
         <span class="text-fp" data-chart-fp="${key}">—</span><span class="text-legacy" data-chart-lg="${key}">—</span>
       </div>
@@ -385,12 +387,12 @@ export class Dashboard {
 
       <section class="fp-bottom hud-panel mx-2 mb-2 shrink-0" data-ref="lanes" data-view="mission" aria-label="Legacy vs FlexiPath"></section>
       <section class="fp-bottom grid shrink-0 grid-cols-1 gap-2 px-2 pb-2 sm:grid-cols-2 lg:grid-cols-3 xl:h-[164px] xl:grid-cols-6" aria-label="Real-time graphs" data-ref="chartsRow" data-view="advanced">
-        ${chartCard('thr', 'Aggregated Throughput', 'Mbps')}
-        ${chartCard('rtt', 'Critical-Flow Latency', 'ms · log')}
-        ${chartCard('loss', 'Packet Loss', '% · crit + RT · 1 s')}
-        ${chartCard('qoe', 'Voice QoE · MOS', 'ITU-T G.107')}
-        ${chartCard('pwr', 'Radio Power', 'W · 3-tier')}
-        ${chartCard('hol', 'Bulk HoL Stall', 'ms · TCP')}
+        ${chartCard('thr', 'Throughput', 'Mbps')}
+        ${chartCard('rtt', 'C2 latency', 'ms · log')}
+        ${chartCard('loss', 'Loss', '% · crit + RT · 1 s')}
+        ${chartCard('qoe', 'Voice MOS', 'ITU-T G.107')}
+        ${chartCard('pwr', 'Radio power', 'W · 3-tier')}
+        ${chartCard('hol', 'Bulk HoL', 'ms · TCP')}
       </section>
     </div>
     <div class="toast-stack" data-ref="toasts" aria-live="polite"></div>

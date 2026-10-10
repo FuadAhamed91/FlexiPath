@@ -116,7 +116,8 @@ export class PredictionPanel {
         ? `<span class="lvl-crit">Carrier ends at dock release</span>${Number.isFinite(pred.dockDistM) ? ` <span class="num text-slate-600">(${pred.dockDistM.toFixed(0)} m)</span>` : ''}`
         : '<span class="text-slate-700">No failure predicted while docked</span>';
     } else {
-      const level = `${pred.failLevel.toFixed(1)} ${spec.signalUnit}`;
+      // failLevel is null until the first signal sample (D-01: a null here froze the render loop).
+      const level = Number.isFinite(pred.failLevel) ? `${pred.failLevel.toFixed(1)} ${spec.signalUnit}` : '—';
       if (pred.mapAhead) {
         const z = pred.mapAhead.zone;
         predText = `<span class="${pred.triggers.map ? 'lvl-crit' : 'lvl-warn'}">Dead zone ahead (coverage map): ${esc(mapAheadText(pred.mapAhead))}</span>${

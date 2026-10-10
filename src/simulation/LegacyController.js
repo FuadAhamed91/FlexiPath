@@ -1,7 +1,7 @@
 /**
- * LegacyController.js — standard OS connection manager (break-before-make).
+ * LegacyController.js — single-path, break-before-make reference stack.
  *
- * Behaviour modelled on stock Windows / macOS / Android connectivity logic:
+ * A simplified single-path connection manager (not a model of any named OS; see README › The legacy baseline):
  *   • one active interface, chosen by static route metric: eth0 > wlan0 > wwan0 > sat0
  *   • stays "sticky" on the current link until a hard floor is crossed
  *     (Wi-Fi RSSI < −85 dBm, 5G RSRP < −122 dBm ≈ radio-link failure) or carrier drops
