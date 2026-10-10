@@ -168,7 +168,8 @@ Each cell reads **Legacy · Reactive multipath · Always duplicate · FlexiPath*
 
 "Kept C2" counts the flights in which the C2 link was never silent long enough (> 300 ms, the piloted-flight rule) to
 force the fail-safe hover. [The hover rule](#the-hover-rule-piloted-vs-waypoint-flight) below adds the waypoint-flight
-rule (1 s) from 3GPP TS 22.125.
+rule (1 s), derived from the 1 s latency that 3GPP TS 22.125 gives for steer-to-waypoint C2. The 300 ms
+piloted-flight rule is our own conservative choice; TS 22.125 defines no hover or lost-link timeout.
 
 - **Anchoring removes the interruption.** Every anchored stack removes the legacy interruption, all TCP resets and all
   remote-visible IP changes in the predictable handovers.
@@ -765,9 +766,10 @@ Stack: Vite 8 · Three.js r186 · Chart.js 4 · Tailwind CSS 4 · Lucide.
   `--wake-ms 260` shows the effect ([Sensitivity](#sensitivity-a-slower-modem-wake)).
 - **Abrupt-loss detection is an assumed constant, not a simulated probe.** FlexiPath detects a sudden link loss after
   60 ms; the reactive multipath baseline detects it after 250 ms (its retransmission timeout). Both react to the same
-  link-down flag in the same tick. With equal detection (60 ms for both) the reactive baseline also keeps C2 in D, G
-  and H, so the D/G/H "kept C2" difference in the tables reflects this assumption. FlexiPath's advantage there is the
-  warm path and the 0 ms gap on predicted moves, not the detection time.
+  link-down flag in the same tick. With equal detection (60 ms for both), reactive multipath keeps C2 in D and H (19/20
+  in G), and FlexiPath's critical-loss advantage falls from about 35 % to about 20 % (A–D, G, H; dev and held-out
+  seeds), and to about 3 % in H. Part of the headline therefore reflects the detection assumption; the rest comes from
+  the warm path and the 0 ms gap on predicted moves.
 - **The 300 ms hover rule is applied at all speeds.** 3GPP TS 22.125 scopes stick steering to ≤ 60 km/h. Under a
   speed-consistent rule (300 ms at ≤ 60 km/h, 1 s above) always duplicate keeps C2 on 18 of 20 flights in G, and
   reactive multipath on 10 of 20 in D, G and H.
