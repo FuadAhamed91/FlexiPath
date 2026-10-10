@@ -127,6 +127,7 @@ async function boot() {
   };
   const ghostState = { flexipath: true, legacy: true };
   let last = performance.now();
+  let hudErrorLogged = false;
 
   const frame = (now) => {
     const dt = Math.min(0.1, Math.max(0, (now - last) / 1000));
@@ -161,7 +162,15 @@ async function boot() {
     sceneManager.updateCamera(dt, focusPos, showGhost ? vehicles.getPosition(other, otherPos) : null);
     sceneManager.render();
     updateOffscreen(snapshot, focus, other, showGhost);
-    dashboard.frame(now);
+    try {
+      dashboard.frame(now);
+    } catch (err) {
+      // A HUD error must never stop the 3D twin (D-01). Log it once and keep the loop going.
+      if (!hudErrorLogged) {
+        hudErrorLogged = true;
+        console.error('[FlexiPath] HUD update failed; the twin keeps running', err);
+      }
+    }
     requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);

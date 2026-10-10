@@ -10,6 +10,7 @@ This repository is a **simulation prototype**: a deterministic network simulatio
 FlexiPath side by side with a **legacy break-before-make baseline** under identical conditions, an explainable
 decision HUD, controlled experiments, and a Blender pipeline that generates every 3D asset. No real-world
 measurements are included; every number below is a *measured simulation result* unless marked as a model parameter.
+AI tools supported the work; see the [AI-use declaration](#ai-use-declaration).
 
 **The scenario.** Two identical drones fly the same low-altitude corridor on the same mission, for example an
 inspection or emergency-response flight whose C2 link (flight commands + telemetry) must never drop. Each starts
@@ -47,12 +48,12 @@ are reported too: in this model the 400 ms burst adds no measurable reliability,
 
 ## What the demo shows
 
-The site opens on a **landing page** that explains the solution (the problem, the decision loop, the six ideas, the results against existing mechanisms, the guidelines and the real-life plan). **Launch the simulator** opens `simulator.html` on the **Mission view**, kept to the story. The HUD is light (white panels) around the night-time 3D twin. The 3D twin takes most of the screen, with one short column beside it. The header and toolbar are one line each; the decision loop is a one-line stepper where only the active stage shows its text. Fault injection, reset, Experiments and "Why FlexiPath?" are icon buttons with tooltips. The beam legend sits behind a button in the playback bar.
+The site opens on a **landing page** that explains the solution (the problem, the decision loop, the seven ideas, the results against existing mechanisms, the guidelines and the real-life plan). **Launch the simulator** opens `simulator.html` on the **Mission view**, kept to the story. The HUD is light (white panels) around the night-time 3D twin. The 3D twin takes most of the screen, with one short column beside it. The header and toolbar are one line each; the decision loop is a one-line stepper where only the active stage shows its text. Fault injection, reset, Experiments and "Why FlexiPath?" are icon buttons with tooltips. The beam legend sits behind a button in the playback bar.
 
 | Area | What it answers |
 | --- | --- |
 | **Decision loop** — DETECT → PREDICT → PREPARE → REPLICATE → SWITCH → CONTINUE | Which stage the controller is in right now, when it reached each stage, which stages were skipped (e.g. an abrupt outage cannot be predicted), and the radio state each stage runs at (DRX standby, warm probe, burst). |
-| **3D twin** | A moonlit night over a real city and desert (press `L` for the original neon digital twin). Two drones on the same corridor; the camera keeps both in frame and an edge marker points to the other drone if it falls out of view. The legacy drone's label shows the distance it has lost. Sleeping modems draw no probe beams (a faint blink marks each DRX signal sample); a warm modem shows dashed heartbeat beams; both beams pulse purple during the burst. |
+| **3D twin** | A moonlit night over a realistic procedural city and desert (press `L` for the original neon digital twin). Two drones on the same corridor; the camera keeps both in frame and an edge marker points to the other drone if it falls out of view. The legacy drone's label shows the distance it has lost. Sleeping modems draw no probe beams (a faint blink marks each DRX signal sample); a warm modem shows dashed heartbeat beams; both beams pulse purple during the burst. |
 | **Why did FlexiPath do that?** | The latest decision as a short card — headline, action and reason, beside the rule the legacy stack follows. **Show details** opens the full record (current path, status, alternate, traffic, **radio power tier**) and the decision history. |
 | **At a glance** | Which traffic is protected right now (critical, voice, bulk), and FlexiPath vs Legacy on radio power, the longest data stall and client IP changes seen by remote services. **Details** opens the Advanced view. |
 | **Legacy vs FlexiPath** | One line of headline numbers. **Show steps** opens both drones' latest transition step by step, timed relative to the moment the path *actually* failed, with the simulated interruption, critical packets lost and failures acted on before they happened. |
@@ -113,7 +114,7 @@ before G and H were added.
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | A | 1.216 / 1.315 | 42.8 / 39.0 | 0.40 | 43 | 7.6 / 1.2 | 390 / 102 | 15.0 / 0.5 | 1.00 / 0 |
 | B | 1.216 / 1.315 | 88.1 / 81.7 | 0.84 | 102 | 7.8 / 2.5 | 411 / 133 | 27.4 / 0.6 | 1.95 / 0 |
-| C | 1.217 / 1.316 | 43.4 / 40.8 | 0.40 | 54 | 8.3 / 3.2 | 394 / 65 | 12.3 / 0.0 | 0.95 / 0 |
+| C | 1.217 / 1.316 | 43.4 / 40.8 | 0.40 | 54 | 8.3 / 3.1 | 394 / 65 | 12.3 / 0.0 | 0.95 / 0 |
 | D | 1.221 / 1.254 | 113.6 / 90.7 | 1.00 | 111 | 6.4 / 3.9 | 421 / 257 | 25.8 / 2.2 | 5.20 / 0 |
 | E | 1.216 / 1.315 | 42.8 / 39.0 | 0.40 | 43 | — (no bulk) | — | — | 1.00 / 0 |
 | F | 1.221 / 1.315 | 36.3 / 39.0 | 0.40 | 0 | 9.1 / 1.1 | 390 / 102 | 15.0 / 0.5 | 1.00 / 0 |
@@ -234,7 +235,8 @@ and 120 km/h runs are above the stick-steering speed limit, so they belong under
 | G · Radio shadow on the route | 0 · 0 · 40 · 100 | 0 · 100 · 100 · 100 |
 | H · Coverage map out of date | 0 · 0 · 100 · 100 | 0 · 100 · 100 · 100 |
 
-- **Piloted flight:** FlexiPath is the only stack that keeps C2 on every flight of every scenario. Reactive multipath's
+- **Piloted flight:** FlexiPath is the only stack that keeps C2 on every flight of every scenario (with a modem kept in
+  a fast-resume state; with a 260 ms wake it hovers in D and most of H, see [Sensitivity](#sensitivity-a-slower-modem-wake)). Reactive multipath's
   0.35 s gap (a 250 ms retransmission timeout plus a 100 ms modem wake) makes it hover in D, G and H.
 - **Waypoint flight:** every multipath stack keeps C2 everywhere; only the legacy stack's 3.6–3.8 s breaks force a
   hover. FlexiPath's advantage is then the rest of the comparison: the shortest gaps of the low-power stacks (0–0.16 s
@@ -284,7 +286,7 @@ all early moves. **Lead** = mean time from the action to the failure.
 | A | 100 % | 40 % | 100 % | 100 % | 3.4 s |
 | B | 100 % | 25 % | 100 % | 98 % | 3.8 s |
 | C | 100 % | 35 % | 100 % | 100 % | 4.6 s |
-| D | 62 % | 13 % | 62 % | 97 % | 1.3 s |
+| D | 62 % | 13 % | 62 % | 97 % | 1.2 s |
 | E | 100 % | 40 % | 100 % | 100 % | 3.4 s |
 | F | 100 % | 40 % | 100 % | 100 % | 3.4 s |
 | G | 100 % | 100 % | 0 % | 100 % | 3.2 s |
@@ -446,7 +448,7 @@ burst if time-to-failure < 3.0 s"*. The predictor computes no confidence score, 
 
 ### The legacy baseline
 
-Stock OS behaviour: static metric order `eth0 > wlan0 > wwan0 > sat0`, sticky until a hard floor (Wi-Fi **−85 dBm**,
+A single-path, break-before-make reference stack (not a model of any named OS): static metric order `eth0 > wlan0 > wwan0 > sat0`, sticky until a hard floor (Wi-Fi **−85 dBm**,
 5G RSRP −122 dBm), then break-before-make:
 
 | Phase (model parameter) | Wireless | Wired undock |
@@ -543,11 +545,19 @@ npm run dev          # landing page http://localhost:5173 · simulator http://lo
 | Command | What it does |
 | --- | --- |
 | `npm run dev` | Vite dev server with the full HUD |
-| `npm run build` / `npm run preview` | Production bundle in `dist/` |
+| `npm run build` / `npm run preview` | Production bundle in `dist/` (open it through a web server, see below) |
 | `npm run benchmark` | Paired experiments → `results/benchmark_*.json`, per-run `.csv`, `_comparison.csv`, `_mechanisms.csv`, `_efficiency.csv` (critical delivery per extra watt), `_ablations.csv` and `_prediction.csv` (`--quick`, `--seeds 10`, `--speeds 60`, `--scenarios A,D`, `--no-failsafe`, `--baselines mptcp,redundant` or `none`, `--ablations fpNoPred,fpNoBurst,fpNoMap` or `none`, `--seed-block dev` or `test`, `--failsafe-ms 1000` for the waypoint-flight hover rule) |
 | `node scripts/tradeoff-chart.js <_mechanisms.csv>` | Redraw `public/landing/tradeoff.svg` (reliability vs radio power) from a default benchmark |
 | `node scripts/handover-probe.js` | Measure one real network change on your own laptop ([Real-world check](#real-world-check-one-network-change-on-your-own-laptop)) |
 | `npm run models` | Regenerate the six GLB assets with headless Blender (`blender` on `PATH`) |
+
+**Open the built files through a local web server, not by double-click.** A browser opened on `dist/index.html` as a
+`file://` page blocks the module scripts and the stylesheet, so the page stays blank. Serve `dist/` instead:
+
+```bash
+npm run preview                                   # http://localhost:4173/
+python3 -m http.server 8000 --directory dist      # http://localhost:8000/
+```
 
 Simulator URL parameters (on `simulator.html`; a link to the site root that carries any of them is forwarded to the
 simulator): `?scenario=A&seed=2026&speed=90&mode=advanced&focus=legacy&camera=overview&paused=1`, `intro=0` skips
@@ -568,6 +578,16 @@ Keys: `Space` pause · `M` mission / advanced · `D` guided demo (`→` next, `�
   next to every continuity metric) and the paired comparison (means, SDs, mean difference, 95 % CI, pairs).
 
 ---
+
+## AI-use declaration
+
+**AI-use declaration.** We used AI tools to support this project, as the ATP 2026 FAQ (item 09) allows. Anthropic Claude
+(through Claude Code) assisted with writing and refactoring code, the simulation and 3D front end, the Blender asset
+script (driven via Blender MCP), and drafting and editing documentation, the proposal deck and the video; the video narration is an AI voice (Kokoro). The problem framing,
+choice of scenario, the FlexiPath mechanism, the experiment design, the parameter choices and the interpretation of
+results are the team's own. Every number reported comes from our simulator or from the cited published sources, and
+each team member can explain the design, the code and the results in their own words. The file `CLAUDE.md` is the
+instruction file we gave the AI assistant.
 
 ## Data provenance and claims
 
@@ -743,6 +763,27 @@ Stack: Vite 8 · Three.js r186 · Chart.js 4 · Tailwind CSS 4 · Lucide.
   flight). Which stacks keep C2 depends on it ([The hover rule](#the-hover-rule-piloted-vs-waypoint-flight)).
 - **Modem wake** is 100 ms, which assumes a spare modem kept in a fast-resume state; an idle LTE modem measured 260 ms.
   `--wake-ms 260` shows the effect ([Sensitivity](#sensitivity-a-slower-modem-wake)).
+- **Abrupt-loss detection is an assumed constant, not a simulated probe.** FlexiPath detects a sudden link loss after
+  60 ms; the reactive multipath baseline detects it after 250 ms (its retransmission timeout). Both react to the same
+  link-down flag in the same tick. With equal detection (60 ms for both) the reactive baseline also keeps C2 in D, G
+  and H, so the D/G/H "kept C2" difference in the tables reflects this assumption. FlexiPath's advantage there is the
+  warm path and the 0 ms gap on predicted moves, not the detection time.
+- **The 300 ms hover rule is applied at all speeds.** 3GPP TS 22.125 scopes stick steering to ≤ 60 km/h. Under a
+  speed-consistent rule (300 ms at ≤ 60 km/h, 1 s above) always duplicate keeps C2 on 18 of 20 flights in G, and
+  reactive multipath on 10 of 20 in D, G and H.
+- **FlexiPath trades throughput for C2 continuity in G and H.** Against reactive multipath it delivers 71.9 vs
+  82.4 Mbit/s in G and 64.5 vs 85.3 Mbit/s in H, where it is also below the legacy stack's 66.7 Mbit/s, because the
+  satellite path it moves to is slower. The mechanisms table does not report throughput.
+- **The reactive baseline is loss-triggered** (it leaves a path after 15 % loss for 250 ms). Real stacks also use
+  signal thresholds (3GPP measurement events, ATSSS, 802.11k/v/r). A threshold-triggered variant with no prediction
+  matches FlexiPath in A and H in a 3-seed check; it is future work, and we do not claim that prediction alone gives
+  the gain in A.
+- **Scenario G shows the value of route foresight.** Only FlexiPath receives the coverage map; no baseline is given
+  a map.
+- **The legacy baseline** is a single-path, break-before-make reference, not a model of any named OS. Its 1.5 s
+  TCP/TLS re-establish stall blocks every flow, UDP included, and its 0.5 s DHCP phase is also applied when the target
+  is cellular (which uses PDU sessions, not DHCP). A UDP-only C2 gap would be about 2.3 s instead of 3.8 s; the hover
+  result does not change.
 - **Not modelled, though measured in the real world** ([Checked against published
   measurements](#checked-against-published-measurements)):
   - cell-to-cell handovers within one technology (76–167 ms on commercial networks);
@@ -775,4 +816,6 @@ Stack: Vite 8 · Three.js r186 · Chart.js 4 · Tailwind CSS 4 · Lucide.
 
 ## License
 
-Private prototype — no license granted yet (`"license": "UNLICENSED"`). Choose one before publishing.
+© 2026 Team Tarot Club (Al Ain University). All rights reserved. Submitted to ATRC ATP 2026; a non-exclusive licence is granted to EDGE Group
+under Rules §VII. The package stays `"license": "UNLICENSED"` (no public licence). Third-party components and their
+licences are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
