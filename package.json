@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "serve": "vite build && vite preview --host 127.0.0.1 --port 4173 --open",
     "benchmark": "node scripts/benchmark.js",
     "models": "blender -b -P blender/generate_all_models.py",
     "test": "vitest run",

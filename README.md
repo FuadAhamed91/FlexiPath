@@ -556,6 +556,7 @@ npm run dev          # landing page http://localhost:5173 · simulator http://lo
 | --- | --- |
 | `npm run dev` | Vite dev server with the full HUD |
 | `npm run build` / `npm run preview` | Production bundle in `dist/` (open it through a web server, see below) |
+| `npm run serve` | Build, then serve `dist/` on http://localhost:4173/ and open the browser |
 | `npm run benchmark` | Paired experiments → `results/benchmark_*.json`, per-run `.csv`, `_comparison.csv`, `_mechanisms.csv`, `_efficiency.csv` (critical delivery per extra watt), `_ablations.csv` and `_prediction.csv` (`--quick`, `--seeds 10`, `--speeds 60`, `--scenarios A,D`, `--no-failsafe`, `--baselines mptcp,redundant` or `none`, `--ablations fpNoPred,fpNoBurst,fpNoMap` or `none`, `--seed-block dev` or `test`, `--failsafe-ms 1000` for the waypoint-flight hover rule) |
 | `npm test` | Tests of the simulation core (Vitest, about 5 s): determinism per seed, A–H run to completion, controller invariants, and a quick benchmark checked against the README's four-stack table within stated tolerances |
 | `npm run test:full` | `npm test` plus the full default and held-out benchmarks, which must reproduce the CSVs in `results/published/` byte for byte (under a minute) |
@@ -564,12 +565,17 @@ npm run dev          # landing page http://localhost:5173 · simulator http://lo
 | `npm run models` | Regenerate the six GLB assets with headless Blender (`blender` on `PATH`) |
 
 **Open the built files through a local web server, not by double-click.** A browser opened on `dist/index.html` as a
-`file://` page blocks the module scripts and the stylesheet, so the page stays blank. Serve `dist/` instead:
+`file://` page blocks the module scripts and the stylesheet, so the page can not start (it shows a "serve over HTTP"
+message instead). Serve `dist/` instead:
 
 ```bash
+npm run serve                                     # build, then http://localhost:4173/ (opens the browser)
+sh dist/serve.sh                                  # one-line launcher shipped in dist/ (Python 3): http://localhost:8000/
 npm run preview                                   # http://localhost:4173/
 python3 -m http.server 8000 --directory dist      # http://localhost:8000/
 ```
+
+On Windows, double-click `dist\serve.cmd`. `dist/README.txt` repeats these steps for a copy of `dist/` on its own.
 
 Simulator URL parameters (on `simulator.html`; a link to the site root that carries any of them is forwarded to the
 simulator): `?scenario=A&seed=2026&speed=90&mode=advanced&focus=legacy&camera=overview&paused=1`, `intro=0` skips
