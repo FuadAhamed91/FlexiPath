@@ -139,8 +139,8 @@ const LOGO = `
 
 const chartCard = (key, title, unit) => `
   <article class="hud-panel chart-card flex min-h-[148px] flex-col px-3 pt-2 pb-1">
-    <header class="flex items-center justify-between gap-2">
-      <h3 class="hud-title truncate" title="${title} · ${unit}">${title} <span class="font-mono text-[9px] tracking-normal text-slate-400 normal-case">${unit}</span></h3>
+    <header class="flex items-start justify-between gap-2">
+      <h3 class="hud-title flex min-w-0 flex-col gap-0.5 leading-tight" title="${title} · ${unit}"><span class="truncate">${title}</span><span class="truncate font-mono text-[9px] tracking-normal text-slate-500 normal-case">${unit}</span></h3>
       <div class="num flex shrink-0 gap-2.5 text-[10.5px] font-semibold">
         <span class="text-fp" data-chart-fp="${key}">—</span><span class="text-legacy" data-chart-lg="${key}">—</span>
       </div>
