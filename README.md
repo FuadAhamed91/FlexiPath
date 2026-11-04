@@ -95,6 +95,15 @@ The baselines have their own random streams and the ablations replay FlexiPath's
 below are identical with or without them (`--baselines none --ablations none`); A–F are unchanged from the release
 before G and H were added.
 
+**Archived data.** The raw CSVs behind every table in this section are committed in
+[`results/published/`](results/published/MANIFEST.md): the default run, the held-out seeds, the 1 s hover rule and the
+260 ms wake. The data was produced at commit `8a3983ca71dbc368dff790c3971b24fa7947a479`;
+[MANIFEST.md](results/published/MANIFEST.md) gives the date, the exact commands, the seed blocks and SHA-256 sums. To
+check a number, check out that commit (or any later one that does not change `src/simulation`) and run the same
+command: the runs are deterministic, so the CSVs are byte-identical (`npm run test:full` does this for you). When the
+model changes, re-run the four commands into `results/published/`, put the new commit hash here and in the manifest,
+and update the tables.
+
 **Continuity**
 
 | Scenario | Simulated interruption (s) LG / FP | Critical packets delivered (%) LG / FP | Voice MOS LG / FP | FP replication overhead: protected / all bytes | Action vs. path failure (s) LG / FP |
@@ -548,6 +557,8 @@ npm run dev          # landing page http://localhost:5173 · simulator http://lo
 | `npm run dev` | Vite dev server with the full HUD |
 | `npm run build` / `npm run preview` | Production bundle in `dist/` (open it through a web server, see below) |
 | `npm run benchmark` | Paired experiments → `results/benchmark_*.json`, per-run `.csv`, `_comparison.csv`, `_mechanisms.csv`, `_efficiency.csv` (critical delivery per extra watt), `_ablations.csv` and `_prediction.csv` (`--quick`, `--seeds 10`, `--speeds 60`, `--scenarios A,D`, `--no-failsafe`, `--baselines mptcp,redundant` or `none`, `--ablations fpNoPred,fpNoBurst,fpNoMap` or `none`, `--seed-block dev` or `test`, `--failsafe-ms 1000` for the waypoint-flight hover rule) |
+| `npm test` | Tests of the simulation core (Vitest, about 5 s): determinism per seed, A–H run to completion, controller invariants, and a quick benchmark checked against the README's four-stack table within stated tolerances |
+| `npm run test:full` | `npm test` plus the full default and held-out benchmarks, which must reproduce the CSVs in `results/published/` byte for byte (under a minute) |
 | `node scripts/tradeoff-chart.js <_mechanisms.csv>` | Redraw `public/landing/tradeoff.svg` (reliability vs radio power) from a default benchmark |
 | `node scripts/handover-probe.js` | Measure one real network change on your own laptop ([Real-world check](#real-world-check-one-network-change-on-your-own-laptop)) |
 | `npm run models` | Regenerate the six GLB assets with headless Blender (`blender` on `PATH`) |

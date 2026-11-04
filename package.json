@@ -9,7 +9,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "benchmark": "node scripts/benchmark.js",
-    "models": "blender -b -P blender/generate_all_models.py"
+    "models": "blender -b -P blender/generate_all_models.py",
+    "test": "vitest run",
+    "test:full": "vitest run --config vitest.full.config.js"
   },
   "keywords": [
     "multipath",
@@ -29,6 +31,7 @@
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
     "tailwindcss": "^4.3.3",
-    "vite": "^8.3.1"
+    "vite": "^8.3.1",
+    "vitest": "^5.1.0"
   }
 }

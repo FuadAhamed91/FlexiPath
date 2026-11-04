@@ -1,0 +1,217 @@
+scenario,metric,label,unit,legacy_mean,legacy_sd,flexipath_mean,flexipath_sd,diff_mean,diff_ci95,pairs
+A,c2KeptPct,Flights that kept the C2 link (no fail-safe hover),%,0,0,100,0,100,0,20
+A,interruptionS,Simulated interruption (total),s,3.8,0,0,0,-3.8,0,20
+A,longestInterruptionS,Longest single interruption,s,3.8,0,0,0,-3.8,0,20
+A,meanRecoveryS,Recovery time per interruption,s,3.8,0,,,,,0
+A,packetDeliveryPct,Packet delivery (critical + real-time),%,84.72249,5.19071,99.04485,0.159691,14.32236,2.420508,20
+A,criticalDeliveryPct,Critical packet delivery,%,84.67926,5.223444,99.066615,0.182701,14.387355,2.444692,20
+A,packetLossPct,Packet loss (critical + real-time),%,15.27751,5.19071,0.95515,0.159691,-14.32236,2.420508,20
+A,meanThroughputMbps,Mean throughput,Mbps,78.122,5.289235,92.5215,1.352266,14.3995,2.036744,20
+A,meanLatencyMs,Mean critical-flow RTT,ms,19.4775,0.649136,21.0205,0.663971,1.543,0.265003,20
+A,meanMos,Voice QoE · mean MOS (G.107),,3.71455,0.188645,4.28705,0.022638,0.5725,0.086957,20
+A,timeBelowMos36S,Time below MOS 3.6,s,6.59,1.336492,0,0,-6.59,0.62549,20
+A,replicationOverheadPct,Replication overhead · protected-flow bytes,%,0,0,1.1403,0.517728,1.1403,0.242301,20
+A,replicationOverheadTotalPct,Replication overhead · all traffic bytes,%,0,0,0.004665,0.002153,0.004665,0.001008,20
+A,actionVsFailureS,Action time vs. path failure,s,1.5,1.343601,-3.335,1.873155,-4.835,1.405117,20
+A,tcpResets,TCP connection resets,,4,0,0,0,-4,0,20
+A,journeyTimeS,Journey time,s,35.345,16.707813,29.925,17.109766,-5.42,0.371191,20
+A,meanPowerW,Mean radio power,W,1.2165,0.006428,1.3232,0.05136,0.1067,0.022531,20
+A,energyJ,Radio energy per journey,J,42.77,20.073552,38.995,21.424174,-3.775,0.972724,20
+A,burstTimeS,Dual-radio burst time,s,0,0,0.4,0,0.4,0,20
+A,duplicatesDiscarded,Duplicate packets discarded,,0,0,42.95,5.780867,42.95,2.705498,20
+A,criticalHolStallMs,HoL stall · critical + real-time,ms,0,0,0,0,0,0,20
+A,inOrderWaitMaxMs,In-order delivery would have added (max),ms,2.0145,3.010192,0.235,0.792866,-1.7795,1.500222,20
+A,bulkHolMeanMs,HoL buffer latency · bulk (mean),ms,7.9589,2.621918,1.1883,0.216921,-6.7706,1.226043,20
+A,bulkHolPeakMs,HoL stall · bulk (peak),ms,392.765,47.022495,120.08,90.650199,-272.685,52.699771,20
+A,bulkRtoStalls,TCP retransmission-timeout stalls,,15.95,10.595307,0.55,0.510418,-15.4,4.974772,20
+A,remoteIpChanges,Client IP changes seen by remote services,,1,0,0,0,-1,0,20
+A,physicalIpChanges,Physical IP changes (radio side),,1,0,1,0,0,0,20
+B,c2KeptPct,Flights that kept the C2 link (no fail-safe hover),%,0,0,100,0,100,0,20
+B,interruptionS,Simulated interruption (total),s,7.6,0,0,0,-7.6,0,20
+B,longestInterruptionS,Longest single interruption,s,3.8,0,0,0,-3.8,0,20
+B,meanRecoveryS,Recovery time per interruption,s,3.8,0,,,,,0
+B,packetDeliveryPct,Packet delivery (critical + real-time),%,84.26604,5.423019,98.609555,0.123746,14.343515,2.506033,20
+B,criticalDeliveryPct,Critical packet delivery,%,84.243785,5.468439,98.61078,0.142477,14.366995,2.526222,20
+B,packetLossPct,Packet loss (critical + real-time),%,15.73396,5.423019,1.390445,0.123746,-14.343515,2.506033,20
+B,meanThroughputMbps,Mean throughput,Mbps,64.1355,3.752791,68.826,3.608483,4.6905,1.005636,20
+B,meanLatencyMs,Mean critical-flow RTT,ms,30.4255,1.626758,40.5195,3.784349,10.094,1.958601,20
+B,meanMos,Voice QoE · mean MOS (G.107),,3.67735,0.187471,4.24065,0.024616,0.5633,0.085521,20
+B,timeBelowMos36S,Time below MOS 3.6,s,14.115,2.927955,0.165,0.397724,-13.95,1.302351,20
+B,replicationOverheadPct,Replication overhead · protected-flow bytes,%,0,0,1.1956,0.541839,1.1956,0.253585,20
+B,replicationOverheadTotalPct,Replication overhead · all traffic bytes,%,0,0,0.00668,0.003229,0.00668,0.001511,20
+B,actionVsFailureS,Action time vs. path failure,s,1.65,1.051815,-3.845,2.045464,-5.495,1.311456,20
+B,tcpResets,TCP connection resets,,8,0,0,0,-8,0,20
+B,journeyTimeS,Journey time,s,73.05,35.84617,62.825,35.984673,-10.225,0.936618,20
+B,meanPowerW,Mean radio power,W,1.21585,0.00693,1.30495,0.032851,0.0891,0.013744,20
+B,energyJ,Radio energy per journey,J,88.505,43.006652,81.105,44.969539,-7.4,1.494084,20
+B,burstTimeS,Dual-radio burst time,s,0,0,0.8,0,0.8,0,20
+B,duplicatesDiscarded,Duplicate packets discarded,,0,0,95.25,10.207711,95.25,4.777301,20
+B,criticalHolStallMs,HoL stall · critical + real-time,ms,0,0,0,0,0,0,20
+B,inOrderWaitMaxMs,In-order delivery would have added (max),ms,9.44,2.610763,13.9205,4.812062,4.4805,2.698739,20
+B,bulkHolMeanMs,HoL buffer latency · bulk (mean),ms,7.46945,1.472048,2.64875,0.451253,-4.8207,0.749288,20
+B,bulkHolPeakMs,HoL stall · bulk (peak),ms,414.53,29.248592,139.5,68.62391,-275.03,36.836954,20
+B,bulkRtoStalls,TCP retransmission-timeout stalls,,25.75,15.071322,0.55,0.510418,-25.2,7.074281,20
+B,remoteIpChanges,Client IP changes seen by remote services,,2,0,0,0,-2,0,20
+B,physicalIpChanges,Physical IP changes (radio side),,2,0,2,0,0,0,20
+C,c2KeptPct,Flights that kept the C2 link (no fail-safe hover),%,0,0,100,0,100,0,20
+C,interruptionS,Simulated interruption (total),s,3.8,0,0,0,-3.8,0,20
+C,longestInterruptionS,Longest single interruption,s,3.8,0,0,0,-3.8,0,20
+C,meanRecoveryS,Recovery time per interruption,s,3.8,0,,,,,0
+C,packetDeliveryPct,Packet delivery (critical + real-time),%,83.255405,5.883685,98.372815,0.199369,15.11741,2.749963,20
+C,criticalDeliveryPct,Critical packet delivery,%,83.28485,5.804418,98.34227,0.260474,15.05742,2.706474,20
+C,packetLossPct,Packet loss (critical + real-time),%,16.744595,5.883685,1.627185,0.199369,-15.11741,2.749963,20
+C,meanThroughputMbps,Mean throughput,Mbps,49.6925,3.212475,54.623,3.58862,4.9305,1.493603,20
+C,meanLatencyMs,Mean critical-flow RTT,ms,41.713,2.571588,50.303,4.24172,8.59,2.322764,20
+C,meanMos,Voice QoE · mean MOS (G.107),,3.60725,0.220462,4.22195,0.026528,0.6147,0.105763,20
+C,timeBelowMos36S,Time below MOS 3.6,s,7.71,1.768407,0.15,0.306937,-7.56,0.809961,20
+C,replicationOverheadPct,Replication overhead · protected-flow bytes,%,0,0,1.27035,0.613019,1.27035,0.286898,20
+C,replicationOverheadTotalPct,Replication overhead · all traffic bytes,%,0,0,0.008985,0.004768,0.008985,0.002231,20
+C,actionVsFailureS,Action time vs. path failure,s,2.045,1.335931,-3.785,2.396988,-5.83,1.513106,20
+C,tcpResets,TCP connection resets,,4,0,0,0,-4,0,20
+C,journeyTimeS,Journey time,s,36.215,18.207005,31.425,17.991427,-4.79,0.628799,20
+C,meanPowerW,Mean radio power,W,1.21625,0.007532,1.29755,0.024169,0.0813,0.009481,20
+C,energyJ,Radio energy per journey,J,43.805,21.841811,40.375,22.664623,-3.43,0.866579,20
+C,burstTimeS,Dual-radio burst time,s,0,0,0.4,0,0.4,0,20
+C,duplicatesDiscarded,Duplicate packets discarded,,0,0,50.7,7.881357,50.7,3.688546,20
+C,criticalHolStallMs,HoL stall · critical + real-time,ms,0,0,0,0,0,0,20
+C,inOrderWaitMaxMs,In-order delivery would have added (max),ms,8.334,2.473139,10.344,2.45901,2.01,1.667336,20
+C,bulkHolMeanMs,HoL buffer latency · bulk (mean),ms,7.2981,1.408373,3.305,0.510563,-3.9931,0.713549,20
+C,bulkHolPeakMs,HoL stall · bulk (peak),ms,416.635,34.678088,65.32,0.258742,-351.315,16.23257,20
+C,bulkRtoStalls,TCP retransmission-timeout stalls,,9.85,5.479867,0,0,-9.85,2.564627,20
+C,remoteIpChanges,Client IP changes seen by remote services,,1,0,0,0,-1,0,20
+C,physicalIpChanges,Physical IP changes (radio side),,1,0,1,0,0,0,20
+D,c2KeptPct,Flights that kept the C2 link (no fail-safe hover),%,0,0,100,0,100,0,20
+D,interruptionS,Simulated interruption (total),s,16.45,2.497894,0.16,0,-16.29,1.169037,20
+D,longestInterruptionS,Longest single interruption,s,3.8,0,0.16,0,-3.64,0,20
+D,meanRecoveryS,Recovery time per interruption,s,3.1415,0.10917,0.16,0,-2.9815,0.051093,20
+D,packetDeliveryPct,Packet delivery (critical + real-time),%,77.24508,5.79788,98.176525,0.236668,20.931445,2.612429,20
+D,criticalDeliveryPct,Critical packet delivery,%,77.26558,5.777635,98.17949,0.232246,20.91391,2.612047,20
+D,packetLossPct,Packet loss (critical + real-time),%,22.75492,5.79788,1.823475,0.236668,-20.931445,2.612429,20
+D,meanThroughputMbps,Mean throughput,Mbps,55.494,8.099039,57.5055,6.479152,2.0115,1.789848,20
+D,meanLatencyMs,Mean critical-flow RTT,ms,37.6865,4.660641,51.914,6.12915,14.2275,1.761489,20
+D,meanMos,Voice QoE · mean MOS (G.107),,3.3715,0.227446,4.1897,0.037582,0.8182,0.093688,20
+D,timeBelowMos36S,Time below MOS 3.6,s,27.24,5.632836,1.83,0.400132,-25.41,2.616884,20
+D,replicationOverheadPct,Replication overhead · protected-flow bytes,%,0,0,0.9037,0.232583,0.9037,0.108851,20
+D,replicationOverheadTotalPct,Replication overhead · all traffic bytes,%,0,0,0.0059,0.001318,0.0059,0.000617,20
+D,actionVsFailureS,Action time vs. path failure,s,1.01375,0.540985,-1.1708,1.269999,-2.18455,0.817043,20
+D,tcpResets,TCP connection resets,,21,3.402785,0,0,-21,1.592534,20
+D,journeyTimeS,Journey time,s,93.585,43.409789,71.65,41.023004,-21.935,2.297753,20
+D,meanPowerW,Mean radio power,W,1.22065,0.006548,1.2686,0.041085,0.04795,0.020497,20
+D,energyJ,Radio energy per journey,J,113.87,52.272898,91.525,54.105986,-22.345,3.09957,20
+D,burstTimeS,Dual-radio burst time,s,0,0,1,0.680557,1,0.318507,20
+D,duplicatesDiscarded,Duplicate packets discarded,,0,0,107.8,73.741083,107.8,34.511493,20
+D,criticalHolStallMs,HoL stall · critical + real-time,ms,0,0,0,0,0,0,20
+D,inOrderWaitMaxMs,In-order delivery would have added (max),ms,9.464,2.099116,17.924,17.254328,8.46,8.152937,20
+D,bulkHolMeanMs,HoL buffer latency · bulk (mean),ms,6.42555,1.283305,3.8551,0.655503,-2.57045,0.662804,20
+D,bulkHolPeakMs,HoL stall · bulk (peak),ms,424.42,36.827358,263.295,107.080312,-161.125,52.682398,20
+D,bulkRtoStalls,TCP retransmission-timeout stalls,,24.65,13.807988,1.95,0.510418,-22.7,6.35401,20
+D,remoteIpChanges,Client IP changes seen by remote services,,5.25,0.850696,0,0,-5.25,0.398134,20
+D,physicalIpChanges,Physical IP changes (radio side),,5.25,0.850696,3.5,1.701393,-1.75,0.52325,20
+E,c2KeptPct,Flights that kept the C2 link (no fail-safe hover),%,0,0,100,0,100,0,20
+E,interruptionS,Simulated interruption (total),s,3.8,0,0,0,-3.8,0,20
+E,longestInterruptionS,Longest single interruption,s,3.8,0,0,0,-3.8,0,20
+E,meanRecoveryS,Recovery time per interruption,s,3.8,0,,,,,0
+E,packetDeliveryPct,Packet delivery (critical + real-time),%,84.72249,5.19071,99.04485,0.159691,14.32236,2.420508,20
+E,criticalDeliveryPct,Critical packet delivery,%,84.67926,5.223444,99.066615,0.182701,14.387355,2.444692,20
+E,packetLossPct,Packet loss (critical + real-time),%,15.27751,5.19071,0.95515,0.159691,-14.32236,2.420508,20
+E,meanThroughputMbps,Mean throughput,Mbps,0.3205,0.020125,0.37,0,0.0495,0.009419,20
+E,meanLatencyMs,Mean critical-flow RTT,ms,19.4775,0.649136,21.0205,0.663971,1.543,0.265003,20
+E,meanMos,Voice QoE · mean MOS (G.107),,3.71455,0.188645,4.28705,0.022638,0.5725,0.086957,20
+E,timeBelowMos36S,Time below MOS 3.6,s,6.59,1.336492,0,0,-6.59,0.62549,20
+E,replicationOverheadPct,Replication overhead · protected-flow bytes,%,0,0,1.1403,0.517728,1.1403,0.242301,20
+E,replicationOverheadTotalPct,Replication overhead · all traffic bytes,%,0,0,1.14029,0.517702,1.14029,0.242289,20
+E,actionVsFailureS,Action time vs. path failure,s,1.5,1.343601,-3.335,1.873155,-4.835,1.405117,20
+E,tcpResets,TCP connection resets,,4,0,0,0,-4,0,20
+E,journeyTimeS,Journey time,s,35.345,16.707813,29.925,17.109766,-5.42,0.371191,20
+E,meanPowerW,Mean radio power,W,1.2165,0.006428,1.3232,0.05136,0.1067,0.022531,20
+E,energyJ,Radio energy per journey,J,42.77,20.073552,38.995,21.424174,-3.775,0.972724,20
+E,burstTimeS,Dual-radio burst time,s,0,0,0.4,0,0.4,0,20
+E,duplicatesDiscarded,Duplicate packets discarded,,0,0,42.95,5.780867,42.95,2.705498,20
+E,criticalHolStallMs,HoL stall · critical + real-time,ms,0,0,0,0,0,0,20
+E,inOrderWaitMaxMs,In-order delivery would have added (max),ms,2.0145,3.010192,0.235,0.792866,-1.7795,1.500222,20
+E,bulkHolMeanMs,HoL buffer latency · bulk (mean),ms,,,,,,,0
+E,bulkHolPeakMs,HoL stall · bulk (peak),ms,,,,,,,0
+E,bulkRtoStalls,TCP retransmission-timeout stalls,,0,0,0,0,0,0,20
+E,remoteIpChanges,Client IP changes seen by remote services,,1,0,0,0,-1,0,20
+E,physicalIpChanges,Physical IP changes (radio side),,1,0,1,0,0,0,20
+F,c2KeptPct,Flights that kept the C2 link (no fail-safe hover),%,,,,,,,0
+F,interruptionS,Simulated interruption (total),s,3.8,0,0,0,-3.8,0,20
+F,longestInterruptionS,Longest single interruption,s,3.8,0,0,0,-3.8,0,20
+F,meanRecoveryS,Recovery time per interruption,s,3.8,0,,,,,0
+F,packetDeliveryPct,Packet delivery (critical + real-time),%,,,,,,,0
+F,criticalDeliveryPct,Critical packet delivery,%,,,,,,,0
+F,packetLossPct,Packet loss (critical + real-time),%,,,,,,,0
+F,meanThroughputMbps,Mean throughput,Mbps,76.982,6.546512,95.165,1.151381,18.183,3.158486,20
+F,meanLatencyMs,Mean critical-flow RTT,ms,,,,,,,0
+F,meanMos,Voice QoE · mean MOS (G.107),,,,,,,,0
+F,timeBelowMos36S,Time below MOS 3.6,s,,,,,,,0
+F,replicationOverheadPct,Replication overhead · protected-flow bytes,%,0,0,0,0,0,0,20
+F,replicationOverheadTotalPct,Replication overhead · all traffic bytes,%,0,0,0,0,0,0,20
+F,actionVsFailureS,Action time vs. path failure,s,1.5,1.343601,-3.335,1.873155,-4.835,1.405117,20
+F,tcpResets,TCP connection resets,,4,0,0,0,-4,0,20
+F,journeyTimeS,Journey time,s,29.925,17.109766,29.925,17.109766,0,0,20
+F,meanPowerW,Mean radio power,W,1.221,0.009868,1.3232,0.05136,0.1022,0.021856,20
+F,energyJ,Radio energy per journey,J,36.25,20.524376,38.995,21.424174,2.745,0.788187,20
+F,burstTimeS,Dual-radio burst time,s,0,0,0.4,0,0.4,0,20
+F,duplicatesDiscarded,Duplicate packets discarded,,0,0,0,0,0,0,20
+F,criticalHolStallMs,HoL stall · critical + real-time,ms,0,0,0,0,0,0,20
+F,inOrderWaitMaxMs,In-order delivery would have added (max),ms,0,0,0,0,0,0,20
+F,bulkHolMeanMs,HoL buffer latency · bulk (mean),ms,9.4658,3.128038,1.1726,0.270125,-8.2932,1.444392,20
+F,bulkHolPeakMs,HoL stall · bulk (peak),ms,392.765,47.022495,120.08,90.650199,-272.685,52.699771,20
+F,bulkRtoStalls,TCP retransmission-timeout stalls,,15.95,10.595307,0.55,0.510418,-15.4,4.974772,20
+F,remoteIpChanges,Client IP changes seen by remote services,,1,0,0,0,-1,0,20
+F,physicalIpChanges,Physical IP changes (radio side),,1,0,1,0,0,0,20
+G,c2KeptPct,Flights that kept the C2 link (no fail-safe hover),%,0,0,100,0,100,0,20
+G,interruptionS,Simulated interruption (total),s,7.69,1.939588,0,0,-7.69,0.907744,20
+G,longestInterruptionS,Longest single interruption,s,3.8,0,0,0,-3.8,0,20
+G,meanRecoveryS,Recovery time per interruption,s,2.98315,0.169969,,,,,0
+G,packetDeliveryPct,Packet delivery (critical + real-time),%,79.630215,5.641283,98.62606,0.153676,18.995845,2.624845,20
+G,criticalDeliveryPct,Critical packet delivery,%,79.636135,5.664861,98.664265,0.195387,19.02813,2.647064,20
+G,packetLossPct,Packet loss (critical + real-time),%,20.369785,5.641283,1.37394,0.153676,-18.995845,2.624845,20
+G,meanThroughputMbps,Mean throughput,Mbps,68.5815,5.280052,71.7745,4.038068,3.193,1.862752,20
+G,meanLatencyMs,Mean critical-flow RTT,ms,27.7725,4.10133,39.2365,2.304646,11.464,1.732609,20
+G,meanMos,Voice QoE · mean MOS (G.107),,3.48445,0.225333,4.23425,0.024222,0.7498,0.102251,20
+G,timeBelowMos36S,Time below MOS 3.6,s,12.005,3.62774,0.185,0.28149,-11.82,1.69565,20
+G,replicationOverheadPct,Replication overhead · protected-flow bytes,%,0,0,1.84845,0.692796,1.84845,0.324235,20
+G,replicationOverheadTotalPct,Replication overhead · all traffic bytes,%,0,0,0.00993,0.004252,0.00993,0.00199,20
+G,actionVsFailureS,Action time vs. path failure,s,0.3375,0.407455,-3.15,0.088852,-3.4875,0.205671,20
+G,tcpResets,TCP connection resets,,10.2,2.041671,0,0,-10.2,0.955521,20
+G,journeyTimeS,Journey time,s,44.75,18.689386,33.05,18.90064,-11.7,1.695949,20
+G,meanPowerW,Mean radio power,W,1.21785,0.005603,1.3422,0.035497,0.12435,0.014995,20
+G,energyJ,Radio energy per journey,J,54.325,22.560559,43.635,23.62272,-10.69,2.251871,20
+G,burstTimeS,Dual-radio burst time,s,0,0,0.8,0,0.8,0,20
+G,duplicatesDiscarded,Duplicate packets discarded,,0,0,96.5,1.90567,96.5,0.891871,20
+G,criticalHolStallMs,HoL stall · critical + real-time,ms,0,0,0,0,0,0,20
+G,inOrderWaitMaxMs,In-order delivery would have added (max),ms,6.7545,3.365835,17.409,4.364076,10.6545,2.756792,20
+G,bulkHolMeanMs,HoL buffer latency · bulk (mean),ms,4.08655,2.869412,2.63715,0.456,-1.4494,1.456825,20
+G,bulkHolPeakMs,HoL stall · bulk (peak),ms,254.865,176.294882,119.805,67.180334,-135.06,96.756185,20
+G,bulkRtoStalls,TCP retransmission-timeout stalls,,9.05,9.703363,0.4,0.502625,-8.65,4.58371,20
+G,remoteIpChanges,Client IP changes seen by remote services,,2.55,0.510418,0,0,-2.55,0.23888,20
+G,physicalIpChanges,Physical IP changes (radio side),,2.55,0.510418,2,0,-0.55,0.23888,20
+H,c2KeptPct,Flights that kept the C2 link (no fail-safe hover),%,0,0,100,0,100,0,20
+H,interruptionS,Simulated interruption (total),s,8.45,1.688194,0.104,0.078298,-8.346,0.797558,20
+H,longestInterruptionS,Longest single interruption,s,3.8,0,0.104,0.078298,-3.696,0.036644,20
+H,meanRecoveryS,Recovery time per interruption,s,3.04975,0.147939,0.16,0,-2.870538,0.096676,13
+H,packetDeliveryPct,Packet delivery (critical + real-time),%,76.93003,5.364806,98.15671,0.352322,21.22668,2.430479,20
+H,criticalDeliveryPct,Critical packet delivery,%,76.95762,5.340892,98.257035,0.329726,21.299415,2.441421,20
+H,packetLossPct,Packet loss (critical + real-time),%,23.06997,5.364806,1.84329,0.352322,-21.22668,2.430479,20
+H,meanThroughputMbps,Mean throughput,Mbps,66.1815,7.894361,64.745,5.872328,-1.4365,2.893955,20
+H,meanLatencyMs,Mean critical-flow RTT,ms,28.5575,4.086358,46.271,4.150453,17.7135,2.376726,20
+H,meanMos,Voice QoE · mean MOS (G.107),,3.36775,0.212331,4.17055,0.055226,0.8028,0.089073,20
+H,timeBelowMos36S,Time below MOS 3.6,s,13.775,3.118514,1.16,0.720672,-12.615,1.595591,20
+H,replicationOverheadPct,Replication overhead · protected-flow bytes,%,0,0,2.6077,0.987256,2.6077,0.462045,20
+H,replicationOverheadTotalPct,Replication overhead · all traffic bytes,%,0,0,0.01583,0.00748,0.01583,0.003501,20
+H,actionVsFailureS,Action time vs. path failure,s,1,0.537293,-3.8775,2.712518,-4.8775,1.111835,20
+H,tcpResets,TCP connection resets,,11,1.777047,0,0,-11,0.831674,20
+H,journeyTimeS,Journey time,s,45.035,19.471174,33.05,18.90064,-11.985,1.179128,20
+H,meanPowerW,Mean radio power,W,1.2203,0.0051,1.38405,0.04911,0.16375,0.02121,20
+H,energyJ,Radio energy per journey,J,54.765,23.511862,44.765,23.91283,-10,1.357269,20
+H,burstTimeS,Dual-radio burst time,s,0,0,1.18,0.119649,1.18,0.055997,20
+H,duplicatesDiscarded,Duplicate packets discarded,,0,0,132.1,10.925104,132.1,5.113047,20
+H,criticalHolStallMs,HoL stall · critical + real-time,ms,0,0,0,0,0,0,20
+H,inOrderWaitMaxMs,In-order delivery would have added (max),ms,8.2435,2.195908,19.4635,7.618505,11.22,3.926131,20
+H,bulkHolMeanMs,HoL buffer latency · bulk (mean),ms,7.8048,1.835133,3.371,0.53643,-4.4338,0.949034,20
+H,bulkHolPeakMs,HoL stall · bulk (peak),ms,405,22.36068,176.615,78.882913,-228.385,37.663406,20
+H,bulkRtoStalls,TCP retransmission-timeout stalls,,18.05,10.267347,1.05,0.825578,-17,4.941291,20
+H,remoteIpChanges,Client IP changes seen by remote services,,2.75,0.444262,0,0,-2.75,0.207918,20
+H,physicalIpChanges,Physical IP changes (radio side),,2.75,0.444262,3.7,0.732695,0.95,0.386378,20

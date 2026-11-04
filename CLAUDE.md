@@ -24,10 +24,17 @@ npm run dev          # Vite dev server: landing page http://localhost:5173, simu
 npm run build        # production bundle → dist/ (base './', sourcemaps on)
 npm run preview      # serve dist/ on :4173
 npm run benchmark    # headless paired experiments in Node → results/benchmark_<stamp>.{json,csv} + _comparison / _mechanisms / _efficiency / _ablations / _prediction CSVs
+npm test             # Vitest: simulation-core tests (~5 s)
+npm run test:full    # + full benchmarks vs results/published/ CSVs, byte for byte (< 1 min)
 npm run models       # regenerate public/models/*.glb (needs `blender` on PATH)
 ```
 
-There is no test suite, linter or type checker. Verify changes with `npm run build` and the benchmark:
+`npm test` (Vitest, `tests/`, about 5 s) covers the simulation core: determinism, A–H completion, controller
+invariants (FlexiPath never sends on a down link, legacy breaks of fixed length) and a quick benchmark checked against
+the README's four-stack table within stated tolerances. `npm run test:full` also re-runs the full default and held-out
+benchmarks and compares them byte for byte with `results/published/` (committed; see its `MANIFEST.md`). CI
+(`.github/workflows/ci.yml`) runs build + both. There is no linter or type checker. Verify changes with `npm run build`,
+the tests and the benchmark:
 
 - Narrow runs: `npm run benchmark -- --quick` (3 seeds, 60 km/h), or e.g. `-- --seeds 1 --speeds 60 --scenarios A,D`;
   also `--no-failsafe`, `--out <dir>`, `--baselines mptcp,redundant` (default) or `none`, `--ablations
@@ -43,7 +50,8 @@ There is no test suite, linter or type checker. Verify changes with `npm run bui
   reproduces the FP/LG-only CSVs exactly, and the `fp_` / `lg_` columns of a full run match them. When you add a
   metric, append it to `SUMMARY_METRICS` so earlier CSV columns keep their order, and compare old vs new by column name.
 - The README's "Measured results" tables come from the default `npm run benchmark`; when model behaviour changes,
-  re-run it and update them, the hover-rule table (re-run with `--failsafe-ms 1000`) and the trade-off chart:
+  re-run it and update them, `results/published/` and its `MANIFEST.md` (commit hash, date, checksums; the README's
+  "Archived data" paragraph names the commit too), the hover-rule table (re-run with `--failsafe-ms 1000`) and the trade-off chart:
   `node scripts/tradeoff-chart.js results/benchmark_mechanisms_<stamp>.csv` redraws `public/landing/tradeoff.svg`
   (README and landing page).
 - `node scripts/handover-probe.js` measures one real network change on the laptop it runs on (README "Real-world

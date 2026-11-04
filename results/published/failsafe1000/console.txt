@@ -1,0 +1,465 @@
+FlexiPath experiments · 160 paired runs (5 seeds × 4 speeds × 8 scenarios)
+Seeds: development seeds (used while building and tuning FlexiPath) · 1000, 8919, 16838, 24757, 32676
+Fail-safe: hover when C2 is silent > 1000 ms
+All values are measured SIMULATION results (model, not hardware).
+  progress    8/160  progress   16/160  progress   24/160  progress   32/160  progress   40/160  progress   48/160  progress   56/160  progress   64/160  progress   72/160  progress   80/160  progress   88/160  progress   96/160  progress  104/160  progress  112/160  progress  120/160  progress  128/160  progress  136/160  progress  144/160  progress  152/160  progress  160/160
+
+A · Wi-Fi → 5G
+┌────────────────────────────────────────────────────┬─────────┬───────────┬──────────────────┬────────┐
+│ (index)                                            │ Legacy  │ FlexiPath │ Δ (FP − LG)      │ unit   │
+├────────────────────────────────────────────────────┼─────────┼───────────┼──────────────────┼────────┤
+│ Flights that kept the C2 link (no fail-safe hover) │ '0'     │ '100'     │ '+100 ± 0'       │ '%'    │
+│ Simulated interruption (total)                     │ '3.80'  │ '0.00'    │ '-3.80 ± 0.00'   │ 's'    │
+│ Critical packet delivery                           │ '83.73' │ '98.97'   │ '+15.23 ± 2.80'  │ '%'    │
+│ Mean throughput                                    │ '77.6'  │ '92.7'    │ '+15.1 ± 2.5'    │ 'Mbps' │
+│ Voice QoE · mean MOS (G.107)                       │ '3.67'  │ '4.30'    │ '+0.63 ± 0.11'   │ ''     │
+│ Replication overhead · protected-flow bytes        │ '0.00'  │ '1.20'    │ '+1.20 ± 0.26'   │ '%'    │
+│ Action time vs. path failure                       │ '1.43'  │ '-3.37'   │ '-4.80 ± 1.43'   │ 's'    │
+│ Mean radio power                                   │ '1.218' │ '1.315'   │ '+0.097 ± 0.011' │ 'W'    │
+│ Radio energy per journey                           │ '40.9'  │ '38.9'    │ '-2.0 ± 0.7'     │ 'J'    │
+│ HoL buffer latency · bulk (mean)                   │ '8.01'  │ '1.15'    │ '-6.86 ± 0.97'   │ 'ms'   │
+│ HoL stall · bulk (peak)                            │ '390'   │ '102'     │ '-288 ± 52'      │ 'ms'   │
+│ TCP retransmission-timeout stalls                  │ '15.0'  │ '0.5'     │ '-14.5 ± 5.0'    │ ''     │
+│ Client IP changes seen by remote services          │ '1.0'   │ '0.0'     │ '-1.0 ± 0.0'     │ ''     │
+└────────────────────────────────────────────────────┴─────────┴───────────┴──────────────────┴────────┘
+
+B · Wi-Fi → 5G → LEO
+┌────────────────────────────────────────────────────┬─────────┬───────────┬──────────────────┬────────┐
+│ (index)                                            │ Legacy  │ FlexiPath │ Δ (FP − LG)      │ unit   │
+├────────────────────────────────────────────────────┼─────────┼───────────┼──────────────────┼────────┤
+│ Flights that kept the C2 link (no fail-safe hover) │ '0'     │ '100'     │ '+100 ± 0'       │ '%'    │
+│ Simulated interruption (total)                     │ '7.37'  │ '0.00'    │ '-7.37 ± 0.21'   │ 's'    │
+│ Critical packet delivery                           │ '83.44' │ '98.66'   │ '+15.22 ± 2.65'  │ '%'    │
+│ Mean throughput                                    │ '64.5'  │ '71.6'    │ '+7.1 ± 1.4'     │ 'Mbps' │
+│ Voice QoE · mean MOS (G.107)                       │ '3.66'  │ '4.25'    │ '+0.60 ± 0.09'   │ ''     │
+│ Replication overhead · protected-flow bytes        │ '0.00'  │ '1.34'    │ '+1.34 ± 0.29'   │ '%'    │
+│ Action time vs. path failure                       │ '2.00'  │ '-3.78'   │ '-5.78 ± 1.68'   │ 's'    │
+│ Mean radio power                                   │ '1.218' │ '1.315'   │ '+0.097 ± 0.010' │ 'W'    │
+│ Radio energy per journey                           │ '84.5'  │ '81.7'    │ '-2.8 ± 1.1'     │ 'J'    │
+│ HoL buffer latency · bulk (mean)                   │ '8.10'  │ '2.36'    │ '-5.74 ± 0.94'   │ 'ms'   │
+│ HoL stall · bulk (peak)                            │ '426'   │ '133'     │ '-293 ± 27'      │ 'ms'   │
+│ TCP retransmission-timeout stalls                  │ '27.8'  │ '0.5'     │ '-27.3 ± 8.4'    │ ''     │
+│ Client IP changes seen by remote services          │ '1.8'   │ '0.0'     │ '-1.8 ± 0.2'     │ ''     │
+└────────────────────────────────────────────────────┴─────────┴───────────┴──────────────────┴────────┘
+
+C · 5G degradation → LEO
+┌────────────────────────────────────────────────────┬─────────┬───────────┬──────────────────┬────────┐
+│ (index)                                            │ Legacy  │ FlexiPath │ Δ (FP − LG)      │ unit   │
+├────────────────────────────────────────────────────┼─────────┼───────────┼──────────────────┼────────┤
+│ Flights that kept the C2 link (no fail-safe hover) │ '0'     │ '100'     │ '+100 ± 0'       │ '%'    │
+│ Simulated interruption (total)                     │ '3.63'  │ '0.00'    │ '-3.63 ± 0.20'   │ 's'    │
+│ Critical packet delivery                           │ '82.32' │ '98.29'   │ '+15.97 ± 2.96'  │ '%'    │
+│ Mean throughput                                    │ '50.5'  │ '56.3'    │ '+5.8 ± 1.2'     │ 'Mbps' │
+│ Voice QoE · mean MOS (G.107)                       │ '3.60'  │ '4.22'    │ '+0.63 ± 0.10'   │ ''     │
+│ Replication overhead · protected-flow bytes        │ '0.00'  │ '1.46'    │ '+1.46 ± 0.33'   │ '%'    │
+│ Action time vs. path failure                       │ '2.28'  │ '-4.60'   │ '-6.88 ± 2.10'   │ 's'    │
+│ Mean radio power                                   │ '1.218' │ '1.316'   │ '+0.098 ± 0.012' │ 'W'    │
+│ Radio energy per journey                           │ '41.6'  │ '40.8'    │ '-0.8 ± 0.8'     │ 'J'    │
+│ HoL buffer latency · bulk (mean)                   │ '8.49'  │ '3.03'    │ '-5.46 ± 1.20'   │ 'ms'   │
+│ HoL stall · bulk (peak)                            │ '394'   │ '65'      │ '-329 ± 22'      │ 'ms'   │
+│ TCP retransmission-timeout stalls                  │ '12.3'  │ '0.0'     │ '-12.3 ± 3.3'    │ ''     │
+│ Client IP changes seen by remote services          │ '0.8'   │ '0.0'     │ '-0.8 ± 0.2'     │ ''     │
+└────────────────────────────────────────────────────┴─────────┴───────────┴──────────────────┴────────┘
+
+D · Multiple network degradation
+┌────────────────────────────────────────────────────┬─────────┬───────────┬──────────────────┬────────┐
+│ (index)                                            │ Legacy  │ FlexiPath │ Δ (FP − LG)      │ unit   │
+├────────────────────────────────────────────────────┼─────────┼───────────┼──────────────────┼────────┤
+│ Flights that kept the C2 link (no fail-safe hover) │ '0'     │ '100'     │ '+100 ± 0'       │ '%'    │
+│ Simulated interruption (total)                     │ '16.76' │ '0.16'    │ '-16.60 ± 1.38'  │ 's'    │
+│ Critical packet delivery                           │ '74.27' │ '98.22'   │ '+23.95 ± 3.37'  │ '%'    │
+│ Mean throughput                                    │ '51.6'  │ '59.8'    │ '+8.2 ± 2.5'     │ 'Mbps' │
+│ Voice QoE · mean MOS (G.107)                       │ '3.27'  │ '4.20'    │ '+0.93 ± 0.12'   │ ''     │
+│ Replication overhead · protected-flow bytes        │ '0.00'  │ '0.98'    │ '+0.98 ± 0.13'   │ '%'    │
+│ Action time vs. path failure                       │ '0.99'  │ '-1.25'   │ '-2.24 ± 1.00'   │ 's'    │
+│ Mean radio power                                   │ '1.224' │ '1.254'   │ '+0.030 ± 0.019' │ 'W'    │
+│ Radio energy per journey                           │ '105.5' │ '90.7'    │ '-14.8 ± 3.0'    │ 'J'    │
+│ HoL buffer latency · bulk (mean)                   │ '6.99'  │ '3.80'    │ '-3.20 ± 0.93'   │ 'ms'   │
+│ HoL stall · bulk (peak)                            │ '441'   │ '257'     │ '-184 ± 54'      │ 'ms'   │
+│ TCP retransmission-timeout stalls                  │ '25.3'  │ '2.2'     │ '-23.1 ± 7.4'    │ ''     │
+│ Client IP changes seen by remote services          │ '5.1'   │ '0.0'     │ '-5.1 ± 0.6'     │ ''     │
+└────────────────────────────────────────────────────┴─────────┴───────────┴──────────────────┴────────┘
+
+E · Critical traffic during handover
+┌────────────────────────────────────────────────────┬─────────┬───────────┬──────────────────┬────────┐
+│ (index)                                            │ Legacy  │ FlexiPath │ Δ (FP − LG)      │ unit   │
+├────────────────────────────────────────────────────┼─────────┼───────────┼──────────────────┼────────┤
+│ Flights that kept the C2 link (no fail-safe hover) │ '0'     │ '100'     │ '+100 ± 0'       │ '%'    │
+│ Simulated interruption (total)                     │ '3.80'  │ '0.00'    │ '-3.80 ± 0.00'   │ 's'    │
+│ Critical packet delivery                           │ '83.73' │ '98.97'   │ '+15.23 ± 2.80'  │ '%'    │
+│ Mean throughput                                    │ '0.3'   │ '0.4'     │ '+0.1 ± 0.0'     │ 'Mbps' │
+│ Voice QoE · mean MOS (G.107)                       │ '3.67'  │ '4.30'    │ '+0.63 ± 0.11'   │ ''     │
+│ Replication overhead · protected-flow bytes        │ '0.00'  │ '1.20'    │ '+1.20 ± 0.26'   │ '%'    │
+│ Action time vs. path failure                       │ '1.43'  │ '-3.37'   │ '-4.80 ± 1.43'   │ 's'    │
+│ Mean radio power                                   │ '1.218' │ '1.315'   │ '+0.097 ± 0.011' │ 'W'    │
+│ Radio energy per journey                           │ '40.9'  │ '38.9'    │ '-2.0 ± 0.7'     │ 'J'    │
+│ HoL buffer latency · bulk (mean)                   │ '—'     │ '—'       │ '—'              │ 'ms'   │
+│ HoL stall · bulk (peak)                            │ '—'     │ '—'       │ '—'              │ 'ms'   │
+│ TCP retransmission-timeout stalls                  │ '0.0'   │ '0.0'     │ '+0.0 ± 0.0'     │ ''     │
+│ Client IP changes seen by remote services          │ '1.0'   │ '0.0'     │ '-1.0 ± 0.0'     │ ''     │
+└────────────────────────────────────────────────────┴─────────┴───────────┴──────────────────┴────────┘
+
+F · Bulk traffic during handover
+┌────────────────────────────────────────────────────┬─────────┬───────────┬──────────────────┬────────┐
+│ (index)                                            │ Legacy  │ FlexiPath │ Δ (FP − LG)      │ unit   │
+├────────────────────────────────────────────────────┼─────────┼───────────┼──────────────────┼────────┤
+│ Flights that kept the C2 link (no fail-safe hover) │ '—'     │ '—'       │ '—'              │ '%'    │
+│ Simulated interruption (total)                     │ '3.80'  │ '0.00'    │ '-3.80 ± 0.00'   │ 's'    │
+│ Critical packet delivery                           │ '—'     │ '—'       │ '—'              │ '%'    │
+│ Mean throughput                                    │ '76.6'  │ '94.4'    │ '+17.8 ± 3.2'    │ 'Mbps' │
+│ Voice QoE · mean MOS (G.107)                       │ '—'     │ '—'       │ '—'              │ ''     │
+│ Replication overhead · protected-flow bytes        │ '0.00'  │ '0.00'    │ '+0.00 ± 0.00'   │ '%'    │
+│ Action time vs. path failure                       │ '1.43'  │ '-3.37'   │ '-4.80 ± 1.43'   │ 's'    │
+│ Mean radio power                                   │ '1.221' │ '1.315'   │ '+0.094 ± 0.011' │ 'W'    │
+│ Radio energy per journey                           │ '36.3'  │ '38.9'    │ '+2.7 ± 0.7'     │ 'J'    │
+│ HoL buffer latency · bulk (mean)                   │ '9.13'  │ '1.14'    │ '-7.99 ± 1.18'   │ 'ms'   │
+│ HoL stall · bulk (peak)                            │ '390'   │ '102'     │ '-288 ± 52'      │ 'ms'   │
+│ TCP retransmission-timeout stalls                  │ '15.0'  │ '0.5'     │ '-14.5 ± 5.0'    │ ''     │
+│ Client IP changes seen by remote services          │ '1.0'   │ '0.0'     │ '-1.0 ± 0.0'     │ ''     │
+└────────────────────────────────────────────────────┴─────────┴───────────┴──────────────────┴────────┘
+
+G · Radio shadow on the route
+┌────────────────────────────────────────────────────┬─────────┬───────────┬──────────────────┬────────┐
+│ (index)                                            │ Legacy  │ FlexiPath │ Δ (FP − LG)      │ unit   │
+├────────────────────────────────────────────────────┼─────────┼───────────┼──────────────────┼────────┤
+│ Flights that kept the C2 link (no fail-safe hover) │ '0'     │ '100'     │ '+100 ± 0'       │ '%'    │
+│ Simulated interruption (total)                     │ '7.31'  │ '0.00'    │ '-7.31 ± 0.91'   │ 's'    │
+│ Critical packet delivery                           │ '77.84' │ '98.54'   │ '+20.71 ± 2.50'  │ '%'    │
+│ Mean throughput                                    │ '68.4'  │ '70.1'    │ '+1.8 ± 2.1'     │ 'Mbps' │
+│ Voice QoE · mean MOS (G.107)                       │ '3.40'  │ '4.24'    │ '+0.84 ± 0.10'   │ ''     │
+│ Replication overhead · protected-flow bytes        │ '0.00'  │ '2.22'    │ '+2.22 ± 0.46'   │ '%'    │
+│ Action time vs. path failure                       │ '0.45'  │ '-3.15'   │ '-3.60 ± 0.32'   │ 's'    │
+│ Mean radio power                                   │ '1.219' │ '1.346'   │ '+0.127 ± 0.018' │ 'W'    │
+│ Radio energy per journey                           │ '48.6'  │ '43.7'    │ '-4.9 ± 1.1'     │ 'J'    │
+│ HoL buffer latency · bulk (mean)                   │ '4.10'  │ '2.68'    │ '-1.42 ± 1.84'   │ 'ms'   │
+│ HoL stall · bulk (peak)                            │ '212'   │ '93'      │ '-118 ± 92'      │ 'ms'   │
+│ TCP retransmission-timeout stalls                  │ '9.4'   │ '0.2'     │ '-9.2 ± 5.7'     │ ''     │
+│ Client IP changes seen by remote services          │ '2.5'   │ '0.0'     │ '-2.5 ± 0.2'     │ ''     │
+└────────────────────────────────────────────────────┴─────────┴───────────┴──────────────────┴────────┘
+
+H · Coverage map out of date
+┌────────────────────────────────────────────────────┬─────────┬───────────┬──────────────────┬────────┐
+│ (index)                                            │ Legacy  │ FlexiPath │ Δ (FP − LG)      │ unit   │
+├────────────────────────────────────────────────────┼─────────┼───────────┼──────────────────┼────────┤
+│ Flights that kept the C2 link (no fail-safe hover) │ '0'     │ '100'     │ '+100 ± 0'       │ '%'    │
+│ Simulated interruption (total)                     │ '7.88'  │ '0.10'    │ '-7.78 ± 0.89'   │ 's'    │
+│ Critical packet delivery                           │ '75.84' │ '98.09'   │ '+22.25 ± 2.84'  │ '%'    │
+│ Mean throughput                                    │ '67.5'  │ '62.0'    │ '-5.5 ± 2.4'     │ 'Mbps' │
+│ Voice QoE · mean MOS (G.107)                       │ '3.33'  │ '4.17'    │ '+0.84 ± 0.11'   │ ''     │
+│ Replication overhead · protected-flow bytes        │ '0.00'  │ '3.05'    │ '+3.05 ± 0.60'   │ '%'    │
+│ Action time vs. path failure                       │ '0.64'  │ '-3.47'   │ '-4.11 ± 1.30'   │ 's'    │
+│ Mean radio power                                   │ '1.221' │ '1.388'   │ '+0.167 ± 0.024' │ 'W'    │
+│ Radio energy per journey                           │ '49.4'  │ '44.8'    │ '-4.6 ± 1.3'     │ 'J'    │
+│ HoL buffer latency · bulk (mean)                   │ '6.83'  │ '3.71'    │ '-3.12 ± 0.98'   │ 'ms'   │
+│ HoL stall · bulk (peak)                            │ '400'   │ '197'     │ '-203 ± 66'      │ 'ms'   │
+│ TCP retransmission-timeout stalls                  │ '12.3'  │ '0.7'     │ '-11.7 ± 2.9'    │ ''     │
+│ Client IP changes seen by remote services          │ '2.6'   │ '0.0'     │ '-2.6 ± 0.2'     │ ''     │
+└────────────────────────────────────────────────────┴─────────┴───────────┴──────────────────┴────────┘
+
+A · existing mechanisms vs FlexiPath
+┌────────────────────────────────────────────────────┬───────────┬────────────────────┬──────────────────┬───────────┬──────┐
+│ (index)                                            │ Legacy OS │ Reactive multipath │ Always duplicate │ FlexiPath │ unit │
+├────────────────────────────────────────────────────┼───────────┼────────────────────┼──────────────────┼───────────┼──────┤
+│ Flights that kept the C2 link (no fail-safe hover) │ '0'       │ '100'              │ '100'            │ '100'     │ '%'  │
+│ Simulated interruption (total)                     │ '3.80'    │ '0.00'             │ '0.00'           │ '0.00'    │ 's'  │
+│ Longest single interruption                        │ '3.80'    │ '0.00'             │ '0.00'           │ '0.00'    │ 's'  │
+│ Critical packet delivery                           │ '83.73'   │ '98.26'            │ '99.97'          │ '98.97'   │ '%'  │
+│ Voice QoE · mean MOS (G.107)                       │ '3.67'    │ '4.22'             │ '4.38'           │ '4.30'    │ ''   │
+│ Duplicate bytes · protected flows                  │ '0.0'     │ '0.0'              │ '99.6'           │ '1.2'     │ '%'  │
+│ Mean radio power                                   │ '1.22'    │ '1.20'             │ '3.39'           │ '1.31'    │ 'W'  │
+│ Radio energy per journey                           │ '40.9'    │ '35.9'             │ '101.3'          │ '38.9'    │ 'J'  │
+│ TCP connection resets                              │ '4.0'     │ '0.0'              │ '0.0'            │ '0.0'     │ ''   │
+│ Client IP changes seen by remote services          │ '1.0'     │ '0.0'              │ '0.0'            │ '0.0'     │ ''   │
+│ Action time vs. path failure                       │ '1.43'    │ '0.42'             │ '0.28'           │ '-3.37'   │ 's'  │
+└────────────────────────────────────────────────────┴───────────┴────────────────────┴──────────────────┴───────────┴──────┘
+
+B · existing mechanisms vs FlexiPath
+┌────────────────────────────────────────────────────┬───────────┬────────────────────┬──────────────────┬───────────┬──────┐
+│ (index)                                            │ Legacy OS │ Reactive multipath │ Always duplicate │ FlexiPath │ unit │
+├────────────────────────────────────────────────────┼───────────┼────────────────────┼──────────────────┼───────────┼──────┤
+│ Flights that kept the C2 link (no fail-safe hover) │ '0'       │ '100'              │ '100'            │ '100'     │ '%'  │
+│ Simulated interruption (total)                     │ '7.37'    │ '0.00'             │ '0.00'           │ '0.00'    │ 's'  │
+│ Longest single interruption                        │ '3.80'    │ '0.00'             │ '0.00'           │ '0.00'    │ 's'  │
+│ Critical packet delivery                           │ '83.44'   │ '97.79'            │ '99.55'          │ '98.66'   │ '%'  │
+│ Voice QoE · mean MOS (G.107)                       │ '3.66'    │ '4.16'             │ '4.33'           │ '4.25'    │ ''   │
+│ Duplicate bytes · protected flows                  │ '0.0'     │ '0.0'              │ '77.8'           │ '1.3'     │ '%'  │
+│ Mean radio power                                   │ '1.22'    │ '1.20'             │ '3.13'           │ '1.31'    │ 'W'  │
+│ Radio energy per journey                           │ '84.5'    │ '75.4'             │ '196.0'          │ '81.7'    │ 'J'  │
+│ TCP connection resets                              │ '8.0'     │ '0.0'              │ '0.0'            │ '0.0'     │ ''   │
+│ Client IP changes seen by remote services          │ '1.8'     │ '0.0'              │ '0.0'            │ '0.0'     │ ''   │
+│ Action time vs. path failure                       │ '2.00'    │ '0.53'             │ '0.43'           │ '-3.78'   │ 's'  │
+└────────────────────────────────────────────────────┴───────────┴────────────────────┴──────────────────┴───────────┴──────┘
+
+C · existing mechanisms vs FlexiPath
+┌────────────────────────────────────────────────────┬───────────┬────────────────────┬──────────────────┬───────────┬──────┐
+│ (index)                                            │ Legacy OS │ Reactive multipath │ Always duplicate │ FlexiPath │ unit │
+├────────────────────────────────────────────────────┼───────────┼────────────────────┼──────────────────┼───────────┼──────┤
+│ Flights that kept the C2 link (no fail-safe hover) │ '0'       │ '100'              │ '100'            │ '100'     │ '%'  │
+│ Simulated interruption (total)                     │ '3.63'    │ '0.00'             │ '0.00'           │ '0.00'    │ 's'  │
+│ Longest single interruption                        │ '3.63'    │ '0.00'             │ '0.00'           │ '0.00'    │ 's'  │
+│ Critical packet delivery                           │ '82.32'   │ '97.51'            │ '99.37'          │ '98.29'   │ '%'  │
+│ Voice QoE · mean MOS (G.107)                       │ '3.60'    │ '4.11'             │ '4.31'           │ '4.22'    │ ''   │
+│ Duplicate bytes · protected flows                  │ '0.0'     │ '0.0'              │ '68.4'           │ '1.5'     │ '%'  │
+│ Mean radio power                                   │ '1.22'    │ '1.20'             │ '2.85'           │ '1.32'    │ 'W'  │
+│ Radio energy per journey                           │ '41.6'    │ '37.7'             │ '89.0'           │ '40.8'    │ 'J'  │
+│ TCP connection resets                              │ '3.8'     │ '0.0'              │ '0.0'            │ '0.0'     │ ''   │
+│ Client IP changes seen by remote services          │ '0.8'     │ '0.0'              │ '0.0'            │ '0.0'     │ ''   │
+│ Action time vs. path failure                       │ '2.28'    │ '0.41'             │ '0.45'           │ '-4.60'   │ 's'  │
+└────────────────────────────────────────────────────┴───────────┴────────────────────┴──────────────────┴───────────┴──────┘
+
+D · existing mechanisms vs FlexiPath
+┌────────────────────────────────────────────────────┬───────────┬────────────────────┬──────────────────┬───────────┬──────┐
+│ (index)                                            │ Legacy OS │ Reactive multipath │ Always duplicate │ FlexiPath │ unit │
+├────────────────────────────────────────────────────┼───────────┼────────────────────┼──────────────────┼───────────┼──────┤
+│ Flights that kept the C2 link (no fail-safe hover) │ '0'       │ '100'              │ '100'            │ '100'     │ '%'  │
+│ Simulated interruption (total)                     │ '16.76'   │ '0.68'             │ '0.00'           │ '0.16'    │ 's'  │
+│ Longest single interruption                        │ '3.80'    │ '0.35'             │ '0.00'           │ '0.16'    │ 's'  │
+│ Critical packet delivery                           │ '74.27'   │ '96.89'            │ '99.06'          │ '98.22'   │ '%'  │
+│ Voice QoE · mean MOS (G.107)                       │ '3.27'    │ '4.09'             │ '4.28'           │ '4.20'    │ ''   │
+│ Duplicate bytes · protected flows                  │ '0.0'     │ '0.0'              │ '53.4'           │ '1.0'     │ '%'  │
+│ Mean radio power                                   │ '1.22'    │ '1.20'             │ '2.65'           │ '1.25'    │ 'W'  │
+│ Radio energy per journey                           │ '105.5'   │ '86.1'             │ '197.8'          │ '90.7'    │ 'J'  │
+│ TCP connection resets                              │ '21.4'    │ '0.0'              │ '0.0'            │ '0.0'     │ ''   │
+│ Client IP changes seen by remote services          │ '5.1'     │ '0.0'              │ '0.0'            │ '0.0'     │ ''   │
+│ Action time vs. path failure                       │ '0.99'    │ '0.28'             │ '0.25'           │ '-1.25'   │ 's'  │
+└────────────────────────────────────────────────────┴───────────┴────────────────────┴──────────────────┴───────────┴──────┘
+
+E · existing mechanisms vs FlexiPath
+┌────────────────────────────────────────────────────┬───────────┬────────────────────┬──────────────────┬───────────┬──────┐
+│ (index)                                            │ Legacy OS │ Reactive multipath │ Always duplicate │ FlexiPath │ unit │
+├────────────────────────────────────────────────────┼───────────┼────────────────────┼──────────────────┼───────────┼──────┤
+│ Flights that kept the C2 link (no fail-safe hover) │ '0'       │ '100'              │ '100'            │ '100'     │ '%'  │
+│ Simulated interruption (total)                     │ '3.80'    │ '0.00'             │ '0.00'           │ '0.00'    │ 's'  │
+│ Longest single interruption                        │ '3.80'    │ '0.00'             │ '0.00'           │ '0.00'    │ 's'  │
+│ Critical packet delivery                           │ '83.73'   │ '98.26'            │ '99.97'          │ '98.97'   │ '%'  │
+│ Voice QoE · mean MOS (G.107)                       │ '3.67'    │ '4.22'             │ '4.38'           │ '4.30'    │ ''   │
+│ Duplicate bytes · protected flows                  │ '0.0'     │ '0.0'              │ '99.6'           │ '1.2'     │ '%'  │
+│ Mean radio power                                   │ '1.22'    │ '1.20'             │ '3.39'           │ '1.31'    │ 'W'  │
+│ Radio energy per journey                           │ '40.9'    │ '35.9'             │ '101.3'          │ '38.9'    │ 'J'  │
+│ TCP connection resets                              │ '4.0'     │ '0.0'              │ '0.0'            │ '0.0'     │ ''   │
+│ Client IP changes seen by remote services          │ '1.0'     │ '0.0'              │ '0.0'            │ '0.0'     │ ''   │
+│ Action time vs. path failure                       │ '1.43'    │ '0.42'             │ '0.28'           │ '-3.37'   │ 's'  │
+└────────────────────────────────────────────────────┴───────────┴────────────────────┴──────────────────┴───────────┴──────┘
+
+F · existing mechanisms vs FlexiPath
+┌────────────────────────────────────────────────────┬───────────┬────────────────────┬──────────────────┬───────────┬──────┐
+│ (index)                                            │ Legacy OS │ Reactive multipath │ Always duplicate │ FlexiPath │ unit │
+├────────────────────────────────────────────────────┼───────────┼────────────────────┼──────────────────┼───────────┼──────┤
+│ Flights that kept the C2 link (no fail-safe hover) │ '—'       │ '—'                │ '—'              │ '—'       │ '%'  │
+│ Simulated interruption (total)                     │ '3.80'    │ '0.00'             │ '0.00'           │ '0.00'    │ 's'  │
+│ Longest single interruption                        │ '3.80'    │ '0.00'             │ '0.00'           │ '0.00'    │ 's'  │
+│ Critical packet delivery                           │ '—'       │ '—'                │ '—'              │ '—'       │ '%'  │
+│ Voice QoE · mean MOS (G.107)                       │ '—'       │ '—'                │ '—'              │ '—'       │ ''   │
+│ Duplicate bytes · protected flows                  │ '0.0'     │ '0.0'              │ '0.0'            │ '0.0'     │ '%'  │
+│ Mean radio power                                   │ '1.22'    │ '1.20'             │ '1.20'           │ '1.31'    │ 'W'  │
+│ Radio energy per journey                           │ '36.3'    │ '35.9'             │ '35.9'           │ '38.9'    │ 'J'  │
+│ TCP connection resets                              │ '4.0'     │ '0.0'              │ '0.0'            │ '0.0'     │ ''   │
+│ Client IP changes seen by remote services          │ '1.0'     │ '0.0'              │ '0.0'            │ '0.0'     │ ''   │
+│ Action time vs. path failure                       │ '1.43'    │ '0.42'             │ '0.39'           │ '-3.37'   │ 's'  │
+└────────────────────────────────────────────────────┴───────────┴────────────────────┴──────────────────┴───────────┴──────┘
+
+G · existing mechanisms vs FlexiPath
+┌────────────────────────────────────────────────────┬───────────┬────────────────────┬──────────────────┬───────────┬──────┐
+│ (index)                                            │ Legacy OS │ Reactive multipath │ Always duplicate │ FlexiPath │ unit │
+├────────────────────────────────────────────────────┼───────────┼────────────────────┼──────────────────┼───────────┼──────┤
+│ Flights that kept the C2 link (no fail-safe hover) │ '0'       │ '100'              │ '100'            │ '100'     │ '%'  │
+│ Simulated interruption (total)                     │ '7.31'    │ '0.40'             │ '0.21'           │ '0.00'    │ 's'  │
+│ Longest single interruption                        │ '3.80'    │ '0.35'             │ '0.21'           │ '0.00'    │ 's'  │
+│ Critical packet delivery                           │ '77.84'   │ '97.49'            │ '98.98'          │ '98.54'   │ '%'  │
+│ Voice QoE · mean MOS (G.107)                       │ '3.40'    │ '4.17'             │ '4.29'           │ '4.24'    │ ''   │
+│ Duplicate bytes · protected flows                  │ '0.0'     │ '0.0'              │ '92.7'           │ '2.2'     │ '%'  │
+│ Mean radio power                                   │ '1.22'    │ '1.21'             │ '3.21'           │ '1.35'    │ 'W'  │
+│ Radio energy per journey                           │ '48.6'    │ '39.7'             │ '105.6'          │ '43.7'    │ 'J'  │
+│ TCP connection resets                              │ '9.8'     │ '0.0'              │ '0.0'            │ '0.0'     │ ''   │
+│ Client IP changes seen by remote services          │ '2.5'     │ '0.0'              │ '0.0'            │ '0.0'     │ ''   │
+│ Action time vs. path failure                       │ '0.45'    │ '0.07'             │ '0.04'           │ '-3.15'   │ 's'  │
+└────────────────────────────────────────────────────┴───────────┴────────────────────┴──────────────────┴───────────┴──────┘
+
+H · existing mechanisms vs FlexiPath
+┌────────────────────────────────────────────────────┬───────────┬────────────────────┬──────────────────┬───────────┬──────┐
+│ (index)                                            │ Legacy OS │ Reactive multipath │ Always duplicate │ FlexiPath │ unit │
+├────────────────────────────────────────────────────┼───────────┼────────────────────┼──────────────────┼───────────┼──────┤
+│ Flights that kept the C2 link (no fail-safe hover) │ '0'       │ '100'              │ '100'            │ '100'     │ '%'  │
+│ Simulated interruption (total)                     │ '7.88'    │ '0.35'             │ '0.00'           │ '0.10'    │ 's'  │
+│ Longest single interruption                        │ '3.80'    │ '0.35'             │ '0.00'           │ '0.10'    │ 's'  │
+│ Critical packet delivery                           │ '75.84'   │ '97.23'            │ '99.83'          │ '98.09'   │ '%'  │
+│ Voice QoE · mean MOS (G.107)                       │ '3.33'    │ '4.11'             │ '4.37'           │ '4.17'    │ ''   │
+│ Duplicate bytes · protected flows                  │ '0.0'     │ '0.0'              │ '92.8'           │ '3.1'     │ '%'  │
+│ Mean radio power                                   │ '1.22'    │ '1.21'             │ '3.21'           │ '1.39'    │ 'W'  │
+│ Radio energy per journey                           │ '49.4'    │ '39.7'             │ '105.7'          │ '44.8'    │ 'J'  │
+│ TCP connection resets                              │ '10.4'    │ '0.0'              │ '0.0'            │ '0.0'     │ ''   │
+│ Client IP changes seen by remote services          │ '2.6'     │ '0.0'              │ '0.0'            │ '0.0'     │ ''   │
+│ Action time vs. path failure                       │ '0.64'    │ '0.28'             │ '0.23'           │ '-3.47'   │ 's'  │
+└────────────────────────────────────────────────────┴───────────┴────────────────────┴──────────────────┴───────────┴──────┘
+
+Reliability per extra watt: paired gain in critical delivery (pp) ÷ paired extra radio power (W)
+┌─────────┬────────────────────────────────────┬───────────────────────────────────┐
+│ (index) │ FlexiPath over reactive multipath  │ Always duplicate over FlexiPath   │
+├─────────┼────────────────────────────────────┼───────────────────────────────────┤
+│ A       │ '+0.71 pp for +0.11 W = 6.3 pp/W'  │ '+1.00 pp for +2.08 W = 0.5 pp/W' │
+│ B       │ '+0.87 pp for +0.11 W = 7.7 pp/W'  │ '+0.89 pp for +1.81 W = 0.5 pp/W' │
+│ C       │ '+0.78 pp for +0.11 W = 6.9 pp/W'  │ '+1.08 pp for +1.54 W = 0.7 pp/W' │
+│ D       │ '+1.33 pp for +0.05 W = 26.7 pp/W' │ '+0.84 pp for +1.39 W = 0.6 pp/W' │
+│ E       │ '+0.71 pp for +0.11 W = 6.3 pp/W'  │ '+1.00 pp for +2.08 W = 0.5 pp/W' │
+│ G       │ '+1.06 pp for +0.14 W = 7.5 pp/W'  │ '+0.44 pp for +1.86 W = 0.2 pp/W' │
+│ H       │ '+0.86 pp for +0.18 W = 4.8 pp/W'  │ '+1.73 pp for +1.82 W = 1.0 pp/W' │
+└─────────┴────────────────────────────────────┴───────────────────────────────────┘
+
+A · ablations (what each part of FlexiPath contributes)
+┌────────────────────────────────────────────────────┬───────────┬─────────────────────────────────┬──────────────────────┬─────────────────────────────┬──────┐
+│ (index)                                            │ FlexiPath │ FlexiPath · no trend prediction │ FlexiPath · no burst │ FlexiPath · no coverage map │ unit │
+├────────────────────────────────────────────────────┼───────────┼─────────────────────────────────┼──────────────────────┼─────────────────────────────┼──────┤
+│ Flights that kept the C2 link (no fail-safe hover) │ '100'     │ '100'                           │ '100'                │ '100'                       │ '%'  │
+│ Simulated interruption (total)                     │ '0.00'    │ '0.00'                          │ '0.00'               │ '0.00'                      │ 's'  │
+│ Critical packet delivery                           │ '98.97'   │ '98.69'                         │ '99.07'              │ '98.97'                     │ '%'  │
+│ Critical packets lost per flight                   │ '33.4'    │ '43.0'                          │ '30.9'               │ '33.4'                      │ ''   │
+│ Voice QoE · mean MOS (G.107)                       │ '4.30'    │ '4.26'                          │ '4.28'               │ '4.30'                      │ ''   │
+│ Action time vs. path failure                       │ '-3.37'   │ '-0.05'                         │ '-3.37'              │ '-3.37'                     │ 's'  │
+│ Mean radio power                                   │ '1.315'   │ '1.355'                         │ '1.277'              │ '1.315'                     │ 'W'  │
+│ Path changes (seamless)                            │ '1.0'     │ '1.0'                           │ '1.0'                │ '1.0'                       │ ''   │
+└────────────────────────────────────────────────────┴───────────┴─────────────────────────────────┴──────────────────────┴─────────────────────────────┴──────┘
+
+B · ablations (what each part of FlexiPath contributes)
+┌────────────────────────────────────────────────────┬───────────┬─────────────────────────────────┬──────────────────────┬─────────────────────────────┬──────┐
+│ (index)                                            │ FlexiPath │ FlexiPath · no trend prediction │ FlexiPath · no burst │ FlexiPath · no coverage map │ unit │
+├────────────────────────────────────────────────────┼───────────┼─────────────────────────────────┼──────────────────────┼─────────────────────────────┼──────┤
+│ Flights that kept the C2 link (no fail-safe hover) │ '100'     │ '100'                           │ '100'                │ '100'                       │ '%'  │
+│ Simulated interruption (total)                     │ '0.00'    │ '0.00'                          │ '0.00'               │ '0.00'                      │ 's'  │
+│ Critical packet delivery                           │ '98.66'   │ '98.19'                         │ '98.69'              │ '98.66'                     │ '%'  │
+│ Critical packets lost per flight                   │ '90.9'    │ '121.4'                         │ '89.8'               │ '90.9'                      │ ''   │
+│ Voice QoE · mean MOS (G.107)                       │ '4.25'    │ '4.22'                          │ '4.24'               │ '4.25'                      │ ''   │
+│ Action time vs. path failure                       │ '-3.78'   │ '-0.03'                         │ '-3.74'              │ '-3.78'                     │ 's'  │
+│ Mean radio power                                   │ '1.315'   │ '1.336'                         │ '1.278'              │ '1.315'                     │ 'W'  │
+│ Path changes (seamless)                            │ '2.1'     │ '2.0'                           │ '2.2'                │ '2.1'                       │ ''   │
+└────────────────────────────────────────────────────┴───────────┴─────────────────────────────────┴──────────────────────┴─────────────────────────────┴──────┘
+
+C · ablations (what each part of FlexiPath contributes)
+┌────────────────────────────────────────────────────┬───────────┬─────────────────────────────────┬──────────────────────┬─────────────────────────────┬──────┐
+│ (index)                                            │ FlexiPath │ FlexiPath · no trend prediction │ FlexiPath · no burst │ FlexiPath · no coverage map │ unit │
+├────────────────────────────────────────────────────┼───────────┼─────────────────────────────────┼──────────────────────┼─────────────────────────────┼──────┤
+│ Flights that kept the C2 link (no fail-safe hover) │ '100'     │ '100'                           │ '100'                │ '100'                       │ '%'  │
+│ Simulated interruption (total)                     │ '0.00'    │ '0.00'                          │ '0.00'               │ '0.00'                      │ 's'  │
+│ Critical packet delivery                           │ '98.29'   │ '97.80'                         │ '98.27'              │ '98.29'                     │ '%'  │
+│ Critical packets lost per flight                   │ '57.7'    │ '74.8'                          │ '58.4'               │ '57.7'                      │ ''   │
+│ Voice QoE · mean MOS (G.107)                       │ '4.22'    │ '4.17'                          │ '4.22'               │ '4.22'                      │ ''   │
+│ Action time vs. path failure                       │ '-4.60'   │ '-0.23'                         │ '-4.44'              │ '-4.60'                     │ 's'  │
+│ Mean radio power                                   │ '1.316'   │ '1.330'                         │ '1.287'              │ '1.316'                     │ 'W'  │
+│ Path changes (seamless)                            │ '1.0'     │ '1.0'                           │ '1.1'                │ '1.0'                       │ ''   │
+└────────────────────────────────────────────────────┴───────────┴─────────────────────────────────┴──────────────────────┴─────────────────────────────┴──────┘
+
+D · ablations (what each part of FlexiPath contributes)
+┌────────────────────────────────────────────────────┬───────────┬─────────────────────────────────┬──────────────────────┬─────────────────────────────┬──────┐
+│ (index)                                            │ FlexiPath │ FlexiPath · no trend prediction │ FlexiPath · no burst │ FlexiPath · no coverage map │ unit │
+├────────────────────────────────────────────────────┼───────────┼─────────────────────────────────┼──────────────────────┼─────────────────────────────┼──────┤
+│ Flights that kept the C2 link (no fail-safe hover) │ '100'     │ '100'                           │ '100'                │ '100'                       │ '%'  │
+│ Simulated interruption (total)                     │ '0.16'    │ '0.16'                          │ '0.16'               │ '0.16'                      │ 's'  │
+│ Critical packet delivery                           │ '98.22'   │ '98.06'                         │ '98.22'              │ '98.22'                     │ '%'  │
+│ Critical packets lost per flight                   │ '146.3'   │ '165.8'                         │ '145.9'              │ '146.3'                     │ ''   │
+│ Voice QoE · mean MOS (G.107)                       │ '4.20'    │ '4.18'                          │ '4.19'               │ '4.20'                      │ ''   │
+│ Action time vs. path failure                       │ '-1.25'   │ '-0.01'                         │ '-1.12'              │ '-1.25'                     │ 's'  │
+│ Mean radio power                                   │ '1.254'   │ '1.257'                         │ '1.230'              │ '1.254'                     │ 'W'  │
+│ Path changes (seamless)                            │ '2.5'     │ '2.4'                           │ '2.5'                │ '2.5'                       │ ''   │
+└────────────────────────────────────────────────────┴───────────┴─────────────────────────────────┴──────────────────────┴─────────────────────────────┴──────┘
+
+E · ablations (what each part of FlexiPath contributes)
+┌────────────────────────────────────────────────────┬───────────┬─────────────────────────────────┬──────────────────────┬─────────────────────────────┬──────┐
+│ (index)                                            │ FlexiPath │ FlexiPath · no trend prediction │ FlexiPath · no burst │ FlexiPath · no coverage map │ unit │
+├────────────────────────────────────────────────────┼───────────┼─────────────────────────────────┼──────────────────────┼─────────────────────────────┼──────┤
+│ Flights that kept the C2 link (no fail-safe hover) │ '100'     │ '100'                           │ '100'                │ '100'                       │ '%'  │
+│ Simulated interruption (total)                     │ '0.00'    │ '0.00'                          │ '0.00'               │ '0.00'                      │ 's'  │
+│ Critical packet delivery                           │ '98.97'   │ '98.69'                         │ '99.07'              │ '98.97'                     │ '%'  │
+│ Critical packets lost per flight                   │ '33.4'    │ '43.0'                          │ '30.9'               │ '33.4'                      │ ''   │
+│ Voice QoE · mean MOS (G.107)                       │ '4.30'    │ '4.26'                          │ '4.28'               │ '4.30'                      │ ''   │
+│ Action time vs. path failure                       │ '-3.37'   │ '-0.05'                         │ '-3.37'              │ '-3.37'                     │ 's'  │
+│ Mean radio power                                   │ '1.315'   │ '1.355'                         │ '1.277'              │ '1.315'                     │ 'W'  │
+│ Path changes (seamless)                            │ '1.0'     │ '1.0'                           │ '1.0'                │ '1.0'                       │ ''   │
+└────────────────────────────────────────────────────┴───────────┴─────────────────────────────────┴──────────────────────┴─────────────────────────────┴──────┘
+
+F · ablations (what each part of FlexiPath contributes)
+┌────────────────────────────────────────────────────┬───────────┬─────────────────────────────────┬──────────────────────┬─────────────────────────────┬──────┐
+│ (index)                                            │ FlexiPath │ FlexiPath · no trend prediction │ FlexiPath · no burst │ FlexiPath · no coverage map │ unit │
+├────────────────────────────────────────────────────┼───────────┼─────────────────────────────────┼──────────────────────┼─────────────────────────────┼──────┤
+│ Flights that kept the C2 link (no fail-safe hover) │ '—'       │ '—'                             │ '—'                  │ '—'                         │ '%'  │
+│ Simulated interruption (total)                     │ '0.00'    │ '0.00'                          │ '0.00'               │ '0.00'                      │ 's'  │
+│ Critical packet delivery                           │ '—'       │ '—'                             │ '—'                  │ '—'                         │ '%'  │
+│ Critical packets lost per flight                   │ '0.0'     │ '0.0'                           │ '0.0'                │ '0.0'                       │ ''   │
+│ Voice QoE · mean MOS (G.107)                       │ '—'       │ '—'                             │ '—'                  │ '—'                         │ ''   │
+│ Action time vs. path failure                       │ '-3.37'   │ '-0.05'                         │ '-3.37'              │ '-3.37'                     │ 's'  │
+│ Mean radio power                                   │ '1.315'   │ '1.355'                         │ '1.277'              │ '1.315'                     │ 'W'  │
+│ Path changes (seamless)                            │ '1.0'     │ '1.0'                           │ '1.0'                │ '1.0'                       │ ''   │
+└────────────────────────────────────────────────────┴───────────┴─────────────────────────────────┴──────────────────────┴─────────────────────────────┴──────┘
+
+G · ablations (what each part of FlexiPath contributes)
+┌────────────────────────────────────────────────────┬───────────┬─────────────────────────────────┬──────────────────────┬─────────────────────────────┬──────┐
+│ (index)                                            │ FlexiPath │ FlexiPath · no trend prediction │ FlexiPath · no burst │ FlexiPath · no coverage map │ unit │
+├────────────────────────────────────────────────────┼───────────┼─────────────────────────────────┼──────────────────────┼─────────────────────────────┼──────┤
+│ Flights that kept the C2 link (no fail-safe hover) │ '100'     │ '100'                           │ '100'                │ '100'                       │ '%'  │
+│ Simulated interruption (total)                     │ '0.00'    │ '0.00'                          │ '0.00'               │ '0.20'                      │ 's'  │
+│ Critical packet delivery                           │ '98.54'   │ '98.55'                         │ '98.57'              │ '98.15'                     │ '%'  │
+│ Critical packets lost per flight                   │ '55.6'    │ '55.5'                          │ '55.5'               │ '70.0'                      │ ''   │
+│ Voice QoE · mean MOS (G.107)                       │ '4.24'    │ '4.24'                          │ '4.23'               │ '4.18'                      │ ''   │
+│ Action time vs. path failure                       │ '-3.15'   │ '-3.15'                         │ '-3.15'              │ '0.01'                      │ 's'  │
+│ Mean radio power                                   │ '1.346'   │ '1.341'                         │ '1.276'              │ '1.268'                     │ 'W'  │
+│ Path changes (seamless)                            │ '2.0'     │ '2.0'                           │ '2.0'                │ '1.1'                       │ ''   │
+└────────────────────────────────────────────────────┴───────────┴─────────────────────────────────┴──────────────────────┴─────────────────────────────┴──────┘
+
+H · ablations (what each part of FlexiPath contributes)
+┌────────────────────────────────────────────────────┬───────────┬─────────────────────────────────┬──────────────────────┬─────────────────────────────┬──────┐
+│ (index)                                            │ FlexiPath │ FlexiPath · no trend prediction │ FlexiPath · no burst │ FlexiPath · no coverage map │ unit │
+├────────────────────────────────────────────────────┼───────────┼─────────────────────────────────┼──────────────────────┼─────────────────────────────┼──────┤
+│ Flights that kept the C2 link (no fail-safe hover) │ '100'     │ '100'                           │ '100'                │ '100'                       │ '%'  │
+│ Simulated interruption (total)                     │ '0.10'    │ '0.12'                          │ '0.10'               │ '0.13'                      │ 's'  │
+│ Critical packet delivery                           │ '98.09'   │ '98.02'                         │ '97.97'              │ '98.42'                     │ '%'  │
+│ Critical packets lost per flight                   │ '71.5'    │ '74.2'                          │ '74.4'               │ '56.3'                      │ ''   │
+│ Voice QoE · mean MOS (G.107)                       │ '4.17'    │ '4.16'                          │ '4.18'               │ '4.21'                      │ ''   │
+│ Action time vs. path failure                       │ '-3.47'   │ '-3.30'                         │ '-3.48'              │ '-1.44'                     │ 's'  │
+│ Mean radio power                                   │ '1.388'   │ '1.385'                         │ '1.286'              │ '1.370'                     │ 'W'  │
+│ Path changes (seamless)                            │ '3.0'     │ '3.0'                           │ '3.0'                │ '2.2'                       │ ''   │
+└────────────────────────────────────────────────────┴───────────┴─────────────────────────────────┴──────────────────────┴─────────────────────────────┴──────┘
+
+Prediction quality (pooled): recall = failures acted on early / all failures · precision = early moves confirmed by a failure / all early moves
+┌─────────────────────────────────────┬──────────┬─────────────┬─────────┬───────────┬──────────┐
+│ (index)                             │ failures │ early moves │ recall  │ precision │ lead (s) │
+├─────────────────────────────────────┼──────────┼─────────────┼─────────┼───────────┼──────────┤
+│ A · FlexiPath                       │ 20       │ 20          │ '100 %' │ '100 %'   │ '3.37'   │
+│ A · FlexiPath · no trend prediction │ 20       │ 8           │ '40 %'  │ '100 %'   │ '0.05'   │
+│ A · FlexiPath · no burst            │ 20       │ 20          │ '100 %' │ '100 %'   │ '3.37'   │
+│ A · FlexiPath · no coverage map     │ 20       │ 20          │ '100 %' │ '100 %'   │ '3.37'   │
+│ B · FlexiPath                       │ 41       │ 42          │ '100 %' │ '98 %'    │ '3.78'   │
+│ B · FlexiPath · no trend prediction │ 40       │ 10          │ '25 %'  │ '100 %'   │ '0.03'   │
+│ B · FlexiPath · no burst            │ 42       │ 44          │ '100 %' │ '95 %'    │ '3.74'   │
+│ B · FlexiPath · no coverage map     │ 41       │ 42          │ '100 %' │ '98 %'    │ '3.78'   │
+│ C · FlexiPath                       │ 20       │ 20          │ '100 %' │ '100 %'   │ '4.60'   │
+│ C · FlexiPath · no trend prediction │ 20       │ 7           │ '35 %'  │ '100 %'   │ '0.23'   │
+│ C · FlexiPath · no burst            │ 21       │ 22          │ '100 %' │ '95 %'    │ '4.44'   │
+│ C · FlexiPath · no coverage map     │ 20       │ 20          │ '100 %' │ '100 %'   │ '4.60'   │
+│ D · FlexiPath                       │ 55       │ 35          │ '62 %'  │ '97 %'    │ '1.25'   │
+│ D · FlexiPath · no trend prediction │ 54       │ 7           │ '13 %'  │ '100 %'   │ '0.01'   │
+│ D · FlexiPath · no burst            │ 54       │ 35          │ '61 %'  │ '94 %'    │ '1.12'   │
+│ D · FlexiPath · no coverage map     │ 55       │ 35          │ '62 %'  │ '97 %'    │ '1.25'   │
+│ E · FlexiPath                       │ 20       │ 20          │ '100 %' │ '100 %'   │ '3.37'   │
+│ E · FlexiPath · no trend prediction │ 20       │ 8           │ '40 %'  │ '100 %'   │ '0.05'   │
+│ E · FlexiPath · no burst            │ 20       │ 20          │ '100 %' │ '100 %'   │ '3.37'   │
+│ E · FlexiPath · no coverage map     │ 20       │ 20          │ '100 %' │ '100 %'   │ '3.37'   │
+│ F · FlexiPath                       │ 20       │ 20          │ '100 %' │ '100 %'   │ '3.37'   │
+│ F · FlexiPath · no trend prediction │ 20       │ 8           │ '40 %'  │ '100 %'   │ '0.05'   │
+│ F · FlexiPath · no burst            │ 20       │ 20          │ '100 %' │ '100 %'   │ '3.37'   │
+│ F · FlexiPath · no coverage map     │ 20       │ 20          │ '100 %' │ '100 %'   │ '3.37'   │
+│ G · FlexiPath                       │ 20       │ 20          │ '100 %' │ '100 %'   │ '3.15'   │
+│ G · FlexiPath · no trend prediction │ 20       │ 20          │ '100 %' │ '100 %'   │ '3.15'   │
+│ G · FlexiPath · no burst            │ 20       │ 20          │ '100 %' │ '100 %'   │ '3.15'   │
+│ G · FlexiPath · no coverage map     │ 28       │ 1           │ '0 %'   │ '0 %'     │ '-0.01'  │
+│ H · FlexiPath                       │ 31       │ 20          │ '45 %'  │ '70 %'    │ '3.47'   │
+│ H · FlexiPath · no trend prediction │ 32       │ 20          │ '44 %'  │ '70 %'    │ '3.30'   │
+│ H · FlexiPath · no burst            │ 31       │ 21          │ '45 %'  │ '67 %'    │ '3.48'   │
+│ H · FlexiPath · no coverage map     │ 40       │ 20          │ '50 %'  │ '100 %'   │ '1.44'   │
+└─────────────────────────────────────┴──────────┴─────────────┴─────────┴───────────┴──────────┘
+
+wrote results/published/failsafe1000/benchmark_failsafe1000ms_2026-11-04T12-28-08.json
+wrote results/published/failsafe1000/benchmark_failsafe1000ms_2026-11-04T12-28-08.csv
+wrote results/published/failsafe1000/benchmark_failsafe1000ms_comparison_2026-11-04T12-28-08.csv
+wrote results/published/failsafe1000/benchmark_failsafe1000ms_prediction_2026-11-04T12-28-08.csv
+wrote results/published/failsafe1000/benchmark_failsafe1000ms_mechanisms_2026-11-04T12-28-08.csv
+wrote results/published/failsafe1000/benchmark_failsafe1000ms_efficiency_2026-11-04T12-28-08.csv
+wrote results/published/failsafe1000/benchmark_failsafe1000ms_ablations_2026-11-04T12-28-08.csv
+(10995 ms wall time)

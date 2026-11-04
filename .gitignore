@@ -3,8 +3,9 @@ node_modules/
 dist/
 .vite/
 
-# benchmark output (regenerate with `npm run benchmark`)
-results/
+# benchmark output (regenerate with `npm run benchmark`); the archived data behind the README is kept
+results/*
+!results/published/
 
 # Blender autosaves / caches
 *.blend1

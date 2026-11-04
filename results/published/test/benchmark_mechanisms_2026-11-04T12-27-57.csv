@@ -1,0 +1,121 @@
+scenario,metric,label,unit,legacy_mean,legacy_sd,mptcp_mean,mptcp_sd,redundant_mean,redundant_sd,flexipath_mean,flexipath_sd,fp_minus_legacy,fp_minus_legacy_ci95,fp_minus_mptcp,fp_minus_mptcp_ci95,fp_minus_redundant,fp_minus_redundant_ci95,pairs
+A,c2KeptPct,Flights that kept the C2 link (no fail-safe hover),%,0,0,100,0,100,0,100,0,100,0,0,0,0,0,20
+A,interruptionS,Simulated interruption (total),s,3.8,0,0,0,0,0,0,0,-3.8,0,0,0,0,0,20
+A,longestInterruptionS,Longest single interruption,s,3.8,0,0,0,0,0,0,0,-3.8,0,0,0,0,0,20
+A,criticalDeliveryPct,Critical packet delivery,%,84.67926,5.223444,98.308905,0.448524,99.96523,0.030914,99.066615,0.182701,14.387355,2.444692,0.75771,0.226734,-0.898615,0.08659,20
+A,meanMos,Voice QoE · mean MOS (G.107),,3.71455,0.188645,4.22505,0.045154,4.3811,0.002447,4.28705,0.022638,0.5725,0.086957,0.062,0.020423,-0.09405,0.010369,20
+A,timeBelowMos36S,Time below MOS 3.6,s,6.59,1.336492,1.455,0.660522,0,0,0,0,-6.59,0.62549,-1.455,0.30913,0,0,20
+A,replicationOverheadPct,Duplicate bytes · protected flows,%,0,0,0,0,99.6601,0.13431,1.1403,0.517728,1.1403,0.242301,1.1403,0.242301,-98.5198,0.304201,20
+A,replicationOverheadTotalPct,Duplicate bytes · all traffic,%,0,0,0,0,0.419315,0.007562,0.004665,0.002153,0.004665,0.001008,0.004665,0.001008,-0.41465,0.002799,20
+A,meanPowerW,Mean radio power,W,1.2165,0.006428,1.2025,0.001147,3.393,0.002991,1.3232,0.05136,0.1067,0.022531,0.1207,0.023748,-2.0698,0.024832,20
+A,energyJ,Radio energy per journey,J,42.77,20.073552,35.85,20.524376,101.275,58.17688,38.995,21.424174,-3.775,0.972724,3.145,0.788187,-62.28,17.237288,20
+A,tcpResets,TCP connection resets,,4,0,0,0,0,0,0,0,-4,0,0,0,0,0,20
+A,remoteIpChanges,Client IP changes seen by remote services,,1,0,0,0,0,0,0,0,-1,0,0,0,0,0,20
+A,bulkHolPeakMs,HoL stall · bulk (peak),ms,392.765,47.022495,390,44.72136,370,73.26951,120.08,90.650199,-272.685,52.699771,-269.92,51.053725,-249.92,63.885304,20
+A,actionVsFailureS,Action time vs. path failure,s,1.5,1.343601,0.58,0.445563,0.355,0.195946,-3.335,1.873155,-4.835,1.405117,-3.915,0.912984,-3.69,0.903927,20
+A,journeyTimeS,Journey time,s,35.345,16.707813,29.925,17.109766,29.925,17.109766,29.925,17.109766,-5.42,0.371191,0,0,0,0,20
+B,c2KeptPct,Flights that kept the C2 link (no fail-safe hover),%,0,0,100,0,100,0,100,0,100,0,0,0,0,0,20
+B,interruptionS,Simulated interruption (total),s,7.6,0,0,0,0,0,0,0,-7.6,0,0,0,0,0,20
+B,longestInterruptionS,Longest single interruption,s,3.8,0,0,0,0,0,0,0,-3.8,0,0,0,0,0,20
+B,criticalDeliveryPct,Critical packet delivery,%,84.243785,5.468439,97.85764,0.355792,99.365455,0.137304,98.61078,0.142477,14.366995,2.526222,0.75314,0.158047,-0.754675,0.05898,20
+B,meanMos,Voice QoE · mean MOS (G.107),,3.67735,0.187471,4.1726,0.035399,4.3215,0.01438,4.24065,0.024616,0.5633,0.085521,0.06805,0.020586,-0.08085,0.011119,20
+B,timeBelowMos36S,Time below MOS 3.6,s,14.115,2.927955,3.75,1.63691,0.055,0.143178,0.165,0.397724,-13.95,1.302351,-3.585,0.756515,0.11,0.17831,20
+B,replicationOverheadPct,Duplicate bytes · protected flows,%,0,0,0,0,72.0563,5.42354,1.1956,0.541839,1.1956,0.253585,1.1956,0.253585,-70.8607,2.72575,20
+B,replicationOverheadTotalPct,Duplicate bytes · all traffic,%,0,0,0,0,0.399955,0.014424,0.00668,0.003229,0.00668,0.001511,0.00668,0.001511,-0.393275,0.007614,20
+B,meanPowerW,Mean radio power,W,1.21585,0.00693,1.2025,0.001147,3.11,0.026933,1.30495,0.032851,0.0891,0.013744,0.10245,0.015051,-1.80505,0.021236,20
+B,energyJ,Radio energy per journey,J,88.505,43.006652,75.375,43.188593,194.755,111.151426,81.105,44.969539,-7.4,1.494084,5.73,1.086505,-113.65,31.002375,20
+B,tcpResets,TCP connection resets,,8,0,0,0,0,0,0,0,-8,0,0,0,0,0,20
+B,remoteIpChanges,Client IP changes seen by remote services,,2,0,0,0,0,0,0,0,-2,0,0,0,0,0,20
+B,bulkHolPeakMs,HoL stall · bulk (peak),ms,414.53,29.248592,400,0,390,44.72136,139.5,68.62391,-275.03,36.836954,-260.5,32.116609,-250.5,41.815304,20
+B,actionVsFailureS,Action time vs. path failure,s,1.65,1.051815,0.59,0.298064,0.325,0.112974,-3.845,2.045464,-5.495,1.311456,-4.435,1.014395,-4.17,0.963911,20
+B,journeyTimeS,Journey time,s,73.05,35.84617,62.825,35.984673,62.825,35.984673,62.825,35.984673,-10.225,0.936618,0,0,0,0,20
+C,c2KeptPct,Flights that kept the C2 link (no fail-safe hover),%,0,0,100,0,100,0,100,0,100,0,0,0,0,0,20
+C,interruptionS,Simulated interruption (total),s,3.8,0,0,0,0,0,0,0,-3.8,0,0,0,0,0,20
+C,longestInterruptionS,Longest single interruption,s,3.8,0,0,0,0,0,0,0,-3.8,0,0,0,0,0,20
+C,criticalDeliveryPct,Critical packet delivery,%,83.28485,5.804418,97.762175,0.335561,99.156535,0.201014,98.34227,0.260474,15.05742,2.706474,0.580095,0.200008,-0.814265,0.16023,20
+C,meanMos,Voice QoE · mean MOS (G.107),,3.60725,0.220462,4.14625,0.038025,4.3045,0.020879,4.22195,0.026528,0.6147,0.105763,0.0757,0.021934,-0.08255,0.014488,20
+C,timeBelowMos36S,Time below MOS 3.6,s,7.71,1.768407,2.02,0.846417,0.105,0.333206,0.15,0.306937,-7.56,0.809961,-1.87,0.384164,0.045,0.228509,20
+C,replicationOverheadPct,Duplicate bytes · protected flows,%,0,0,0,0,62.28025,4.569931,1.27035,0.613019,1.27035,0.286898,1.27035,0.286898,-61.0099,2.211573,20
+C,replicationOverheadTotalPct,Duplicate bytes · all traffic,%,0,0,0,0,0.429465,0.021817,0.008985,0.004768,0.008985,0.002231,0.008985,0.002231,-0.42048,0.010203,20
+C,meanPowerW,Mean radio power,W,1.21625,0.007532,1.2025,0.001147,2.8278,0.064656,1.29755,0.024169,0.0813,0.009481,0.09505,0.010958,-1.53025,0.027746,20
+C,energyJ,Radio energy per journey,J,43.805,21.841811,37.675,21.573177,88.075,49.553957,40.375,22.664623,-3.43,0.866579,2.7,0.571984,-47.7,12.593952,20
+C,tcpResets,TCP connection resets,,4,0,0,0,0,0,0,0,-4,0,0,0,0,0,20
+C,remoteIpChanges,Client IP changes seen by remote services,,1,0,0,0,0,0,0,0,-1,0,0,0,0,0,20
+C,bulkHolPeakMs,HoL stall · bulk (peak),ms,416.635,34.678088,330,97.872097,330,97.872097,65.32,0.258742,-351.315,16.23257,-264.68,45.772959,-264.68,45.838394,20
+C,actionVsFailureS,Action time vs. path failure,s,2.045,1.335931,0.415,0.067082,0.29,0.030779,-3.785,2.396988,-5.83,1.513106,-4.2,1.114153,-4.075,1.122798,20
+C,journeyTimeS,Journey time,s,36.215,18.207005,31.425,17.991427,31.425,17.991427,31.425,17.991427,-4.79,0.628799,0,0,0,0,20
+D,c2KeptPct,Flights that kept the C2 link (no fail-safe hover),%,0,0,0,0,100,0,100,0,100,0,100,0,0,0,20
+D,interruptionS,Simulated interruption (total),s,16.45,2.497894,0.7,0,0,0,0.16,0,-16.29,1.169037,-0.54,0,0.16,0,20
+D,longestInterruptionS,Longest single interruption,s,3.8,0,0.35,0,0,0,0.16,0,-3.64,0,-0.19,0,0.16,0,20
+D,criticalDeliveryPct,Critical packet delivery,%,77.26558,5.777635,97.089925,0.4077,98.929205,0.25654,98.17949,0.232246,20.91391,2.612047,1.089565,0.116263,-0.749715,0.068768,20
+D,meanMos,Voice QoE · mean MOS (G.107),,3.3715,0.227446,4.09055,0.044177,4.26195,0.03206,4.1897,0.037582,0.8182,0.093688,0.09915,0.013031,-0.07225,0.014665,20
+D,timeBelowMos36S,Time below MOS 3.6,s,27.24,5.632836,6.18,2.366788,0.36,0.400526,1.83,0.400132,-25.41,2.616884,-4.35,1.055003,1.47,0.27504,20
+D,replicationOverheadPct,Duplicate bytes · protected flows,%,0,0,0,0,48.4848,12.491345,0.9037,0.232583,0.9037,0.108851,0.9037,0.108851,-47.5811,5.770537,20
+D,replicationOverheadTotalPct,Duplicate bytes · all traffic,%,0,0,0,0,0.31916,0.047048,0.0059,0.001318,0.0059,0.000617,0.0059,0.000617,-0.31326,0.021748,20
+D,meanPowerW,Mean radio power,W,1.22065,0.006548,1.204,0.001026,2.63545,0.233426,1.2686,0.041085,0.04795,0.020497,0.0646,0.019355,-1.36685,0.102346,20
+D,energyJ,Radio energy per journey,J,113.87,52.272898,86.155,49.333841,197.05,129.13215,91.525,54.105986,-22.345,3.09957,5.37,2.49253,-105.525,35.175128,20
+D,tcpResets,TCP connection resets,,21,3.402785,0,0,0,0,0,0,-21,1.592534,0,0,0,0,20
+D,remoteIpChanges,Client IP changes seen by remote services,,5.25,0.850696,0,0,0,0,0,0,-5.25,0.398134,0,0,0,0,20
+D,bulkHolPeakMs,HoL stall · bulk (peak),ms,424.42,36.827358,390,91.190951,360,99.472292,263.295,107.080312,-161.125,52.682398,-126.705,70.45049,-96.705,61.766897,20
+D,actionVsFailureS,Action time vs. path failure,s,1.01375,0.540985,0.20295,0.119088,0.1592,0.060867,-1.1708,1.269999,-2.18455,0.817043,-1.37375,0.632718,-1.33,0.60973,20
+D,journeyTimeS,Journey time,s,93.585,43.409789,71.665,41.048358,71.65,41.023004,71.65,41.023004,-21.935,2.297753,-0.015,0.017145,0,0,20
+E,c2KeptPct,Flights that kept the C2 link (no fail-safe hover),%,0,0,100,0,100,0,100,0,100,0,0,0,0,0,20
+E,interruptionS,Simulated interruption (total),s,3.8,0,0,0,0,0,0,0,-3.8,0,0,0,0,0,20
+E,longestInterruptionS,Longest single interruption,s,3.8,0,0,0,0,0,0,0,-3.8,0,0,0,0,0,20
+E,criticalDeliveryPct,Critical packet delivery,%,84.67926,5.223444,98.308905,0.448524,99.96523,0.030914,99.066615,0.182701,14.387355,2.444692,0.75771,0.226734,-0.898615,0.08659,20
+E,meanMos,Voice QoE · mean MOS (G.107),,3.71455,0.188645,4.22505,0.045154,4.3811,0.002447,4.28705,0.022638,0.5725,0.086957,0.062,0.020423,-0.09405,0.010369,20
+E,timeBelowMos36S,Time below MOS 3.6,s,6.59,1.336492,1.455,0.660522,0,0,0,0,-6.59,0.62549,-1.455,0.30913,0,0,20
+E,replicationOverheadPct,Duplicate bytes · protected flows,%,0,0,0,0,99.6601,0.13431,1.1403,0.517728,1.1403,0.242301,1.1403,0.242301,-98.5198,0.304201,20
+E,replicationOverheadTotalPct,Duplicate bytes · all traffic,%,0,0,0,0,99.66024,0.134228,1.14029,0.517702,1.14029,0.242289,1.14029,0.242289,-98.51995,0.304163,20
+E,meanPowerW,Mean radio power,W,1.2165,0.006428,1.2025,0.001147,3.393,0.002991,1.3232,0.05136,0.1067,0.022531,0.1207,0.023748,-2.0698,0.024832,20
+E,energyJ,Radio energy per journey,J,42.77,20.073552,35.85,20.524376,101.275,58.17688,38.995,21.424174,-3.775,0.972724,3.145,0.788187,-62.28,17.237288,20
+E,tcpResets,TCP connection resets,,4,0,0,0,0,0,0,0,-4,0,0,0,0,0,20
+E,remoteIpChanges,Client IP changes seen by remote services,,1,0,0,0,0,0,0,0,-1,0,0,0,0,0,20
+E,bulkHolPeakMs,HoL stall · bulk (peak),ms,,,,,,,,,,,,,,,0
+E,actionVsFailureS,Action time vs. path failure,s,1.5,1.343601,0.58,0.445563,0.355,0.195946,-3.335,1.873155,-4.835,1.405117,-3.915,0.912984,-3.69,0.903927,20
+E,journeyTimeS,Journey time,s,35.345,16.707813,29.925,17.109766,29.925,17.109766,29.925,17.109766,-5.42,0.371191,0,0,0,0,20
+F,c2KeptPct,Flights that kept the C2 link (no fail-safe hover),%,,,,,,,,,,,,,,,0
+F,interruptionS,Simulated interruption (total),s,3.8,0,0,0,0,0,0,0,-3.8,0,0,0,0,0,20
+F,longestInterruptionS,Longest single interruption,s,3.8,0,0,0,0,0,0,0,-3.8,0,0,0,0,0,20
+F,criticalDeliveryPct,Critical packet delivery,%,,,,,,,,,,,,,,,0
+F,meanMos,Voice QoE · mean MOS (G.107),,,,,,,,,,,,,,,,0
+F,timeBelowMos36S,Time below MOS 3.6,s,,,,,,,,,,,,,,,0
+F,replicationOverheadPct,Duplicate bytes · protected flows,%,0,0,0,0,0,0,0,0,0,0,0,0,0,0,20
+F,replicationOverheadTotalPct,Duplicate bytes · all traffic,%,0,0,0,0,0,0,0,0,0,0,0,0,0,0,20
+F,meanPowerW,Mean radio power,W,1.221,0.009868,1.2025,0.001147,1.2025,0.001147,1.3232,0.05136,0.1022,0.021856,0.1207,0.023748,0.1207,0.023748,20
+F,energyJ,Radio energy per journey,J,36.25,20.524376,35.85,20.524376,35.85,20.524376,38.995,21.424174,2.745,0.788187,3.145,0.788187,3.145,0.788187,20
+F,tcpResets,TCP connection resets,,4,0,0,0,0,0,0,0,-4,0,0,0,0,0,20
+F,remoteIpChanges,Client IP changes seen by remote services,,1,0,0,0,0,0,0,0,-1,0,0,0,0,0,20
+F,bulkHolPeakMs,HoL stall · bulk (peak),ms,392.765,47.022495,390,44.72136,370,73.26951,120.08,90.650199,-272.685,52.699771,-269.92,51.053725,-249.92,63.885304,20
+F,actionVsFailureS,Action time vs. path failure,s,1.5,1.343601,0.58,0.445563,0.455,0.195946,-3.335,1.873155,-4.835,1.405117,-3.915,0.912984,-3.79,0.903927,20
+F,journeyTimeS,Journey time,s,29.925,17.109766,29.925,17.109766,29.925,17.109766,29.925,17.109766,0,0,0,0,0,0,20
+G,c2KeptPct,Flights that kept the C2 link (no fail-safe hover),%,0,0,0,0,30,47.016235,100,0,100,0,100,0,70,22.004022,20
+G,interruptionS,Simulated interruption (total),s,7.69,1.939588,0.39,0.068056,0.245,0.164557,0,0,-7.69,0.907744,-0.39,0.031851,-0.245,0.077014,20
+G,longestInterruptionS,Longest single interruption,s,3.8,0,0.35,0,0.245,0.164557,0,0,-3.8,0,-0.35,0,-0.245,0.077014,20
+G,criticalDeliveryPct,Critical packet delivery,%,79.636135,5.664861,97.823565,0.358318,99.139,0.509386,98.664265,0.195387,19.02813,2.647064,0.8407,0.184757,-0.474735,0.233358,20
+G,meanMos,Voice QoE · mean MOS (G.107),,3.48445,0.225333,4.1877,0.035063,4.3026,0.047256,4.23425,0.024222,0.7498,0.102251,0.04655,0.016827,-0.06835,0.019638,20
+G,timeBelowMos36S,Time below MOS 3.6,s,12.005,3.62774,2.155,0.815298,1.11,0.748964,0.185,0.28149,-11.82,1.69565,-1.97,0.400328,-0.925,0.340843,20
+G,replicationOverheadPct,Duplicate bytes · protected flows,%,0,0,0,0,93.54585,0.979439,1.84845,0.692796,1.84845,0.324235,1.84845,0.324235,-91.6974,0.387293,20
+G,replicationOverheadTotalPct,Duplicate bytes · all traffic,%,0,0,0,0,0.42872,0.016005,0.00993,0.004252,0.00993,0.00199,0.00993,0.00199,-0.41879,0.006106,20
+G,meanPowerW,Mean radio power,W,1.21785,0.005603,1.20535,0.002084,3.203,0.008404,1.3422,0.035497,0.12435,0.014995,0.13685,0.015825,-1.8608,0.01829,20
+G,energyJ,Radio energy per journey,J,54.325,22.560559,39.71,22.731543,105.595,60.647241,43.635,23.62272,-10.69,2.251871,3.925,0.506087,-61.96,17.33496,20
+G,tcpResets,TCP connection resets,,10.2,2.041671,0,0,0,0,0,0,-10.2,0.955521,0,0,0,0,20
+G,remoteIpChanges,Client IP changes seen by remote services,,2.55,0.510418,0,0,0,0,0,0,-2.55,0.23888,0,0,0,0,20
+G,bulkHolPeakMs,HoL stall · bulk (peak),ms,254.865,176.294882,140.955,138.994511,178.235,164.182489,119.805,67.180334,-135.06,96.756185,-21.15,77.681258,-58.43,87.175023,20
+G,actionVsFailureS,Action time vs. path failure,s,0.3375,0.407455,0.06585,0.094825,0.0658,0.130037,-3.15,0.088852,-3.4875,0.205671,-3.21585,0.076612,-3.2158,0.080783,20
+G,journeyTimeS,Journey time,s,44.75,18.689386,33.08,18.92491,33.05,18.90064,33.05,18.90064,-11.7,1.695949,-0.03,0.022004,0,0,20
+H,c2KeptPct,Flights that kept the C2 link (no fail-safe hover),%,0,0,0,0,100,0,100,0,100,0,100,0,0,0,20
+H,interruptionS,Simulated interruption (total),s,8.45,1.688194,0.35,0,0,0,0.104,0.078298,-8.346,0.797558,-0.246,0.036644,0.104,0.036644,20
+H,longestInterruptionS,Longest single interruption,s,3.8,0,0.35,0,0,0,0.104,0.078298,-3.696,0.036644,-0.246,0.036644,0.104,0.036644,20
+H,criticalDeliveryPct,Critical packet delivery,%,76.95762,5.340892,97.496065,0.574326,99.825795,0.076127,98.257035,0.329726,21.299415,2.441421,0.76097,0.242863,-1.56876,0.144015,20
+H,meanMos,Voice QoE · mean MOS (G.107),,3.36775,0.212331,4.15615,0.048929,4.3613,0.01217,4.17055,0.055226,0.8028,0.089073,0.0144,0.019076,-0.19075,0.025188,20
+H,timeBelowMos36S,Time below MOS 3.6,s,13.775,3.118514,3.19,0.840363,0.06,0.175919,1.16,0.720672,-12.615,1.595591,-2.03,0.549178,1.1,0.365053,20
+H,replicationOverheadPct,Duplicate bytes · protected flows,%,0,0,0,0,93.68195,0.632962,2.6077,0.987256,2.6077,0.462045,2.6077,0.462045,-91.07425,0.407835,20
+H,replicationOverheadTotalPct,Duplicate bytes · all traffic,%,0,0,0,0,0.413165,0.014664,0.01583,0.00748,0.01583,0.003501,0.01583,0.003501,-0.397335,0.004553,20
+H,meanPowerW,Mean radio power,W,1.2203,0.0051,1.20725,0.00311,3.20465,0.006515,1.38405,0.04911,0.16375,0.02121,0.1768,0.021742,-1.8206,0.025493,20
+H,energyJ,Radio energy per journey,J,54.765,23.511862,39.71,22.690362,105.7,60.85542,44.765,23.91283,-10,1.357269,5.055,0.666633,-60.935,17.298798,20
+H,tcpResets,TCP connection resets,,11,1.777047,0,0,0,0,0,0,-11,0.831674,0,0,0,0,20
+H,remoteIpChanges,Client IP changes seen by remote services,,2.75,0.444262,0,0,0,0,0,0,-2.75,0.207918,0,0,0,0,20
+H,bulkHolPeakMs,HoL stall · bulk (peak),ms,405,22.36068,390,44.72136,355,109.904265,176.615,78.882913,-228.385,37.663406,-213.385,43.690165,-178.385,59.766899,20
+H,actionVsFailureS,Action time vs. path failure,s,1,0.537293,0.27,0.267739,0.185,0.082876,-3.8775,2.712518,-4.8775,1.111835,-4.1475,1.228667,-4.0625,1.255063,20
+H,journeyTimeS,Journey time,s,45.035,19.471174,33.055,18.909103,33.05,18.90064,33.05,18.90064,-11.985,1.179128,-0.005,0.010465,0,0,20
