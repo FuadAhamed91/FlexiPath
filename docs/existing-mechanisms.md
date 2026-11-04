@@ -1,5 +1,7 @@
 # Existing seamless-connectivity mechanisms, and what FlexiPath adapts
 
+> **Note:** Numbers in this file are from the development seeds with a 300 ms hover rule at every speed (before the 2026-11-04 review fixes); the README has the current numbers.
+
 This note covers success criteria 01, 02 and 04 of the EDGE challenge statement:
 
 - **01**: investigate existing mechanisms.

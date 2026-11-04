@@ -1,5 +1,7 @@
 # Guidelines for QoS and QoE across heterogeneous networks
 
+> **Note:** Numbers in this file are from the development seeds with a 300 ms hover rule at every speed (before the 2026-11-04 review fixes); the README has the current numbers.
+
 This note covers success criterion 05 of the EDGE challenge statement: "create guidelines for improving the quality of service and the quality of experience for the users of the networks".
 
 Each guideline gives:
