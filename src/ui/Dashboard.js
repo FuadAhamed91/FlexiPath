@@ -916,6 +916,26 @@ export class Dashboard {
     this.demo.start();
   }
 
+  /**
+   * Kiosk mode (?kiosk=1, D-06) for an unattended screen: the intro shows over a flying mission (the engine runs
+   * behind it), the guided demo starts by itself after `delayMs`, and its cards step on by themselves. The first
+   * key press, click or touch hands control to the visitor: the automatic start and the auto-advance stop.
+   */
+  startKiosk(delayMs = 8000) {
+    this.refs.intro.hidden = false;
+    this.togglePause(false);
+    this.demo.kiosk = true;
+    const timer = setTimeout(() => {
+      if (this.demo.kiosk && !this.demo.active) this.startDemo();
+    }, delayMs);
+    const handOver = () => {
+      clearTimeout(timer);
+      this.demo.kiosk = false;
+      for (const t of ['keydown', 'pointerdown', 'wheel']) window.removeEventListener(t, handOver, true);
+    };
+    for (const t of ['keydown', 'pointerdown', 'wheel']) window.addEventListener(t, handOver, true);
+  }
+
   // ── Modals ──────────────────────────────────────────────────────────────
   openModal(html) {
     this.refs.modalBody.innerHTML = html;

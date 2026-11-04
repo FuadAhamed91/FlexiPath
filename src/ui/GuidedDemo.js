@@ -30,6 +30,8 @@ const sentence = (s) => {
   const cap = t.charAt(0).toUpperCase() + t.slice(1);
   return /[.!?]$/.test(cap) ? cap : `${cap}.`;
 };
+const KIOSK_DWELL_MS = 9000; // kiosk mode: how long a paused card stays before the demo goes on
+const KIOSK_END_MS = 20000; // kiosk mode: how long the end card stays before the demo replays
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const nth = (n) => ['First', 'Second', 'Third', 'Fourth', 'Fifth'][n] ?? `${n + 1}th`;
 const secs = (v) => (v < 1 ? v.toFixed(2) : v.toFixed(1));
@@ -48,6 +50,8 @@ export class GuidedDemo {
     this.unsubs = [];
     this.raf = 0;
     this._last = {};
+    this.kiosk = false; // ?kiosk=1 (D-06): paused cards step on by themselves until a visitor touches anything
+    this._shownAt = 0;
     this._frame = this._frame.bind(this);
     this._build();
   }
@@ -214,6 +218,7 @@ export class GuidedDemo {
   // ── Rendering ─────────────────────────────────────────────────────────
   _render(spec) {
     this.spec = spec;
+    this._shownAt = performance.now();
     const R = this.refs;
     R.step.textContent = spec.step ?? '';
     R.title.textContent = spec.title ?? '';
@@ -259,6 +264,21 @@ export class GuidedDemo {
     if (!this.active) return;
     this.raf = requestAnimationFrame(this._frame);
     this._layout();
+    if (this.kiosk) this._kioskStep();
+  }
+
+  /**
+   * Kiosk mode only (?kiosk=1, an unattended Demo Day screen): a card that waits for the visitor goes on by itself
+   * after a dwell time, and the end card replays the demo. The first key press or click turns kiosk mode off
+   * (Dashboard), so a hands-on visitor gets the normal demo, where nothing resumes by itself.
+   */
+  _kioskStep() {
+    const e = this.engine;
+    if (!this.spec || !(e.paused || e.completed)) return;
+    const waited = performance.now() - this._shownAt;
+    if (e.completed && this.spec === this.endCard) {
+      if (waited > KIOSK_END_MS) this.start();
+    } else if (waited > KIOSK_DWELL_MS) this.next();
   }
 
   _target(spec) {

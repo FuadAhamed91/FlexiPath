@@ -59,7 +59,9 @@ the tests and the benchmark:
 
 In the browser, URL parameters on `simulator.html` give reproducible states (`index.html` forwards any link that carries
 one of them to the simulator): `?scenario=A&seed=2026&speed=90&mode=advanced&focus=legacy
-&camera=overview&intro=0&paused=1` (`paused` only applies with `intro=0`); `demo=1` starts the guided demo,
+&camera=overview&intro=0&paused=1` (`paused` only applies with `intro=0`); `demo=1` starts the guided demo, `kiosk=1`
+(unattended screen: engine runs behind the intro, `startKiosk()` starts the demo after 8 s, `GuidedDemo.kiosk` steps paused
+cards on after 9 s and replays from the end card; the first key / click / wheel turns it off),
 `models=procedural` forces the primitive models and `look=twin` starts in the neon look. `window.flexipath` exposes `{ engine, dashboard, sceneManager,
 vehicles, nodes, beams, particles }` in the console.
 
@@ -203,7 +205,7 @@ vehicles, nodes, beams, particles }` in the console.
 - The guided demo (`GuidedDemo.js`, `D`, `?demo=1`) flies the full `mission` scenario (seed 2026, 60 km/h: three
   handovers, dock → Wi-Fi → 5G → LEO) and owns the tour layer (`refs.tour`: a fixed card over the lower part of the
   twin and a ring around the panel a card talks about). It is never scripted: one orientation card on the dock, then
-  engine events pause the simulation (`_moment`) and **nothing resumes by itself**. Each moment names the panels it
+  engine events pause the simulation (`_moment`) and **nothing resumes by itself** (except in kiosk mode, until the visitor touches anything). Each moment names the panels it
   changed (`panels`, keys of `_panelCards`: the Mission panels, the Advanced tabs, the charts); a panel is explained
   once in the demo (`shownPanels`) unless a stop marks it `'name!'` because its numbers are the point. Next steps
   through them one card each, beside the ringed panel with a pointer (`_layout`: left of a right-hand panel, above a

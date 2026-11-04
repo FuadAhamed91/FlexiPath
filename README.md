@@ -579,7 +579,7 @@ On Windows, double-click `dist\serve.cmd`. `dist/README.txt` repeats these steps
 
 Simulator URL parameters (on `simulator.html`; a link to the site root that carries any of them is forwarded to the
 simulator): `?scenario=A&seed=2026&speed=90&mode=advanced&focus=legacy&camera=overview&paused=1`, `intro=0` skips
-the intro screen, `demo=1` starts the guided demo, `models=procedural` forces the built-in primitive models, `look=twin` starts in the neon digital-twin look.
+the intro screen, `demo=1` starts the guided demo, `kiosk=1` is for an unattended screen (the mission flies behind the intro, the guided demo starts after 8 s and its cards step on by themselves; the first key press or click hands control to the visitor), `models=procedural` forces the built-in primitive models, `look=twin` starts in the neon digital-twin look.
 
 Keys: `Space` pause · `M` mission / advanced · `D` guided demo (`→` next, `←` back) · `X` experiments · `I` why FlexiPath? · `F` Wi-Fi fade ·
 `G` 5G outage · `R` reset · `1`/`2` focus · `C` camera · `V` ghost drone · `T` theatre · `L` real / twin look · `E` export JSON.

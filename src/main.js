@@ -6,6 +6,8 @@
  *
  * URL parameters: ?scenario=mission|A…F&seed=2026&speed=60&mode=mission|advanced
  *                 &focus=flexipath|legacy&camera=chase|cinematic|overview&intro=0&paused=1&demo=1
+ *                 &kiosk=1 (unattended screen: the mission flies behind the intro, the guided demo starts after 8 s
+ *                 and steps on by itself until a visitor presses a key or clicks)
  */
 import * as THREE from 'three';
 import { SimulationEngine } from './simulation/SimulationEngine.js';
@@ -33,6 +35,7 @@ function readParams() {
     paused: q.get('paused') === '1',
     intro: q.get('intro') !== '0',
     demo: q.get('demo') === '1',
+    kiosk: q.get('kiosk') === '1',
   };
 }
 
@@ -177,6 +180,7 @@ async function boot() {
 
   hideSplash();
   if (params.demo) dashboard.startDemo();
+  else if (params.kiosk) dashboard.startKiosk();
   else if (params.intro) dashboard.showIntro();
   else dashboard.togglePause(params.paused);
 

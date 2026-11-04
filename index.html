@@ -6,7 +6,7 @@
       // Links made for the simulator before it moved (?scenario=…, ?demo=1, …) still open it directly.
       (function () {
         var q = new URLSearchParams(location.search);
-        var keys = ['scenario', 'seed', 'speed', 'mode', 'focus', 'camera', 'intro', 'paused', 'demo', 'models', 'look'];
+        var keys = ['scenario', 'seed', 'speed', 'mode', 'focus', 'camera', 'intro', 'paused', 'demo', 'kiosk', 'models', 'look'];
         if (keys.some(function (k) { return q.has(k); })) location.replace('simulator.html' + location.search + location.hash);
       })();
     </script>
