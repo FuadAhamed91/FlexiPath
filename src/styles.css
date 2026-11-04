@@ -27,8 +27,8 @@
   --ui-text: #0f172a;
   --ui-text-2: #334155;
   --ui-text-3: #475569;
-  --ui-muted: #64748b;
-  --ui-faint: #94a3b8;
+  --ui-muted: #556274; /* D-11: one step darker, 5.5:1 or more on every panel background (was #64748b, 4.2:1 on --ui-hover) */
+  --ui-faint: #64748b; /* D-11: was #94a3b8 (2.6:1); now 4.2:1 or more */
   --ui-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 10px 28px -20px rgba(15, 23, 42, 0.25);
   --fp: #0891b2;
   --fp-ink: #0e7490;
@@ -393,6 +393,10 @@ body {
     background 0.25s ease,
     box-shadow 0.25s ease,
     color 0.25s ease;
+}
+/* D-11: the 10 px detail was the pill colour at 75 % opacity (2.8:1); a deeper mix of the same colour reads at 4.5:1+. */
+.state-pill .pill-detail {
+  color: color-mix(in srgb, var(--pill-c, var(--fp)) 55%, var(--ink));
 }
 .state-pill .dot {
   width: 8px;
@@ -863,6 +867,7 @@ body {
   z-index: 70;
   right: 16px;
   bottom: 16px;
+  max-width: min(320px, 36vw);
   display: flex;
   flex-direction: column;
   gap: 8px;

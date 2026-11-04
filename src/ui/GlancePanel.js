@@ -20,7 +20,7 @@ export class GlancePanel {
         <h2 class="hud-title text-slate-800!">At a glance</h2>
         <div class="flex items-center gap-1.5">
           ${tag('measured')}
-          <button type="button" class="btn h-[20px]! px-2! text-[10px]!" data-ref="details" title="Full detail in the Advanced view (M)">Details</button>
+          <button type="button" class="btn h-[24px]! px-2! text-[10px]!" data-ref="details" title="Full detail in the Advanced view (M)">Details</button>
         </div>
       </div>
       <div class="flex flex-wrap gap-x-3 gap-y-1.5 px-3 pb-3" data-ref="classes" aria-label="Protection by traffic class"></div>

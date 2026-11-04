@@ -379,7 +379,10 @@ export class GuidedDemo {
     } else {
       const v = this.dash.refs.viewport.getBoundingClientRect();
       x = clamp(v.left + v.width / 2 - w / 2, MARGIN, vw - w - MARGIN);
-      y = clamp(v.bottom - h - 64, MARGIN, vh - h - MARGIN);
+      // D-10: keep the card clear of the playback bar, whatever its height.
+      const bar = this.dash.refs.play.parentElement.getBoundingClientRect();
+      const above = bar.height > 0 ? Math.min(v.bottom - h - 64, bar.top - h - 10) : v.bottom - h - 64;
+      y = clamp(above, MARGIN, vh - h - MARGIN);
     }
     y = clamp(y, MARGIN, Math.max(MARGIN, vh - h - MARGIN));
     const key = `${x | 0},${y | 0},${place},${ax | 0},${ay | 0}`;

@@ -262,7 +262,7 @@ export class Dashboard {
         <div class="flex min-w-0 flex-1 items-center justify-center gap-2 overflow-hidden max-xl:order-last max-xl:basis-full max-xl:justify-start">
           <div class="state-pill min-w-0" data-ref="pill" aria-live="polite">
             <span class="dot shrink-0"></span><span class="shrink-0" data-ref="pillText">INITIALISING</span>
-            <span class="truncate font-mono text-[10px] font-semibold tracking-[0.04em] opacity-75" data-ref="pillDetail"></span>
+            <span class="pill-detail truncate font-mono text-[10px] font-semibold tracking-[0.04em]" data-ref="pillDetail"></span>
           </div>
         </div>
         <div class="flex min-w-0 flex-wrap items-center gap-2">
@@ -868,6 +868,15 @@ export class Dashboard {
     const el = document.createElement('div');
     el.className = `toast ${kind === 'warn' ? 'warn' : ''}`;
     el.textContent = message;
+    // D-10: anchor the stack in the twin's lower-right corner, above its playback bar, so a toast never hides the
+    // Legacy-vs-FlexiPath strip, the charts or the playback controls.
+    const vp = this.refs.viewport.getBoundingClientRect();
+    if (vp.height > 0) {
+      const bar = this.refs.play.parentElement.getBoundingClientRect();
+      const floor = bar.height > 0 ? bar.top - 8 : vp.bottom - 12;
+      this.refs.toasts.style.bottom = `${Math.max(16, window.innerHeight - floor)}px`;
+      this.refs.toasts.style.right = `${Math.max(16, window.innerWidth - vp.right + 12)}px`;
+    }
     this.refs.toasts.append(el);
     setTimeout(() => el.remove(), 2800);
     while (this.refs.toasts.childElementCount > 4) this.refs.toasts.firstElementChild.remove();

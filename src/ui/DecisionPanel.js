@@ -95,10 +95,10 @@ export class DecisionPanel {
         <div class="legacy-rule dp-legacy dp-line1 mt-2.5" data-ref="legacy">Legacy OS · —</div>
         <div class="dp-more mt-3 flex items-center justify-between">
           <span class="hud-label">Decision history</span>
-          <button type="button" class="btn h-[22px]! px-2! text-[10px]!" data-ref="follow" hidden>Follow latest</button>
+          <button type="button" class="btn h-[24px]! px-2! text-[10px]!" data-ref="follow" hidden>Follow latest</button>
         </div>
         <div class="dp-more decision-history mt-1 flex flex-col gap-0.5" data-ref="history"></div>
-        <button type="button" class="dp-toggle btn mt-2.5 h-[22px]! w-full justify-center px-2! text-[10px]!" data-ref="more" aria-expanded="false">Show details</button>
+        <button type="button" class="dp-toggle btn mt-2.5 h-[24px]! w-full justify-center px-2! text-[10px]!" data-ref="more" aria-expanded="false">Show details</button>
       </div>`;
     root.classList.add('decision-panel');
     this.refs = {};
