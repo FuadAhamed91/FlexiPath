@@ -99,15 +99,14 @@ The baselines have their own random streams and the ablations replay FlexiPath's
 below are identical with or without them (`--baselines none --ablations none`).
 
 **Archived data.** The raw CSVs behind every table in this section are committed in
-[`results/published/`](results/published/MANIFEST.md): the default run, the held-out seeds, the 1 s hover rule and the
-260 ms wake. The data was produced at commit `8a3983ca71dbc368dff790c3971b24fa7947a479`;
+[`results/published/`](results/published/MANIFEST.md): ten runs, each on the development and the held-out seeds: the
+default (speed-consistent) hover rule, the 300 ms and the 1 s rule at every speed, the 260 ms modem wake and the 60 ms
+reactive RTO. The data was produced at commit `ec5378940279eb494a9e7be1aacd020de39cf276`;
 [MANIFEST.md](results/published/MANIFEST.md) gives the date, the exact commands, the seed blocks and SHA-256 sums. To
 check a number, check out that commit (or any later one that does not change `src/simulation`) and run the same
 command: the runs are deterministic, so the CSVs are byte-identical (`npm run test:full` does this for you). When the
-model changes, re-run the four commands into `results/published/`, put the new commit hash here and in the manifest,
-and update the tables.
-
-**Status of the archive.** The archived CSVs are from the model *before* the review fixes (300 ms hover rule at every speed, two reactive baselines). The tables below come from the fixed model (speed-consistent hover rule, 60 ms reactive baseline, throughput, seed-clustered CIs), so `npm run test:full` fails until `results/published/` is re-published from the fixed model. Do this before you quote any table as archived.
+model changes, re-run the commands in the manifest into `results/published/`, put the new commit hash here and in the
+manifest, and update the tables.
 
 **Hover rule.** A drone hovers (fail-safe) when its C2 link is silent too long. The benchmark uses a speed-consistent
 rule, after 3GPP TS 22.125: **300 ms at ≤ 60 km/h** (stick steering, which the standard specifies up to 60 km/h) and
@@ -654,7 +653,7 @@ npm run dev          # landing page http://localhost:5173 · simulator http://lo
 | `npm run serve` | Build, then serve `dist/` on http://localhost:4173/ and open the browser |
 | `npm run benchmark` | Paired experiments → `results/benchmark_*.json`, per-run `.csv`, `_comparison.csv`, `_mechanisms.csv`, `_efficiency.csv` (critical delivery per extra watt), `_ablations.csv` and `_prediction.csv` (`--quick`, `--seeds 10`, `--speeds 60`, `--scenarios A,D`, `--no-failsafe`, `--baselines mptcp,mptcpFast,redundant` or `none`, `--ablations fpNoPred,fpNoBurst,fpNoMap` or `none`, `--seed-block dev` or `test`, `--failsafe-ms 300` / `1000` for one hover rule at every speed instead of the speed-consistent default, `--wake-ms 260`, `--rto-ms 60`); `_headline.csv` pools A–D, G, H with seed-clustered CIs |
 | `npm test` | Tests of the simulation core (Vitest, about 5 s): determinism per seed, A–H run to completion, controller invariants, and a quick benchmark checked against the README's four-stack table within stated tolerances |
-| `npm run test:full` | `npm test` plus the full default and held-out benchmarks, which must reproduce the CSVs in `results/published/` byte for byte (under a minute) |
+| `npm run test:full` | `npm test` plus the ten full benchmarks archived in `results/published/`, which must reproduce its CSVs byte for byte (about 2 min) |
 | `node scripts/tradeoff-chart.js <_mechanisms.csv>` | Redraw `public/landing/tradeoff.svg` (reliability vs radio power) from a default benchmark |
 | `node scripts/handover-probe.js` | Measure one real network change on your own laptop ([Real-world check](#real-world-check-one-network-change-on-your-own-laptop)) |
 | `npm run models` | Regenerate the six GLB assets with headless Blender (`blender` on `PATH`) |

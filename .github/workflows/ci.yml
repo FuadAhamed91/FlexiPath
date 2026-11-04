@@ -34,7 +34,7 @@ jobs:
       - name: Test (simulation core, quick benchmark vs README)
         run: npm test
 
-      # The full default and held-out benchmarks must reproduce results/published/ byte for byte (F-16).
+      # Every full benchmark archived in results/published/ must reproduce its CSVs byte for byte (F-16).
       # A model change that does not re-publish the data fails here.
       - name: Test (full benchmarks vs results/published)
         run: npm run test:full

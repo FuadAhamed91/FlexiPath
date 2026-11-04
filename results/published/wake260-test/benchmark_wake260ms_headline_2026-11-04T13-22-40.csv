@@ -1,0 +1,4 @@
+baseline,label,scenarios,runs,seeds,fpCriticalLossPct,baselineCriticalLossPct,lossReductionPct,lossReductionLo,lossReductionHi,deliveryPp,deliveryPpLo,deliveryPpHi,runsFpBetter,runsFpWorse,powerW,powerWLo,powerWHi,throughputMbps,throughputMbpsLo,throughputMbpsHi,mos,mosLo,mosHi
+mptcp,Reactive multipath,A B C D G H,120,5,1.618318,2.800763,42.218682,38.266513,45.991244,1.182445,1.046835,1.328773,117,3,0.109992,0.099925,0.12385,-5.077667,-5.551917,-4.762083,0.086925,0.073917,0.097825
+mptcpFast,Reactive multipath · 60 ms detection,A B C D G H,120,5,1.618318,2.508733,35.492624,30.548693,40.185627,0.890415,0.742835,1.057896,112,8,0.110025,0.099917,0.123967,-5.176417,-5.630417,-4.87425,0.073992,0.064217,0.0815
+redundant,Always duplicate,A B C D G H,120,5,1.618318,0.702055,-130.511498,-144.351063,-117.761763,-0.916262,-1.008824,-0.842511,10,109,-1.727708,-1.75165,-1.703767,-5.51375,-6.084,-5.112583,-0.102608,-0.11035,-0.0944
