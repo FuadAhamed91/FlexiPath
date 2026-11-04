@@ -37,10 +37,15 @@ export async function loadGLB(file) {
   if (FORCE_PROCEDURAL) return null;
   const url = `${MODEL_BASE}${file}`;
   try {
-    const head = await fetch(url, { method: 'HEAD', cache: 'no-cache' });
-    const type = head.headers.get('content-type') || '';
-    if (!head.ok || type.includes('text/html')) return null;
-    const gltf = await loader.loadAsync(url);
+    // One GET (D-12: the old HEAD probe doubled the requests and showed as failed in DevTools). A missing file, or
+    // a host that answers every path with its HTML page, falls back with a console note instead of silently.
+    const res = await fetch(url);
+    const type = res.headers.get('content-type') || '';
+    if (!res.ok || type.includes('text/html')) {
+      console.info(`[FlexiPath] ${file} not found (HTTP ${res.status}${res.ok ? `, ${type}` : ''}) — using procedural fallback`);
+      return null;
+    }
+    const gltf = await loader.parseAsync(await res.arrayBuffer(), MODEL_BASE);
     return gltf.scene;
   } catch (err) {
     console.info(`[FlexiPath] ${file} unavailable (${err?.message ?? err}) — using procedural fallback`);
