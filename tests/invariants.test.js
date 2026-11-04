@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { EXPERIMENT_SCENARIOS, BASELINE_ENGINES, seedsFor } from '../src/simulation/ExperimentRunner.js';
+import { EXPERIMENT_SCENARIOS, BASELINE_ENGINES, seedsFor, failSafeForSpeed } from '../src/simulation/ExperimentRunner.js';
 import { SimulationEngine } from '../src/simulation/SimulationEngine.js';
 import { LEGACY_PARAMS, LEGACY_WIRELESS_STALL_S } from '../src/simulation/LegacyController.js';
 
@@ -9,10 +9,13 @@ const phaseSum = (phases) => phases.reduce((a, p) => a + p.duration, 0);
 const LEGACY_STALLS_S = Object.values(LEGACY_PARAMS.stallPhases).map(phaseSum);
 const close = (a, b) => Math.abs(a - b) < 1e-6;
 
-/** Fly one run and record, tick by tick, what each controller decided and the link states it saw. */
+/**
+ * Fly one run and record, tick by tick, what each controller decided and the link states it saw. The hover threshold
+ * is the benchmark's speed-consistent rule (300 ms at <= 60 km/h, 1 s above), so 30 and 120 km/h cover both sides.
+ */
 function fly(scenario, seed, speedKmh) {
-  const e = new SimulationEngine({ seed, speedKmh, scenario, recordHistory: false, maxSimSeconds: 900, agents: AGENTS });
-  const v = { fpPrimaryDown: [], fpPathDown: [], fpStalledTicks: 0, fpReplicateNotMap: 0, legacyStalls: [], events: {} };
+  const e = new SimulationEngine({ seed, speedKmh, scenario, failSafeS: failSafeForSpeed(speedKmh), recordHistory: false, maxSimSeconds: 900, agents: AGENTS });
+  const v = { fpPrimaryDown: [], fpPathDown: [], fpStalledTicks: 0, fpReplicateNotMap: 0, legacyStalls: [], legacyCutStall: null, events: {} };
   let run = 0;
   while (!e.completed) {
     e.step();
@@ -36,7 +39,9 @@ function fly(scenario, seed, speedKmh) {
       }
     }
   }
-  if (run) v.legacyStalls.push(run / 10);
+  // A break still open when the flight ends was cut off by the finish (e.g. at 120 km/h under the 1 s rule the legacy
+  // drone flies on for 1 s before it hovers and can reach the route end mid-break): it has no full modelled length.
+  if (run) v.legacyCutStall = run / 10;
   return { v, summary: e.getSummary() };
 }
 
@@ -47,6 +52,7 @@ describe('controller invariants', () => {
 
   for (const scenario of EXPERIMENT_SCENARIOS) {
     it(`${scenario}: FlexiPath never sends on a down link; legacy breaks have constant lengths`, () => {
+      let fullWirelessBreaks = 0;
       for (const seed of seedsFor(2)) {
         for (const speedKmh of [30, 120]) {
           const tag = `${scenario} seed ${seed} ${speedKmh} km/h`;
@@ -59,12 +65,16 @@ describe('controller invariants', () => {
           // decision.replicate must be an explicit per-class map (undefined would mirror every flow).
           expect(v.fpReplicateNotMap, tag).toBe(0);
 
-          // Legacy: every break-before-make outage lasts exactly one of the modelled recovery sums, and at least
-          // one handover in every scenario is the full 3.8 s wireless break.
-          expect(v.legacyStalls.length, tag).toBeGreaterThan(0);
+          // Legacy: every completed break-before-make outage lasts exactly one of the modelled recovery sums; a break
+          // cut off by the finish is shorter than the longest sum. Every run breaks at least once, and the longest
+          // interruption the summary reports is the longest break measured here.
+          expect(v.legacyStalls.length + (v.legacyCutStall !== null ? 1 : 0), tag).toBeGreaterThan(0);
           for (const s of v.legacyStalls) expect(LEGACY_STALLS_S.some((x) => close(x, s)), `${tag}: legacy stall ${s} s`).toBe(true);
-          expect(v.legacyStalls.some((s) => close(s, LEGACY_WIRELESS_STALL_S)), tag).toBe(true);
-          expect(summary.legacy.longestInterruptionS, tag).toBeCloseTo(LEGACY_WIRELESS_STALL_S, 6);
+          if (v.legacyCutStall !== null) expect(v.legacyCutStall, `${tag}: break cut off by the finish`).toBeLessThan(Math.max(...LEGACY_STALLS_S) + 1e-6);
+          expect(summary.legacy.longestInterruptionS, tag).toBeCloseTo(Math.max(...v.legacyStalls, v.legacyCutStall ?? 0), 6);
+          const fullBreak = v.legacyStalls.some((s) => close(s, LEGACY_WIRELESS_STALL_S));
+          if (fullBreak) fullWirelessBreaks++;
+          if (speedKmh <= 60) expect(fullBreak, `${tag}: a full 3.8 s wireless break`).toBe(true);
 
           // Anchored stacks never reset TCP and never show the remote side a new client IP.
           for (const id of ['flexipath', ...BASELINE_ENGINES]) {
@@ -77,6 +87,9 @@ describe('controller invariants', () => {
           expect(v.events.legacy?.HOT_SWAP ?? 0, tag).toBe(0);
         }
       }
+      // At least one handover is the full 3.8 s wireless break in every run at <= 60 km/h (checked above) and in
+      // every scenario; at 120 km/h (1 s hover rule) a run's only break can be cut off by the finish (C, seed 8919).
+      expect(fullWirelessBreaks, `${scenario}: runs with a full 3.8 s wireless break`).toBeGreaterThanOrEqual(2);
     });
   }
 });
