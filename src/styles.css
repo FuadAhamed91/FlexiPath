@@ -1735,6 +1735,16 @@ body {
 }
 } /* end @layer components */
 
+/* D-09: a node / pad / zone label under a drone chip fades out (SceneManager._declutterLabels). */
+.node-label,
+.zone-label {
+  transition: opacity 0.2s ease;
+}
+.node-label.is-occluded,
+.zone-label.is-occluded {
+  opacity: 0.08 !important;
+}
+
 /* View switching (unlayered on purpose: these structural rules must beat the layout utilities). */
 .fp-shell[data-mode='mission'] [data-view='advanced'],
 .fp-shell[data-mode='advanced'] [data-view='mission'],
