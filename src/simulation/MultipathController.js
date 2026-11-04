@@ -32,6 +32,9 @@ export const MULTIPATH_PARAMS = {
   failLoss: SWITCH_LOSS, // a path in use counts as failed above 15 % measured loss …
   lossAlpha: 0.3, // … on an EWMA of the 10 Hz measurements …
   rtoS: 0.25, // … for one retransmission timeout; a dropped radio link is also noticed by the RTO
+  // Time to notice that a radio link dropped. null = one RTO (the default baseline). The "60 ms detection" variant
+  // (ENGINES.mptcpFast) sets FlexiPath's failoverDetectMs here, so both stacks detect an abrupt loss equally fast.
+  downDetectS: null,
   wiredDetectS: 0.05, // dock carrier loss: the interface-down event closes the subflow at once
   wakeLatencyS: POWER_PARAMS.wakeLatencyS, // a standby radio leaving DRX before it can carry traffic
   switchBackDwellS: LEGACY_PARAMS.switchBackDwellS, // a preferred path must stay joinable this long
@@ -109,7 +112,7 @@ class MultipathBase {
   }
 
   _detectS(id) {
-    return isWired(id) ? this.p.wiredDetectS : this.p.rtoS;
+    return isWired(id) ? this.p.wiredDetectS : (this.p.downDetectS ?? this.p.rtoS);
   }
 
   /** Seconds before an interface can carry traffic: a sleeping modem needs its wake-up, a wired port none. */
@@ -135,7 +138,7 @@ class MultipathBase {
     this.blackoutUntil = t + detectS + wakeS;
     this.blackoutTotalMs = ms(detectS + wakeS);
     this.wake = wakeS > 0 ? { id: to, from: t + detectS, until: t + detectS + wakeS } : null;
-    const how = isWired(lost) ? 'interface down' : 'retransmission timeout';
+    const how = isWired(lost) ? 'interface down' : this.p.downDetectS != null ? 'missed probes' : 'retransmission timeout';
     const reason = `${lost} lost · detected after ${ms(detectS)} ms (${how})${wakeS > 0 ? ` + ${ms(wakeS)} ms waking ${to} from DRX` : ''}`;
     this.lastSwitch = { t, from: lost, to, seamless: false, reason, blackoutMs: this.blackoutTotalMs };
     events.push({ level: 'crit', code: 'FAILOVER', message: `FAILOVER ${lost} → ${to} · ${reason} · ${label}`, from: lost, to });

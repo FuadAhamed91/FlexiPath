@@ -9,8 +9,10 @@
  *   npm run benchmark -- --baselines none               (no existing-mechanism baselines)
  *   npm run benchmark -- --ablations none               (no FlexiPath ablations)
  *   npm run benchmark -- --seed-block test              (held-out seeds, never used while tuning)
- *   npm run benchmark -- --failsafe-ms 1000             (waypoint-flight hover rule instead of the default 300 ms)
+ *   npm run benchmark -- --failsafe-ms 300              (sensitivity: the piloted 300 ms hover rule at every speed)
+ *   npm run benchmark -- --failsafe-ms 1000             (the waypoint-flight 1 s hover rule at every speed)
  *   npm run benchmark -- --wake-ms 260                  (sensitivity: a sleeping modem takes 260 ms to wake, not 100 ms)
+ *   npm run benchmark -- --rto-ms 60                    (sensitivity: reactive multipath's RTO, i.e. its loss trigger and link-down detection, 60 ms)
  *
  * Writes results/benchmark_<stamp>.json, .csv (per-run rows, every engine side by side),
  * _comparison.csv (Metric | Legacy | FlexiPath | Difference with 95 % CI), _prediction.csv (precision,
@@ -18,12 +20,16 @@
  * mechanisms (default: reactive multipath + always duplicate) — _mechanisms.csv and _efficiency.csv (critical delivery
  * gained per extra watt of radio power, between neighbouring stacks), and — with the
  * ablations (default: no trend prediction, no burst, no coverage map) — _ablations.csv.
+ * _headline.csv pools A–D, G, H: FlexiPath's critical-loss reduction against each baseline, with seed-clustered
+ * bootstrap 95 % intervals.
+ * Hover rule: by default speed-consistent (3GPP TS 22.125): 300 ms of C2 silence at <= 60 km/h (stick steering),
+ * 1 s above (waypoint flight). --failsafe-ms <ms> applies one fixed threshold to every run instead.
  * All numbers are measured simulation results, not real-world measurements.
  */
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { ExperimentRunner, EXPERIMENT_SCENARIOS, SCENARIOS, BASELINE_ENGINES, ABLATION_ENGINES, SEED_BLOCKS, seedsFor } from '../src/simulation/ExperimentRunner.js';
+import { ExperimentRunner, EXPERIMENT_SCENARIOS, SCENARIOS, BASELINE_ENGINES, ABLATION_ENGINES, SEED_BLOCKS, seedsFor, PILOTED_MAX_KMH, WAYPOINT_FAILSAFE_S } from '../src/simulation/ExperimentRunner.js';
 import { ENGINES, FAILSAFE_OUTAGE_S } from '../src/simulation/SimulationEngine.js';
 import { POWER_PARAMS } from '../src/simulation/PowerModel.js';
 import { MULTIPATH_PARAMS } from '../src/simulation/MultipathController.js';
@@ -49,7 +55,9 @@ if (unknown.length) {
   process.exit(1);
 }
 const failSafe = !args.includes('--no-failsafe');
-// Hover rule: C2 silent longer than this. 300 ms (default) suits a piloted drone; 1000 ms suits waypoint flight.
+// Hover rule: C2 silent longer than this. Default: speed-consistent (300 ms at <= 60 km/h, 1 s above). A fixed
+// --failsafe-ms applies to every run: 300 = the piloted rule everywhere, 1000 = the waypoint rule everywhere.
+const failSafeRule = opt('failsafe-ms', null) === null ? 'speed' : 'fixed';
 const failSafeMs = Number(opt('failsafe-ms', FAILSAFE_OUTAGE_S * 1000));
 if (!(failSafeMs > 0)) {
   console.error(`--failsafe-ms needs a positive number of milliseconds`);
@@ -69,8 +77,17 @@ if (wakeMs !== defaultWakeMs) {
   POWER_PARAMS.wakeLatencyS = wakeMs / 1000;
   MULTIPATH_PARAMS.wakeLatencyS = wakeMs / 1000;
 }
+// Sensitivity (review F-01): the reactive baseline's retransmission timeout, which sets both its loss trigger (loss
+// above the failure level for one RTO) and, by default, its link-down detection. Default 250 ms.
+const defaultRtoMs = MULTIPATH_PARAMS.rtoS * 1000;
+const rtoMs = Number(opt('rto-ms', defaultRtoMs));
+if (!(rtoMs > 0)) {
+  console.error(`--rto-ms needs a positive number of milliseconds`);
+  process.exit(1);
+}
+if (rtoMs !== defaultRtoMs) MULTIPATH_PARAMS.rtoS = rtoMs / 1000;
 // Non-default settings get their own file names, so their CSVs are never mistaken for the published ones.
-const fsTag = (failSafeS === FAILSAFE_OUTAGE_S ? '' : `_failsafe${failSafeMs}ms`) + (wakeMs === defaultWakeMs ? '' : `_wake${wakeMs}ms`);
+const fsTag = (failSafeRule === 'speed' ? '' : `_failsafe${failSafeMs}ms`) + (wakeMs === defaultWakeMs ? '' : `_wake${wakeMs}ms`) + (rtoMs === defaultRtoMs ? '' : `_rto${rtoMs}ms`);
 const outDir = resolve(dirname(fileURLToPath(import.meta.url)), '..', opt('out', 'results'));
 const baselineArg = opt('baselines', BASELINE_ENGINES.join(','));
 const baselines = baselineArg === 'none' ? [] : baselineArg.split(',');
@@ -87,12 +104,19 @@ if (badAblation.length) {
   process.exit(1);
 }
 
-const runner = new ExperimentRunner({ seeds, speeds, scenarios, failSafe, failSafeS, baselines, ablations, seedBlock });
+const runner = new ExperimentRunner({ seeds, speeds, scenarios, failSafe, failSafeRule, failSafeS, baselines, ablations, seedBlock });
 const total = runner.plan.length;
 console.log(`FlexiPath experiments · ${total} paired runs (${seeds.length} seeds × ${speeds.length} speeds × ${scenarios.length} scenarios)`);
 console.log(`Seeds: ${SEED_BLOCKS[seedBlock].label} · ${seeds.join(', ')}`);
-console.log(failSafe ? `Fail-safe: hover when C2 is silent > ${failSafeMs} ms` : 'Fail-safe: off');
+console.log(
+  !failSafe
+    ? 'Fail-safe: off'
+    : failSafeRule === 'speed'
+      ? `Fail-safe: hover when C2 is silent > ${FAILSAFE_OUTAGE_S * 1000} ms at <= ${PILOTED_MAX_KMH} km/h, > ${WAYPOINT_FAILSAFE_S * 1000} ms above (speed-consistent rule)`
+      : `Fail-safe: hover when C2 is silent > ${failSafeMs} ms (fixed, every speed)`,
+);
 if (wakeMs !== defaultWakeMs) console.log(`Modem wake: ${wakeMs} ms (default ${defaultWakeMs} ms)`);
+if (rtoMs !== defaultRtoMs) console.log(`Reactive multipath RTO: ${rtoMs} ms (default ${defaultRtoMs} ms)`);
 console.log('All values are measured SIMULATION results (model, not hardware).');
 
 const results = await runner.run({
@@ -123,7 +147,7 @@ for (const scenario of scenarios) {
 }
 
 // Existing mechanisms, same runs: Legacy | baselines | FlexiPath (means over the paired runs).
-const mechPick = ['c2KeptPct', 'interruptionS', 'longestInterruptionS', 'criticalDeliveryPct', 'meanMos', 'replicationOverheadPct', 'meanPowerW', 'energyJ', 'tcpResets', 'remoteIpChanges', 'actionVsFailureS'];
+const mechPick = ['c2KeptPct', 'interruptionS', 'longestInterruptionS', 'criticalDeliveryPct', 'meanMos', 'replicationOverheadPct', 'meanPowerW', 'energyJ', 'meanThroughputMbps', 'tcpResets', 'remoteIpChanges', 'actionVsFailureS'];
 if (results.mechanisms) {
   for (const scenario of scenarios) {
     console.log(`\n${scenario} · existing mechanisms vs FlexiPath`);
@@ -143,9 +167,32 @@ if (Object.keys(efficiency).length) {
   const cell = (st) => (st ? `${st.gainPp >= 0 ? '+' : ''}${fmt(st.gainPp)} pp for +${fmt(st.extraW)} W = ${fmt(st.ppPerW, 1)} pp/W` : '—');
   const effRows = {};
   for (const [scenario, e] of Object.entries(efficiency)) {
-    effRows[scenario] = { 'FlexiPath over reactive multipath': cell(e.flexipathOverReactive), 'Always duplicate over FlexiPath': cell(e.duplicateOverFlexipath) };
+    effRows[scenario] = {
+      'FlexiPath over reactive multipath': cell(e.flexipathOverReactive),
+      'FlexiPath over reactive multipath (60 ms detection)': cell(e.flexipathOverReactiveFast),
+      'Always duplicate over FlexiPath': cell(e.duplicateOverFlexipath),
+    };
   }
   console.table(effRows);
+}
+
+// Headline: pooled over A–D, G, H, FlexiPath against each baseline, seed-clustered bootstrap 95 % intervals.
+const headline = results.mechanisms ? ExperimentRunner.headline(results) : [];
+if (headline.length) {
+  console.log(`\nHeadline (${SEED_BLOCKS[seedBlock].label}), pooled over ${headline[0].scenarios}: FlexiPath − baseline, [seed-clustered 95 % CI]`);
+  const ci = (m, lo, hi, d) => (m === null ? '—' : `${m >= 0 ? '+' : ''}${fmt(m, d)} [${fmt(lo, d)}, ${fmt(hi, d)}]`);
+  const hRows = {};
+  for (const h of headline) {
+    hRows[h.label] = {
+      'critical loss FP / base (%)': `${fmt(h.fpCriticalLossPct)} / ${fmt(h.baselineCriticalLossPct)}`,
+      'fewer critical packets lost (%)': ci(h.lossReductionPct, h.lossReductionLo, h.lossReductionHi, 1),
+      'critical delivery (pp)': ci(h.deliveryPp, h.deliveryPpLo, h.deliveryPpHi, 2),
+      'radio power (W)': ci(h.powerW, h.powerWLo, h.powerWHi, 3),
+      'throughput (Mbps)': ci(h.throughputMbps, h.throughputMbpsLo, h.throughputMbpsHi, 1),
+      'runs FP better / worse': `${h.runsFpBetter} / ${h.runsFpWorse} of ${h.runs} (${h.seeds} seeds)`,
+    };
+  }
+  console.table(hRows);
 }
 
 // Ablations, same runs: FlexiPath | FlexiPath with one part switched off.
@@ -197,6 +244,11 @@ if (Object.keys(efficiency).length) {
   const effPath = resolve(outDir, timestampedName(`benchmark${fsTag}_efficiency`, 'csv'));
   writeFileSync(effPath, ExperimentRunner.efficiencyCSV(results));
   written.push(effPath);
+}
+if (headline.length) {
+  const headPath = resolve(outDir, timestampedName(`benchmark${fsTag}_headline`, 'csv'));
+  writeFileSync(headPath, ExperimentRunner.headlineCSV(results));
+  written.push(headPath);
 }
 if (results.ablation) {
   const ablPath = resolve(outDir, timestampedName(`benchmark${fsTag}_ablations`, 'csv'));

@@ -18,10 +18,20 @@
  * Seed blocks: `dev` (1000 + 7919·i) is the block FlexiPath was built and tuned on; `test`
  * (900001 + 7919·i) is a held-out block, run once to check that the results carry over to new conditions.
  *
+ * Hover rule (review F-02): by default the fail-safe threshold follows the flight speed, as in 3GPP TS 22.125
+ * Table 7.2-1: stick steering is specified up to 60 km/h, so a run at <= 60 km/h hovers after 300 ms of C2 silence;
+ * a faster run is waypoint flight and hovers after 1 s. A fixed threshold (`failSafeRule: 'fixed'`, the CLI's
+ * --failsafe-ms) is kept for sensitivity runs.
+ *
+ * Confidence intervals (review F-17): the four speeds of one seed share its RF field and faults, so the seed is the
+ * unit of independence. Every paired difference carries, besides the Student-t interval over runs, a 95 %
+ * percentile interval from a bootstrap that resamples whole seeds (`seedCI`).
+ *
  * Works in the browser (chunked, with progress) and in Node (scripts/benchmark.js).
  */
 import { SimulationEngine, VERSION, ANCHOR_IP, ENGINES, BASELINE_ENGINES, ABLATION_ENGINES, FAILSAFE_OUTAGE_S } from './SimulationEngine.js';
 import { RunningStats, round } from '../utils/Metrics.js';
+import { Random } from '../utils/Random.js';
 import { toCSV } from '../utils/Export.js';
 import { SCENARIOS, EXPERIMENT_SCENARIOS } from './Scenarios.js';
 
@@ -32,6 +42,62 @@ export const SEED_BLOCKS = {
   dev: { base: 1000, label: 'development seeds (used while building and tuning FlexiPath)' },
   test: { base: 900001, label: 'held-out test seeds (never used before this run)' },
 };
+
+/** Speed-consistent hover rule (3GPP TS 22.125 Table 7.2-1): piloted <= 60 km/h -> 300 ms, waypoint flight -> 1 s. */
+export const PILOTED_MAX_KMH = 60;
+export const WAYPOINT_FAILSAFE_S = 1.0;
+export const failSafeForSpeed = (speedKmh) => (speedKmh <= PILOTED_MAX_KMH ? FAILSAFE_OUTAGE_S : WAYPOINT_FAILSAFE_S);
+
+/** Scenarios pooled for the headline: every scenario with C2 traffic except E (its C2 numbers equal A's). */
+export const HEADLINE_SCENARIOS = ['A', 'B', 'C', 'D', 'G', 'H'];
+
+/** Seed-clustered bootstrap: resamples whole seeds (all speeds of a seed together). Deterministic. */
+const BOOT_RESAMPLES = 4000;
+const BOOT_SEED = 20261009;
+const meanD = (xs) => xs.reduce((a, x) => a + x.d, 0) / xs.length;
+/**
+ * 95 % percentile interval of a statistic under a bootstrap over seeds.
+ * @param {{seed:number}[]} items  one entry per run (or per paired difference), each carrying its seed
+ * @param {(items: object[]) => number} stat  statistic of a resample (default: mean of `d`)
+ * @returns {[number, number] | null}
+ */
+export function seedCI(items, stat = meanD) {
+  const bySeed = new Map();
+  for (const it of items) {
+    if (!bySeed.has(it.seed)) bySeed.set(it.seed, []);
+    bySeed.get(it.seed).push(it);
+  }
+  const groups = [...bySeed.values()];
+  if (groups.length < 2) return null;
+  const rng = new Random(BOOT_SEED);
+  const vals = [];
+  for (let b = 0; b < BOOT_RESAMPLES; b++) {
+    const pick = [];
+    for (let i = 0; i < groups.length; i++) pick.push(...groups[Math.floor(rng.next() * groups.length)]);
+    const v = stat(pick);
+    if (Number.isFinite(v)) vals.push(v);
+  }
+  if (!vals.length) return null;
+  vals.sort((a, b) => a - b);
+  const q = (p) => vals[Math.min(vals.length - 1, Math.max(0, Math.round(p * (vals.length - 1))))];
+  return [q(0.025), q(0.975)];
+}
+
+/** Paired-difference summary: mean, sd, n, Student-t half-width over runs, seed-clustered bootstrap interval. */
+function diffSummary(stats, items) {
+  const n = stats.count;
+  if (!n) return null;
+  const ci = seedCI(items);
+  return {
+    mean: stats.mean,
+    sd: stats.std,
+    n,
+    ci95: n > 1 ? tCritical95(n - 1) * (stats.std / Math.sqrt(n)) : null,
+    seedLo: ci ? ci[0] : null,
+    seedHi: ci ? ci[1] : null,
+    seeds: new Set(items.map((x) => x.seed)).size,
+  };
+}
 
 /** Metrics shown in the paired comparison (Metric | Legacy | FlexiPath | Difference). */
 export const COMPARISON_METRICS = [
@@ -81,6 +147,7 @@ export const MECHANISM_METRICS = [
   { key: 'bulkHolPeakMs', label: 'HoL stall · bulk (peak)', unit: 'ms', digits: 0 },
   { key: 'actionVsFailureS', label: 'Action time vs. path failure', unit: 's', digits: 2, note: 'Negative = acted before the path failed' },
   { key: 'journeyTimeS', label: 'Journey time', unit: 's', digits: 1 },
+  { key: 'meanThroughputMbps', label: 'Mean throughput', unit: 'Mbps', digits: 1 },
 ];
 
 /** Metrics compared across ablations: FlexiPath | FlexiPath with one part off. */
@@ -178,7 +245,7 @@ export function runSingle({ seed, speedKmh = 60, scenario = 'mission', failSafe 
   const engine = new SimulationEngine({ seed, speedKmh, failSafe, failSafeS, scenario, recordHistory: false, maxSimSeconds, agents });
   while (!engine.completed) engine.step();
   const summary = engine.getSummary();
-  return { seed: engine.config.seed, speedKmh, scenario, failSafe, simTimeS: round(engine.t, 1), ...summary };
+  return { seed: engine.config.seed, speedKmh, scenario, failSafe, failSafeS, simTimeS: round(engine.t, 1), ...summary };
 }
 
 export class ExperimentRunner {
@@ -187,6 +254,7 @@ export class ExperimentRunner {
     speeds = [30, 60, 90, 120],
     scenarios = EXPERIMENT_SCENARIOS,
     failSafe = true,
+    failSafeRule = 'speed', // 'speed': 300 ms at <= 60 km/h, 1 s above (failSafeForSpeed) · 'fixed': failSafeS for every run
     failSafeS = FAILSAFE_OUTAGE_S,
     baselines = BASELINE_ENGINES,
     ablations = [],
@@ -196,6 +264,7 @@ export class ExperimentRunner {
     this.speeds = speeds;
     this.scenarios = scenarios;
     this.failSafe = failSafe;
+    this.failSafeRule = failSafeRule === 'fixed' ? 'fixed' : 'speed';
     this.failSafeS = failSafeS;
     this.baselines = baselines.filter((id) => BASELINE_ENGINES.includes(id));
     this.ablations = ablations.filter((id) => ABLATION_ENGINES.includes(id));
@@ -218,7 +287,8 @@ export class ExperimentRunner {
     const started = Date.now();
     for (let i = 0; i < jobs.length; i++) {
       if (signal?.aborted) break;
-      const run = runSingle({ ...jobs[i], failSafe: this.failSafe, failSafeS: this.failSafeS, baselines: this.baselines, ablations: this.ablations });
+      const failSafeS = this.failSafeRule === 'speed' ? failSafeForSpeed(jobs[i].speedKmh) : this.failSafeS;
+      const run = runSingle({ ...jobs[i], failSafe: this.failSafe, failSafeS, baselines: this.baselines, ablations: this.ablations });
       runs.push(run);
       onProgress?.(i + 1, jobs.length, run);
       if ((i + 1) % yieldEvery === 0) await new Promise((r) => setTimeout(r, 0));
@@ -236,7 +306,9 @@ export class ExperimentRunner {
         speeds: this.speeds,
         scenarios: this.scenarios.map((s) => SCENARIOS[s]),
         failSafe: this.failSafe,
-        failSafeS: this.failSafeS,
+        failSafeRule: this.failSafeRule,
+        failSafeS: this.failSafeRule === 'speed' ? null : this.failSafeS,
+        failSafeBySpeed: Object.fromEntries(this.speeds.map((v) => [v, this.failSafeRule === 'speed' ? failSafeForSpeed(v) : this.failSafeS])),
         baselines: this.baselines.map((id) => ({ id, label: ENGINES[id].label, mechanism: ENGINES[id].mechanism })),
         ablations: this.ablations.map((id) => ({ id, label: ENGINES[id].label, ablation: ENGINES[id].ablation })),
         seedBlock: this.seedBlock,
@@ -267,23 +339,22 @@ export class ExperimentRunner {
     return metrics.map((m) => {
       const stats = Object.fromEntries(engines.map((id) => [id, new RunningStats()]));
       const diffs = Object.fromEntries(ablations.map((id) => [id, new RunningStats()]));
+      const items = Object.fromEntries(ablations.map((id) => [id, []]));
       for (const r of runs) {
         const fp = r.flexipath?.[m.key];
         for (const id of engines) {
           const v = r[id]?.[m.key];
           if (num(v)) stats[id].push(v);
-          if (diffs[id] && num(v) && num(fp)) diffs[id].push(fp - v);
+          if (diffs[id] && num(v) && num(fp)) {
+            diffs[id].push(fp - v);
+            items[id].push({ seed: r.seed, d: fp - v });
+          }
         }
       }
       return {
         ...m,
         engines: Object.fromEntries(engines.map((id) => [id, stats[id].count ? { mean: stats[id].mean, sd: stats[id].std, n: stats[id].count } : null])),
-        diff: Object.fromEntries(
-          Object.entries(diffs).map(([id, d]) => {
-            const n = d.count;
-            return [id, n ? { mean: d.mean, sd: d.std, n, ci95: n > 1 ? tCritical95(n - 1) * (d.std / Math.sqrt(n)) : null } : null];
-          }),
-        ),
+        diff: Object.fromEntries(Object.entries(diffs).map(([id, d]) => [id, diffSummary(d, items[id])])),
       };
     });
   }
@@ -332,6 +403,12 @@ export class ExperimentRunner {
           row[`fp_minus_${id}_ci95`] = d?.ci95 ?? null;
         }
         row.pairs = m.engines.flexipath?.n ?? 0;
+        // Seed-clustered bootstrap interval (appended, so the earlier columns keep their order).
+        for (const [id, d] of Object.entries(m.diff)) {
+          row[`fp_minus_${id}_seed_lo`] = d?.seedLo ?? null;
+          row[`fp_minus_${id}_seed_hi`] = d?.seedHi ?? null;
+        }
+        row.seeds = Object.values(m.diff).find(Boolean)?.seeds ?? 0;
         rows.push(row);
       }
     }
@@ -380,20 +457,22 @@ export class ExperimentRunner {
       const lg = new RunningStats();
       const fp = new RunningStats();
       const diff = new RunningStats();
+      const items = [];
       for (const r of runs) {
         const a = r.legacy[m.key];
         const b = r.flexipath[m.key];
         if (typeof a === 'number' && Number.isFinite(a)) lg.push(a);
         if (typeof b === 'number' && Number.isFinite(b)) fp.push(b);
-        if (typeof a === 'number' && typeof b === 'number' && Number.isFinite(a) && Number.isFinite(b)) diff.push(b - a);
+        if (typeof a === 'number' && typeof b === 'number' && Number.isFinite(a) && Number.isFinite(b)) {
+          diff.push(b - a);
+          items.push({ seed: r.seed, d: b - a });
+        }
       }
-      const n = diff.count;
-      const half = n > 1 ? tCritical95(n - 1) * (diff.std / Math.sqrt(n)) : null;
       return {
         ...m,
         legacy: lg.count ? { mean: lg.mean, sd: lg.std, n: lg.count } : null,
         flexipath: fp.count ? { mean: fp.mean, sd: fp.std, n: fp.count } : null,
-        diff: n ? { mean: diff.mean, sd: diff.std, n, ci95: half } : null,
+        diff: diffSummary(diff, items),
       };
     });
   }
@@ -408,23 +487,22 @@ export class ExperimentRunner {
     return metrics.map((m) => {
       const stats = Object.fromEntries(engines.map((id) => [id, new RunningStats()]));
       const diffs = Object.fromEntries(engines.filter((id) => id !== 'flexipath').map((id) => [id, new RunningStats()]));
+      const items = Object.fromEntries(Object.keys(diffs).map((id) => [id, []]));
       for (const r of runs) {
         const fp = r.flexipath?.[m.key];
         for (const id of engines) {
           const v = r[id]?.[m.key];
           if (num(v)) stats[id].push(v);
-          if (diffs[id] && num(v) && num(fp)) diffs[id].push(fp - v);
+          if (diffs[id] && num(v) && num(fp)) {
+            diffs[id].push(fp - v);
+            items[id].push({ seed: r.seed, d: fp - v });
+          }
         }
       }
       const engineStats = Object.fromEntries(
         engines.map((id) => [id, stats[id].count ? { mean: stats[id].mean, sd: stats[id].std, n: stats[id].count } : null]),
       );
-      const diff = Object.fromEntries(
-        Object.entries(diffs).map(([id, d]) => {
-          const n = d.count;
-          return [id, n ? { mean: d.mean, sd: d.std, n, ci95: n > 1 ? tCritical95(n - 1) * (d.std / Math.sqrt(n)) : null } : null];
-        }),
-      );
+      const diff = Object.fromEntries(Object.entries(diffs).map(([id, d]) => [id, diffSummary(d, items[id])]));
       return { ...m, engines: engineStats, diff };
     });
   }
@@ -446,10 +524,76 @@ export class ExperimentRunner {
       const row = {
         flexipathOverReactive: step(delivery.diff.mptcp?.mean, power.diff.mptcp?.mean),
         duplicateOverFlexipath: step(-delivery.diff.redundant?.mean, -power.diff.redundant?.mean),
+        flexipathOverReactiveFast: step(delivery.diff.mptcpFast?.mean, power.diff.mptcpFast?.mean),
       };
-      if (row.flexipathOverReactive || row.duplicateOverFlexipath) out[scenario] = row;
+      if (row.flexipathOverReactive || row.duplicateOverFlexipath || row.flexipathOverReactiveFast) out[scenario] = row;
     }
     return out;
+  }
+
+  /**
+   * Headline contrasts (review F-08), pooled over HEADLINE_SCENARIOS: FlexiPath against each baseline present.
+   * Critical loss = 100 − critical delivery (%). `lossReductionPct` = 1 − mean FP loss / mean baseline loss over the
+   * same runs. Each value carries a seed-clustered bootstrap 95 % interval; `runsFpBetter` counts runs where
+   * FlexiPath delivered more critical packets.
+   */
+  static headline(results, scenarios = HEADLINE_SCENARIOS) {
+    const runs = results.runs.filter((r) => scenarios.includes(r.scenario) && r.flexipath?.criticalDeliveryPct != null);
+    if (!runs.length) return [];
+    const ids = BASELINE_ENGINES.filter((id) => runs.every((r) => r[id]?.criticalDeliveryPct != null));
+    const num = (v) => typeof v === 'number' && Number.isFinite(v);
+    return ids.map((id) => {
+      const loss = runs.map((r) => ({ seed: r.seed, fp: 100 - r.flexipath.criticalDeliveryPct, x: 100 - r[id].criticalDeliveryPct }));
+      const relStat = (xs) => {
+        const fp = xs.reduce((a, v) => a + v.fp, 0);
+        const x = xs.reduce((a, v) => a + v.x, 0);
+        return x > 0 ? (1 - fp / x) * 100 : NaN;
+      };
+      const contrast = (key) => {
+        const items = runs.filter((r) => num(r.flexipath[key]) && num(r[id][key])).map((r) => ({ seed: r.seed, d: r.flexipath[key] - r[id][key] }));
+        if (!items.length) return { mean: null, lo: null, hi: null };
+        const ci = seedCI(items);
+        return { mean: meanD(items), lo: ci?.[0] ?? null, hi: ci?.[1] ?? null };
+      };
+      const rel = seedCI(loss, relStat);
+      const delivery = contrast('criticalDeliveryPct');
+      return {
+        baseline: id,
+        label: ENGINES[id].label,
+        scenarios: scenarios.filter((s) => runs.some((r) => r.scenario === s)).join(' '),
+        runs: runs.length,
+        seeds: new Set(runs.map((r) => r.seed)).size,
+        fpCriticalLossPct: loss.reduce((a, v) => a + v.fp, 0) / loss.length,
+        baselineCriticalLossPct: loss.reduce((a, v) => a + v.x, 0) / loss.length,
+        lossReductionPct: relStat(loss),
+        lossReductionLo: rel?.[0] ?? null,
+        lossReductionHi: rel?.[1] ?? null,
+        deliveryPp: delivery.mean,
+        deliveryPpLo: delivery.lo,
+        deliveryPpHi: delivery.hi,
+        runsFpBetter: runs.filter((r) => r.flexipath.criticalDeliveryPct > r[id].criticalDeliveryPct).length,
+        runsFpWorse: runs.filter((r) => r.flexipath.criticalDeliveryPct < r[id].criticalDeliveryPct).length,
+        ...Object.fromEntries(
+          [
+            ['powerW', 'meanPowerW'],
+            ['throughputMbps', 'meanThroughputMbps'],
+            ['mos', 'meanMos'],
+          ].flatMap(([name, key]) => {
+            const c = contrast(key);
+            return [
+              [name, c.mean],
+              [`${name}Lo`, c.lo],
+              [`${name}Hi`, c.hi],
+            ];
+          }),
+        ),
+      };
+    });
+  }
+
+  /** Headline contrasts as flat CSV rows (one per baseline). */
+  static headlineCSV(results) {
+    return toCSV(ExperimentRunner.headline(results));
   }
 
   /** Reliability per extra watt as flat CSV rows (one per scenario). */
@@ -462,6 +606,9 @@ export class ExperimentRunner {
       rd_over_fp_delivery_pp: e.duplicateOverFlexipath?.gainPp ?? null,
       rd_over_fp_power_w: e.duplicateOverFlexipath?.extraW ?? null,
       rd_over_fp_pp_per_w: e.duplicateOverFlexipath?.ppPerW ?? null,
+      fp_over_mf_delivery_pp: e.flexipathOverReactiveFast?.gainPp ?? null,
+      fp_over_mf_power_w: e.flexipathOverReactiveFast?.extraW ?? null,
+      fp_over_mf_pp_per_w: e.flexipathOverReactiveFast?.ppPerW ?? null,
     }));
     return toCSV(rows);
   }
@@ -472,6 +619,7 @@ export class ExperimentRunner {
       const row = { scenario: r.scenario, seed: r.seed, speed_kmh: r.speedKmh, fail_safe: r.failSafe, sim_time_s: r.simTimeS };
       const prefixes = enginesOf(r).map((id) => [id, ENGINES[id].short.toLowerCase()]);
       for (const m of SUMMARY_METRICS) for (const [id, px] of prefixes) row[`${px}_${m}`] = r[id][m];
+      row.fail_safe_s = r.failSafeS ?? null; // the hover threshold this run used (appended: earlier columns keep their order)
       return row;
     });
     return toCSV(rows);
@@ -492,6 +640,12 @@ export class ExperimentRunner {
           row[`fp_minus_${id}_ci95`] = d?.ci95 ?? null;
         }
         row.pairs = m.engines.flexipath?.n ?? 0;
+        // Seed-clustered bootstrap interval (appended, so the earlier columns keep their order).
+        for (const [id, d] of Object.entries(m.diff)) {
+          row[`fp_minus_${id}_seed_lo`] = d?.seedLo ?? null;
+          row[`fp_minus_${id}_seed_hi`] = d?.seedHi ?? null;
+        }
+        row.seeds = Object.values(m.diff).find(Boolean)?.seeds ?? 0;
         rows.push(row);
       }
     }
@@ -515,6 +669,9 @@ export class ExperimentRunner {
           diff_mean: m.diff?.mean ?? null,
           diff_ci95: m.diff?.ci95 ?? null,
           pairs: m.diff?.n ?? 0,
+          diff_seed_lo: m.diff?.seedLo ?? null,
+          diff_seed_hi: m.diff?.seedHi ?? null,
+          seeds: m.diff?.seeds ?? 0,
         });
       }
     }

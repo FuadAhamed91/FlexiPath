@@ -6,6 +6,7 @@
  *   • legacy    — LegacyController   (hard-threshold break-before-make)
  * Headless experiments can add baselines modelled on existing mechanisms (config.agents):
  *   • mptcp     — ReactiveMultipathController  (MPTCP backup subflow / ATSSS active-standby)
+ *   • mptcpFast — the same, with FlexiPath's 60 ms abrupt-loss detection instead of one 250 ms RTO
  *   • redundant — RedundantMultipathController (MPTCP redundant scheduler / PDCP duplication)
  * and ablations of FlexiPath with one part switched off (fpNoPred, fpNoBurst, fpNoMap).
  *
@@ -43,6 +44,18 @@ export const ENGINES = {
   legacy: { id: 'legacy', label: 'Legacy OS', short: 'LG', laneOffset: -3.2, color: '#F43F5E' },
   // Comparison baselines (existing mechanisms). Headless only: the twin renders FlexiPath and Legacy.
   mptcp: { id: 'mptcp', label: 'Reactive multipath', short: 'MP', laneOffset: 0, color: '#F59E0B', mechanism: 'MPTCP backup subflow / 3GPP ATSSS active-standby' },
+  // The same reactive design with FlexiPath's abrupt-loss detection (60 ms instead of one 250 ms RTO), so a
+  // difference from FlexiPath in an unpredicted outage cannot come from the detection constant alone (review F-01).
+  mptcpFast: {
+    id: 'mptcpFast',
+    label: 'Reactive multipath · 60 ms detection',
+    short: 'MF',
+    laneOffset: 0,
+    color: '#FB923C',
+    mechanism: 'MPTCP backup subflow / ATSSS active-standby, detection equal to FlexiPath',
+    params: { downDetectS: FLEXIPATH_PARAMS.failoverDetectMs / 1000 },
+    rngOf: 'mptcp', // common random numbers with the default baseline: a difference comes from the detection alone
+  },
   redundant: { id: 'redundant', label: 'Always duplicate', short: 'RD', laneOffset: 0, color: '#A3E635', mechanism: 'MPTCP redundant scheduler / PDCP duplication' },
   // Ablations: FlexiPath with one part switched off, to measure what each part contributes. Headless only.
   // They replay FlexiPath's own random streams (common random numbers, `rngOf`): the same fading, the same
@@ -80,7 +93,7 @@ export const ENGINES = {
 };
 
 /** Baselines modelled on existing seamless-connectivity mechanisms (docs/existing-mechanisms.md). */
-export const BASELINE_ENGINES = ['mptcp', 'redundant'];
+export const BASELINE_ENGINES = ['mptcp', 'mptcpFast', 'redundant'];
 /** FlexiPath with one part switched off (ablation study). */
 export const ABLATION_ENGINES = ['fpNoPred', 'fpNoBurst', 'fpNoMap'];
 const isFlexiPath = (id) => id === 'flexipath' || ABLATION_ENGINES.includes(id);
@@ -199,8 +212,8 @@ export class SimulationEngine {
     const classes = Object.fromEntries(Object.keys(TRAFFIC_CLASSES).map((c) => [c, flows.some((f) => f.cls === c)]));
     const controller = isFlexiPath(id)
       ? new FlexiPathController({ dt: DT, classes, map: this.coverageMap, params: meta.params })
-      : id === 'mptcp'
-        ? new ReactiveMultipathController({ dt: DT })
+      : id === 'mptcp' || id === 'mptcpFast'
+        ? new ReactiveMultipathController({ dt: DT, params: meta.params })
         : id === 'redundant'
           ? new RedundantMultipathController({ dt: DT, classes })
           : new LegacyController({ dt: DT });

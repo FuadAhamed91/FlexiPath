@@ -49,37 +49,37 @@
   <text x="62" y="96" class="tick" text-anchor="end">100.0</text>
   <rect x="70" y="92" width="702" height="318" fill="none" stroke="#cbd5e1"/>
   <text x="80" y="110" class="sub">↖ better: more delivered, less power</text>
-  <circle cx="716.1" cy="94.9" r="5.5" fill="#4D7C0F" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>Always duplicate · A: 99.97 % at 3.39 W</title></circle>
-  <circle cx="644.7" cy="141.7" r="5.5" fill="#4D7C0F" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>Always duplicate · B: 99.45 % at 3.13 W</title></circle>
-  <circle cx="570.3" cy="157.6" r="5.5" fill="#4D7C0F" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>Always duplicate · C: 99.28 % at 2.85 W</title></circle>
-  <circle cx="514.2" cy="185.8" r="5.5" fill="#4D7C0F" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>Always duplicate · D: 98.97 % at 2.65 W</title></circle>
-  <circle cx="664.7" cy="166.7" r="5.5" fill="#4D7C0F" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>Always duplicate · G: 99.18 % at 3.20 W</title></circle>
-  <circle cx="665.5" cy="106.3" r="5.5" fill="#4D7C0F" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>Always duplicate · H: 99.84 % at 3.21 W</title></circle>
-  <circle cx="155.0" cy="186.1" r="5.5" fill="#0891B2" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>FlexiPath · A: 98.96 % at 1.31 W</title></circle>
-  <circle cx="155.0" cy="217.3" r="5.5" fill="#0891B2" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>FlexiPath · B: 98.62 % at 1.31 W</title></circle>
-  <circle cx="155.4" cy="251.6" r="5.5" fill="#0891B2" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>FlexiPath · C: 98.24 % at 1.32 W</title></circle>
-  <circle cx="138.5" cy="255.9" r="5.5" fill="#0891B2" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>FlexiPath · D: 98.20 % at 1.25 W</title></circle>
-  <circle cx="163.4" cy="216.3" r="5.5" fill="#0891B2" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>FlexiPath · G: 98.63 % at 1.35 W</title></circle>
-  <circle cx="174.8" cy="253.7" r="5.5" fill="#0891B2" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>FlexiPath · H: 98.22 % at 1.39 W</title></circle>
-  <circle cx="124.7" cy="243.9" r="5.5" fill="#B45309" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>Reactive multipath · A: 98.33 % at 1.20 W</title></circle>
-  <circle cx="124.7" cy="289.3" r="5.5" fill="#B45309" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>Reactive multipath · B: 97.83 % at 1.20 W</title></circle>
-  <circle cx="124.7" cy="315.4" r="5.5" fill="#B45309" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>Reactive multipath · C: 97.54 % at 1.20 W</title></circle>
-  <circle cx="125.1" cy="366.5" r="5.5" fill="#B45309" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>Reactive multipath · D: 96.98 % at 1.20 W</title></circle>
-  <circle cx="125.5" cy="295.7" r="5.5" fill="#B45309" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>Reactive multipath · G: 97.76 % at 1.21 W</title></circle>
-  <circle cx="126.0" cy="320.0" r="5.5" fill="#B45309" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>Reactive multipath · H: 97.49 % at 1.21 W</title></circle>
-  <text x="500.2445" y="137.35530714285716" text-anchor="end" class="lab" style="fill:#4D7C0F">Always duplicate</text>
-  <text x="500.2445" y="153.35530714285716" text-anchor="end" class="sub">99.0–100.0 % · 2.65–3.39 W</text>
-  <text x="188.78699999999998" y="217.9907942857151" text-anchor="start" class="lab" style="fill:#0891B2">FlexiPath</text>
-  <text x="188.78699999999998" y="233.9907942857151" text-anchor="start" class="sub">98.2–99.0 % · 1.25–1.39 W</text>
-  <text x="139.95749999999998" y="302.2360357142853" text-anchor="start" class="lab" style="fill:#B45309">Reactive multipath</text>
-  <text x="139.95749999999998" y="318.2360357142853" text-anchor="start" class="sub">97.0–98.3 % · 1.20–1.21 W</text>
+  <circle cx="716.1" cy="94.6" r="5.5" fill="#4D7C0F" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>Always duplicate · A: 99.97 % at 3.39 W</title></circle>
+  <circle cx="644.7" cy="134.3" r="5.5" fill="#4D7C0F" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>Always duplicate · B: 99.53 % at 3.13 W</title></circle>
+  <circle cx="570.3" cy="150.6" r="5.5" fill="#4D7C0F" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>Always duplicate · C: 99.36 % at 2.85 W</title></circle>
+  <circle cx="514.2" cy="180.8" r="5.5" fill="#4D7C0F" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>Always duplicate · D: 99.02 % at 2.65 W</title></circle>
+  <circle cx="665.4" cy="184.6" r="5.5" fill="#4D7C0F" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>Always duplicate · G: 98.98 % at 3.21 W</title></circle>
+  <circle cx="665.5" cy="107.5" r="5.5" fill="#4D7C0F" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>Always duplicate · H: 99.83 % at 3.21 W</title></circle>
+  <circle cx="155.0" cy="185.8" r="5.5" fill="#0891B2" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>FlexiPath · A: 98.97 % at 1.31 W</title></circle>
+  <circle cx="155.0" cy="215.0" r="5.5" fill="#0891B2" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>FlexiPath · B: 98.65 % at 1.31 W</title></circle>
+  <circle cx="155.4" cy="248.1" r="5.5" fill="#0891B2" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>FlexiPath · C: 98.28 % at 1.32 W</title></circle>
+  <circle cx="138.5" cy="254.3" r="5.5" fill="#0891B2" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>FlexiPath · D: 98.21 % at 1.25 W</title></circle>
+  <circle cx="163.4" cy="224.2" r="5.5" fill="#0891B2" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>FlexiPath · G: 98.54 % at 1.35 W</title></circle>
+  <circle cx="174.8" cy="263.4" r="5.5" fill="#0891B2" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>FlexiPath · H: 98.11 % at 1.39 W</title></circle>
+  <circle cx="124.7" cy="249.8" r="5.5" fill="#B45309" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>Reactive multipath · A: 98.26 % at 1.20 W</title></circle>
+  <circle cx="124.7" cy="292.4" r="5.5" fill="#B45309" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>Reactive multipath · B: 97.79 % at 1.20 W</title></circle>
+  <circle cx="124.7" cy="317.8" r="5.5" fill="#B45309" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>Reactive multipath · C: 97.52 % at 1.20 W</title></circle>
+  <circle cx="125.1" cy="373.2" r="5.5" fill="#B45309" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>Reactive multipath · D: 96.90 % at 1.20 W</title></circle>
+  <circle cx="125.5" cy="315.4" r="5.5" fill="#B45309" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>Reactive multipath · G: 97.54 % at 1.21 W</title></circle>
+  <circle cx="126.0" cy="340.7" r="5.5" fill="#B45309" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>Reactive multipath · H: 97.26 % at 1.21 W</title></circle>
+  <text x="500.2445" y="136.6066442857142" text-anchor="end" class="lab" style="fill:#4D7C0F">Always duplicate</text>
+  <text x="500.2445" y="152.6066442857142" text-anchor="end" class="sub">99.0–100.0 % · 2.65–3.39 W</text>
+  <text x="188.78699999999998" y="221.60191142857192" text-anchor="start" class="lab" style="fill:#0891B2">FlexiPath</text>
+  <text x="188.78699999999998" y="237.60191142857192" text-anchor="start" class="sub">98.1–99.0 % · 1.25–1.39 W</text>
+  <text x="139.95749999999998" y="308.5126742857146" text-anchor="start" class="lab" style="fill:#B45309">Reactive multipath</text>
+  <text x="139.95749999999998" y="324.5126742857146" text-anchor="start" class="sub">96.9–98.3 % · 1.20–1.21 W</text>
   <rect x="299.5" y="269.1714285714288" width="458.9999999999999" height="78" rx="10" fill="#f8fafc" stroke="#cbd5e1"/>
   <text x="313.5" y="291.1714285714288" class="lab">Critical delivery gained per extra watt</text>
   <circle cx="318.5" cy="310.1714285714288" r="4.5" fill="#0891B2"/>
-  <text x="329.5" y="314.1714285714288" class="sub">FlexiPath over reactive multipath: <tspan class="big">+4.0 to +24.5 points</tspan></text>
+  <text x="329.5" y="314.1714285714288" class="sub">FlexiPath over reactive multipath: <tspan class="big">+4.7 to +26.3 points</tspan></text>
   <circle cx="318.5" cy="330.1714285714288" r="4.5" fill="#4D7C0F"/>
-  <text x="329.5" y="334.1714285714288" class="sub">Always duplicate over FlexiPath: <tspan class="big">+0.3 to +0.9 points</tspan></text>
-  <text x="80" y="400" class="note">↓ Legacy OS (below the chart): 77.3–84.9 % at 1.22 W</text>
+  <text x="329.5" y="334.1714285714288" class="sub">Always duplicate over FlexiPath: <tspan class="big">+0.2 to +0.9 points</tspan></text>
+  <text x="80" y="400" class="note">↓ Legacy OS (below the chart): 74.8–83.8 % at 1.22 W</text>
   <text x="421" y="456" text-anchor="middle" class="ax">Mean radio power (W)</text>
   <text transform="translate(18 251) rotate(-90)" text-anchor="middle" class="ax">Critical packets delivered (%)</text>
 </svg>
