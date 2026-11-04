@@ -1,0 +1,310 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<title>27.EDGE.FlexiPath</title>
+<style>
+@font-face{font-family:Inter;src:url(fonts/Inter-400.woff2) format("woff2");font-weight:400}
+@font-face{font-family:Inter;src:url(fonts/Inter-500.woff2) format("woff2");font-weight:500}
+@font-face{font-family:Inter;src:url(fonts/Inter-600.woff2) format("woff2");font-weight:600}
+@font-face{font-family:Inter;src:url(fonts/Inter-700.woff2) format("woff2");font-weight:700}
+@font-face{font-family:Inter;src:url(fonts/Inter-800.woff2) format("woff2");font-weight:800}
+@font-face{font-family:Inter;src:url(fonts/Inter-900.woff2) format("woff2");font-weight:900}
+@font-face{font-family:Orbitron;src:url(fonts/Orbitron-900.woff2) format("woff2");font-weight:900}
+@font-face{font-family:JBM;src:url(fonts/JetBrainsMono-400.woff2) format("woff2");font-weight:400}
+@font-face{font-family:JBM;src:url(fonts/JetBrainsMono-700.woff2) format("woff2");font-weight:700}
+@font-face{font-family:JBM;src:url(fonts/JetBrainsMono-800.woff2) format("woff2");font-weight:800}
+@page{size:1200mm 1600mm;margin:0}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+html,body{width:1200mm;height:1600mm;background:#070c16;overflow:hidden}
+body{font-family:Inter,sans-serif;color:#e8edf5;font-size:30pt;line-height:1.36}
+:root{--cyan:#22d3ee;--orange:#f59e0b;--muted:#9aa7bb;--panel:#0d1627;--line:rgba(34,211,238,.28);--wifi:#00F0FF;--g5:#10B981;--leo:#F59E0B;--legacy:#ff3b5c;--rep:#c084fc}
+.poster{position:relative;width:1200mm;height:1600mm;overflow:hidden}
+.abs{position:absolute;left:40mm;right:40mm}
+.mono{font-family:JBM,monospace}
+.kicker{font-family:JBM,monospace;font-weight:700;font-size:20pt;letter-spacing:.16em;color:var(--cyan);text-transform:uppercase}
+.kicker.or{color:var(--orange)}
+h2{font-size:56pt;line-height:1;letter-spacing:-.01em;color:#fff;margin:6mm 0 9mm}
+h2 small{display:block;font-size:22pt;font-weight:600;color:var(--muted);letter-spacing:.02em;margin-top:4mm}
+p{margin-bottom:6mm}
+b{color:#fff}
+.panel{background:var(--panel);border:1.2mm solid var(--line);border-radius:10mm;padding:16mm 18mm}
+.corner{position:absolute;width:28mm;height:28mm;border:1.4mm solid var(--cyan);opacity:.75}
+/* ── logo band ─────────────────────────────────────────── */
+.band{position:absolute;left:0;right:0;top:0;height:95mm;background:#fff;color:#0f172a;display:flex;align-items:center;justify-content:space-between;padding:0 40mm}
+.band .edge{display:flex;align-items:center;gap:16mm}
+.band .edge img{height:46mm}
+.band .edge .t{font-size:21pt;line-height:1.25;color:#334155;font-weight:600;border-left:1.2mm solid #cbd5e1;padding-left:14mm}
+.band .edge .t b{color:#0f172a;font-size:24pt;display:block}
+.band .mid{text-align:center;font-family:JBM,monospace;font-size:19pt;letter-spacing:.12em;color:#475569;font-weight:700;text-transform:uppercase;line-height:1.7}
+.band .mid b{color:#0e7490;font-size:22pt}
+.band .aau{display:flex;align-items:center;gap:12mm}
+.band .aau img{height:66mm}
+.band .aau .t{font-size:24pt;font-weight:800;color:#0f172a;line-height:1.2}
+.band .aau .t small{display:block;font-size:19pt;font-weight:600;color:#475569}
+/* ── hero ───────────────────────────────────────────────── */
+.hero{position:absolute;left:0;right:0;top:95mm;height:360mm;overflow:hidden;background:#070c16}
+.hero img.bg{position:absolute;left:0;top:-160mm;width:1200mm;height:675mm;object-fit:cover}
+.hero .shade{position:absolute;inset:0;background:linear-gradient(90deg,rgba(7,12,22,.96) 0%,rgba(7,12,22,.88) 34%,rgba(7,12,22,.35) 62%,rgba(7,12,22,.15) 100%),linear-gradient(0deg,rgba(7,12,22,.92) 0%,rgba(7,12,22,0) 40%)}
+.hero .wrap{position:absolute;left:40mm;top:28mm;width:720mm}
+.hero .brand{display:flex;align-items:center;gap:16mm}
+.hero .brand img{width:64mm;height:64mm;filter:drop-shadow(0 0 10mm rgba(34,211,238,.5))}
+.hero .brand .name{font-family:Orbitron,sans-serif;font-weight:900;font-size:74pt;letter-spacing:.03em;color:#fff;text-shadow:0 0 14mm rgba(34,211,238,.45)}
+.hero .brand .tag{font-family:JBM,monospace;font-size:19pt;letter-spacing:.2em;color:var(--cyan);margin-top:3mm}
+.hero h1{font-size:150pt;line-height:.95;letter-spacing:-.02em;font-weight:900;color:#fff;text-transform:uppercase;margin:16mm 0 14mm}
+.hero h1 em{font-style:normal;color:var(--cyan)}
+.hero .sub{font-size:36pt;line-height:1.3;color:#dbe3ee;max-width:640mm;font-weight:500}
+.hero .sub b{color:#fff}
+.hero .atrc{position:absolute;right:40mm;top:26mm;display:flex;align-items:center;gap:12mm}
+.hero .atrc img{height:40mm}
+.hero .atrc .t{font-family:JBM,monospace;font-size:17pt;letter-spacing:.14em;color:#cbd5e1;text-transform:uppercase;line-height:1.6;text-align:right}
+.team{position:absolute;right:40mm;bottom:22mm;width:400mm;background:rgba(7,12,22,.82);border:1.2mm solid var(--line);border-radius:10mm;padding:14mm 18mm;backdrop-filter:blur(2mm)}
+.team .k{display:flex;justify-content:space-between;align-items:baseline}
+.team .tn{font-size:40pt;font-weight:900;color:#fff;line-height:1.1;margin-top:3mm}
+.team .tn small{display:block;font-size:22pt;font-weight:600;color:var(--muted);margin-top:2mm}
+.team .stand{font-family:JBM,monospace;font-size:20pt;color:var(--orange);letter-spacing:.1em;font-weight:700}
+.team ul{list-style:none;margin-top:10mm;display:grid;grid-template-columns:1fr 1fr;gap:7mm 12mm}
+.team li{font-size:28pt;line-height:1.15;border-left:1.8mm solid var(--cyan);padding-left:8mm}
+.team li b{display:block;color:#fff;font-size:28pt;font-weight:700}
+/* ── challenge statement ────────────────────────────────── */
+.statement{top:473mm;height:92mm;display:flex;gap:18mm;align-items:stretch}
+.statement .q{flex:1;background:var(--panel);border:1.2mm solid rgba(245,158,11,.5);border-left:5mm solid var(--orange);border-radius:10mm;padding:12mm 20mm;display:flex;flex-direction:column;justify-content:center}
+.statement .q .quote{font-size:38pt;font-weight:800;line-height:1.15;color:#fff;margin:3mm 0 4mm}
+.statement .q .quote em{color:var(--orange);font-style:normal}
+.statement .q .ex{font-size:22pt;color:#cbd5e1;line-height:1.3}
+.statement .why{width:360mm;background:var(--panel);border:1.2mm solid var(--line);border-radius:10mm;padding:12mm 18mm;display:flex;flex-direction:column;justify-content:center}
+.statement .why p{font-size:23pt;line-height:1.3;color:#dbe3ee;margin:3mm 0 0}
+/* ── loop band ──────────────────────────────────────────── */
+.loop{top:581mm;height:70mm;display:grid;grid-template-columns:repeat(6,1fr);gap:10mm}
+.loop .st{position:relative;background:var(--panel);border:1.2mm solid var(--line);border-radius:9mm;padding:9mm 12mm 9mm 34mm}
+.loop .st .n{position:absolute;left:10mm;top:9mm;width:18mm;height:18mm;border-radius:50%;background:var(--cyan);color:#061018;font-family:JBM,monospace;font-weight:800;font-size:20pt;display:flex;align-items:center;justify-content:center}
+.loop .st .nm{font-family:JBM,monospace;font-weight:800;font-size:23pt;letter-spacing:.12em;color:var(--cyan)}
+.loop .st .d{font-size:21pt;line-height:1.25;color:#dbe3ee;margin-top:3mm}
+.loop .st::after{content:"▶";position:absolute;right:-9.5mm;top:50%;transform:translateY(-50%);color:var(--cyan);font-size:18pt;opacity:.8}
+.loop .st:last-child::after{content:""}
+.loop .st.rep .n{background:var(--rep)} .loop .st.rep .nm{color:var(--rep)}
+.loop .st.sw .n{background:var(--g5)} .loop .st.sw .nm{color:var(--g5)}
+/* ── three columns ──────────────────────────────────────── */
+.cols{top:667mm;height:472mm;display:grid;grid-template-columns:1fr 1fr 1.18fr;gap:22mm}
+.cols .col{background:var(--panel);border:1.2mm solid var(--line);border-radius:10mm;padding:16mm 20mm;position:relative;overflow:hidden}
+.cols p{font-size:28pt;line-height:1.36;color:#dbe3ee}
+.cols ul{list-style:none}
+.cols li{font-size:24pt;line-height:1.32;color:#dbe3ee;padding-left:14mm;position:relative;margin-bottom:4.5mm}
+.cols li::before{content:"";position:absolute;left:0;top:5mm;width:7mm;height:7mm;border-radius:2mm;background:var(--cyan)}
+.cols li b{color:#fff}
+.tl{margin-top:6mm;border-top:1mm solid rgba(255,255,255,.12);padding-top:7mm}
+.tl .lab{font-family:JBM,monospace;font-size:17pt;letter-spacing:.14em;color:var(--muted);text-transform:uppercase;margin-bottom:4mm}
+.bar{display:flex;align-items:stretch;height:24mm;border-radius:4mm;overflow:hidden;margin:3mm 0}
+.bar div{display:flex;align-items:center;justify-content:center;font-family:JBM,monospace;font-size:18pt;font-weight:700;color:#061018;white-space:nowrap}
+.bar .lg1{background:#ff8fa3;flex:10}.bar .lg2{background:#ff6b85;flex:8}.bar .lg3{background:#ff4d6d;flex:5}.bar .lg4{background:#e11d48;flex:15;color:#fff}
+.bar .fp1{background:#c084fc;flex:4}.bar .fp2{background:#10B981;flex:34;color:#06281c}
+.tl .row{display:flex;align-items:baseline;justify-content:space-between;margin-top:5mm}
+.tl .row .who{font-family:JBM,monospace;font-size:17pt;font-weight:700;letter-spacing:.08em}
+.tl .row .who.l{color:var(--legacy)}.tl .row .who.f{color:var(--cyan)}
+.tl .row .res{font-size:21pt;font-weight:800;text-align:right}
+.tl .row .res.l{color:var(--legacy)}.tl .row .res.f{color:var(--g5)}
+.tl .note{font-size:18pt;color:var(--muted);margin-top:3mm}
+/* ── evidence row ───────────────────────────────────────── */
+.evi{top:1155mm;height:250mm;display:grid;grid-template-columns:395mm 1fr 318mm;gap:20mm}
+.evi .tiles{display:grid;grid-template-columns:1fr 1fr;gap:12mm}
+.evi .tile{background:var(--panel);border:1.2mm solid var(--line);border-radius:9mm;padding:10mm 12mm;display:flex;flex-direction:column;justify-content:center}
+.evi .tile .v{font-family:Inter,sans-serif;font-weight:900;font-size:72pt;line-height:1;color:var(--cyan);letter-spacing:-.02em}
+.evi .tile .l{font-size:21.5pt;line-height:1.25;color:#dbe3ee;margin-top:5mm}
+.evi .tile .l b{color:#fff}
+.evi .tile .m{font-family:JBM,monospace;font-size:14pt;letter-spacing:.14em;color:var(--muted);margin-top:5mm}
+.evi .chart{background:#fff;border-radius:10mm;padding:10mm 12mm 8mm;display:flex;flex-direction:column}
+.evi .chart img{width:100%;height:auto;max-height:172mm;flex:0 1 auto;min-height:0;object-fit:contain}
+.evi .chart .cap{flex:none}
+.evi .chart .cap{font-size:17pt;color:#475569;line-height:1.3;margin-top:4mm}
+.evi .proto{background:var(--panel);border:1.2mm solid var(--line);border-radius:10mm;padding:12mm 14mm;display:flex;flex-direction:column}
+.evi .proto img.shot{width:100%;border-radius:5mm;border:.8mm solid rgba(255,255,255,.15)}
+.evi .proto .qrs{display:flex;gap:10mm;margin-top:9mm}
+.evi .proto .qr{flex:1;display:flex;gap:7mm;align-items:center}
+.evi .proto .qr img{width:62mm;height:62mm;background:#fff;border-radius:4mm;padding:2mm}
+.evi .proto .qr .t{font-size:17pt;line-height:1.25;color:#dbe3ee}
+.evi .proto .qr .t b{display:block;color:#fff;font-size:19pt}
+.evi .proto .url{font-family:JBM,monospace;font-size:20pt;color:var(--cyan);font-weight:700;margin-top:7mm;letter-spacing:.02em}
+/* ── bottom row ─────────────────────────────────────────── */
+.bottom{top:1419mm;height:146mm;display:grid;grid-template-columns:1.25fr 1fr;gap:20mm}
+.bottom .fut{background:var(--panel);border:1.2mm solid var(--line);border-radius:10mm;padding:11mm 18mm 9mm;overflow:hidden}
+.bottom .fut ul{list-style:none;columns:2;column-gap:16mm}
+.bottom .fut li{font-size:22pt;line-height:1.28;color:#dbe3ee;break-inside:avoid;padding-left:12mm;position:relative;margin-bottom:2.8mm}
+.bottom .fut li::before{content:"";position:absolute;left:0;top:5mm;width:6mm;height:6mm;border-radius:1.5mm;background:var(--orange)}
+.bottom .fut li b{color:#fff}
+.sys{background:var(--panel);border:1.2mm solid var(--line);border-radius:10mm;padding:11mm 16mm 9mm;overflow:hidden}
+.sys .flow{display:flex;align-items:stretch;gap:6mm;margin-top:7mm}
+.sys .bx{flex:1;border:1mm solid rgba(255,255,255,.18);border-radius:6mm;padding:7mm 8mm;font-size:19.5pt;line-height:1.25;color:#dbe3ee}
+.sys .bx .h{font-family:JBM,monospace;font-size:17pt;letter-spacing:.1em;font-weight:800;color:var(--cyan);margin-bottom:3mm;text-transform:uppercase}
+.sys .bx.eng{flex:1.5;border-color:var(--cyan);background:rgba(34,211,238,.06)}
+.sys .bx.relay{border-color:var(--orange);background:rgba(245,158,11,.06)}.sys .bx.relay .h{color:var(--orange)}
+.sys .bx.gs{flex:.8}
+.sys .ar{align-self:center;color:var(--cyan);font-size:18pt}
+.sys .foot{font-family:JBM,monospace;font-size:17pt;letter-spacing:.1em;color:var(--orange);margin-top:6mm;text-transform:uppercase;font-weight:700}
+.sys .foot span{color:var(--muted);text-transform:none;letter-spacing:0;font-family:Inter,sans-serif;font-weight:500;font-size:18pt}
+/* ── footer ─────────────────────────────────────────────── */
+.footer{position:absolute;left:0;right:0;top:1573mm;height:27mm;padding:0 40mm;display:flex;align-items:center;justify-content:space-between;gap:20mm;border-top:1mm solid rgba(255,255,255,.1);background:#050910}
+.footer div{font-size:15.5pt;line-height:1.25;color:#8e9bb0}
+.footer b{color:#cbd5e1}
+.footer .r{text-align:right;white-space:nowrap}
+</style></head><body><div class="poster">
+
+<!-- ── Logo band ─────────────────────────────────────────── -->
+<div class="band">
+  <div class="edge">
+    <img src="img/edge-logo.svg" alt="EDGE Group">
+    <div class="t"><b>EDGE Group Challenge</b>Advanced Technology Pioneers 2026</div>
+  </div>
+  <div class="mid">NSTI Festival 2026 · ADNEC Centre Al Ain · 10–13 Nov<br><b>Stand 27 · EDGE track · Team FlexiPath</b></div>
+  <div class="aau">
+    <div class="t">Al Ain University<small>College of Engineering · Abu Dhabi</small></div>
+    <img src="img/aau-logo.svg" alt="Al Ain University">
+  </div>
+</div>
+
+<!-- ── Hero ──────────────────────────────────────────────── -->
+<div class="hero">
+  <img class="bg" src="img/hero-title.jpg" alt="">
+  <div class="shade"></div>
+  <div class="atrc"><div class="t">Organised by<br>Advanced Technology<br>Research Council</div><img src="img/atrc-logo.png" alt="ATRC"></div>
+  <div class="wrap">
+    <div class="brand"><img src="img/favicon.svg" alt=""><div><div class="name">FLEXIPATH</div><div class="tag">PREDICTIVE · TRAFFIC-AWARE CONNECTIVITY ENGINE</div></div></div>
+    <h1>Switch before<br>the link <em>fails.</em></h1>
+    <div class="sub">Keeps a drone's <b>control link</b>, voice and video alive as it moves between <b>Wi-Fi, 5G, satellite and wired</b> networks, by predicting the failure and moving before it happens.</div>
+  </div>
+  <div class="team">
+    <div class="k"><span class="kicker">Team</span><span class="stand">STAND 27 · PROJECT 5007</span></div>
+    <div class="tn">FlexiPath <small>Team Tarot Club · Al Ain University · Abu Dhabi</small></div>
+    <ul>
+      <li><b>Fuad Ahamed</b></li>
+      <li><b>Mohameden Sidi ahmed</b></li>
+      <li><b>Reema Awad</b></li>
+      <li><b>Nazer Alzaabi</b></li>
+    </ul>
+  </div>
+</div>
+
+<!-- ── Sponsor's challenge statement ──────────────────────── -->
+<div class="abs statement">
+  <div class="q">
+    <div class="kicker or">Problem statement · EDGE Group challenge statement</div>
+    <div class="quote">“How might we keep a user's experience <em>unbroken</em> as they move between Wi-Fi, mobile, satellite and wired networks?”</div>
+    <div class="ex">Maintaining a seamless connection as users move between network technologies and coverage areas is one of the greatest challenges in modern communication. Interruptions degrade the user experience and hit users' critical applications. — EDGE Group, ATP 2026</div>
+  </div>
+  <div class="why">
+    <div class="kicker">Why it matters · our scenario</div>
+    <p>Emergency response, industrial automation, connected transport and defence cannot wait for a reconnect. We chose a <b>drone beyond its pilot's sight</b>: in our model its command link may go silent for at most <b>300 ms</b> before it must stop and hover.</p>
+  </div>
+</div>
+
+<!-- ── Six-stage loop ─────────────────────────────────────── -->
+<div class="abs loop">
+  <div class="st"><div class="n">1</div><div class="nm">DETECT</div><div class="d">Measure signal, loss, delay and jitter ten times a second.</div></div>
+  <div class="st"><div class="n">2</div><div class="nm">PREDICT</div><div class="d">Extend the trend; find the time to failure. The route map warns 8 s ahead.</div></div>
+  <div class="st"><div class="n">3</div><div class="nm">PREPARE</div><div class="d">Wake the best spare radio and test it with tiny heartbeats.</div></div>
+  <div class="st rep"><div class="n">4</div><div class="nm">REPLICATE</div><div class="d">Copy only critical traffic on both paths for 400 ms.</div></div>
+  <div class="st sw"><div class="n">5</div><div class="nm">SWITCH</div><div class="d">Make the tested path primary. Zero gap on predicted moves.</div></div>
+  <div class="st"><div class="n">6</div><div class="nm">CONTINUE</div><div class="d">Old radio back to sleep; every session keeps one address.</div></div>
+</div>
+
+<!-- ── Three columns ──────────────────────────────────────── -->
+<div class="abs cols">
+  <div class="col">
+    <div class="kicker">Proposed solution</div>
+    <h2>Predict, prepare, then switch</h2>
+    <p>Today's devices wait for a network to fail before they move to the next one. In our model, that break-before-make switch leaves a legacy stack silent for <b>3.8 seconds</b>. A drone whose control link is silent for more than 300 ms must stop and hover, so every handover becomes a risk.</p>
+    <p><b>FlexiPath</b> is a predictive, traffic-aware connectivity engine that sits under the applications. It watches every link ten times a second and spots a fading signal seconds before it fails. It wakes the next radio and tests it, sends only the critical commands over both networks for 0.4 seconds, then switches with no gap. A fixed anchor relay keeps every session open, so the ground station always sees one address, whatever radio the drone is using. Spare radios sleep the rest of the time to save power.</p>
+    <p>We built it as a working digital twin: two identical drones fly the same mission through Wi-Fi, 5G and satellite coverage, one with FlexiPath and one with a legacy stack, under the same radio conditions. A deterministic simulation and a headless benchmark measure both against two existing mechanisms.</p>
+    <div class="tl">
+      <div class="lab">One handover, in our model</div>
+      <div class="row"><div class="who l">LEGACY STACK</div><div class="res l">3.8 s silent → must hover</div></div>
+      <div class="bar"><div class="lg1">detect 1.0 s</div><div class="lg2">scan 0.8 s</div><div class="lg3">attach 0.5 s</div><div class="lg4">reconnect 1.5 s</div></div>
+      <div class="row"><div class="who f">FLEXIPATH</div><div class="res f">0 s gap · flies on</div></div>
+      <div class="bar"><div class="fp1">0.4 s burst</div><div class="fp2">switched before the old link failed</div></div>
+      <div class="note">Legacy phases and the 300 ms hover rule are model parameters; the gaps are measured in simulation.</div>
+    </div>
+  </div>
+
+  <div class="col">
+    <div class="kicker">Technical explanation</div>
+    <h2>Six stages, ten times a second</h2>
+    <p>The engine runs a six-stage loop ten times a second. <b>DETECT</b> measures signal, loss, delay and jitter. <b>PREDICT</b> fits a 3-second trend and estimates the time to failure, the moment loss would reach 15 %; a coverage map from earlier flights warns 8 seconds before a known dead zone. <b>PREPARE</b> wakes the best spare modem from sleep (1.2 W to 1.8 W) and checks it with 64-byte heartbeats every 100 ms. <b>REPLICATE</b> sends critical traffic on both paths for a 400 ms burst (3.4 W); voice joins only if its loss exceeds budget, and bulk uploads are never copied. <b>SWITCH</b> makes the tested path primary with a 0 ms gap, and <b>CONTINUE</b> puts the old radio back to sleep.</p>
+    <p>The receiver keeps the first copy of each sequence number and drops the late duplicate, so there is no head-of-line delay. All sessions ride a UDP tunnel to an anchor relay, so the remote end never sees an address change and no connection resets. If an outage comes with no warning, failover takes 160 ms in our model. Every decision is recorded with the values that caused it, so the dashboard can explain it.</p>
+    <img src="img/burst.png" alt="" style="width:100%;height:102mm;object-fit:cover;object-position:50% 45%;border-radius:6mm;border:.8mm solid rgba(255,255,255,.15);margin-top:2mm">
+    <div class="tl" style="margin-top:3mm;border:0;padding-top:0"><div class="note">The 400 ms burst in the twin: purple beams carry the control link over Wi-Fi and 5G at once.</div></div>
+  </div>
+
+  <div class="col">
+    <div class="kicker">Solution features</div>
+    <h2>What FlexiPath does differently</h2>
+    <ul>
+      <li><b>Predicts instead of reacting.</b> It acts 1.2–4.6 s before the path fails; reactive multipath acts 0.1–0.5 s after it (scenarios A–D).</li>
+      <li><b>Traffic-aware.</b> Three classes: control, voice and bulk. Only the critical class is ever duplicated, about 1–3 % of protected bytes.</li>
+      <li><b>Power-aware.</b> Spare radios sleep in DRX. FlexiPath draws 1.25–1.39 W, about 8 % more than a single radio, against 2.65–3.39 W for always-on duplication.</li>
+      <li><b>Route foresight.</b> A coverage map from earlier flights warns of dead zones 8 s ahead. In the urban-canyon scenario FlexiPath kept the control link on 20 of 20 flights; reactive multipath on 0 and always duplicate on 8.</li>
+      <li><b>One address for the whole flight.</b> Zero TCP resets and zero visible IP changes in the predicted handovers.</li>
+      <li><b>Explainable.</b> A decision card shows the current path, trend, time to failure, alternate score, radio tier, action and reason.</li>
+      <li><b>Measured, not asserted.</b> 160 paired simulated flights (8 scenarios × 5 seeds × 4 speeds) with 95 % confidence intervals, ablations, held-out seeds and sensitivity runs. One command reproduces every number.</li>
+      <li><b>Honest baselines.</b> A legacy single-path stack, reactive multipath (MPTCP backup subflow / 3GPP ATSSS active-standby) and always duplicate (MPTCP redundant scheduler / PDCP duplication), all on the same seeds.</li>
+      <li><b>Live prototype.</b> An interactive 3D digital twin with a guided demo runs in any browser at flexipath.vercel.app.</li>
+      <li><b>Application-neutral.</b> Designed to sit under any command-and-control application; the application itself does not change.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ── Evidence ───────────────────────────────────────────── -->
+<div class="abs evi">
+  <div class="tiles">
+    <div class="tile"><div class="v">100 %</div><div class="l">of 160 simulated flights kept the control link with FlexiPath · <b>legacy 0 %</b> · reactive multipath fails in 3 of 8 scenarios</div><div class="m">MEASURED · SIM · OUR 300 ms RULE</div></div>
+    <div class="tile"><div class="v">35 %</div><div class="l">fewer critical packets lost than reactive multipath (about 20 % with equal outage detection); holds on held-out seeds</div><div class="m">MEASURED · SIM</div></div>
+    <div class="tile"><div class="v">2.1–2.6×</div><div class="l">less radio power than always-on duplication, for nearly the same delivery (<b>99 % vs 99–100 %</b>)</div><div class="m">MEASURED · SIM</div></div>
+    <div class="tile"><div class="v">4–7 pp/W</div><div class="l">reliability gained per extra watt over reactive multipath; always duplicate adds only 0.3–0.9 pp/W</div><div class="m">MEASURED · SIM</div></div>
+  </div>
+  <div class="chart"><img src="img/tradeoff.svg" alt="Reliability vs radio power"><div class="cap">Critical-packet delivery against mean radio power for the three multipath stacks, scenarios A–D, G and H. Each marker is the mean of 20 paired flights; FlexiPath sits near duplication's reliability at less than half its power.</div></div>
+  <div class="proto">
+    <div class="kicker">Live prototype · try it at the booth</div>
+    <img class="shot" src="img/simulator-mission-2400.webp" alt="FlexiPath mission view" style="margin-top:6mm">
+    <div class="qrs">
+      <div class="qr"><img src="img/qr-site.png" alt=""><div class="t"><b>Guided demo &amp; simulator</b>flexipath.vercel.app</div></div>
+      <div class="qr"><img src="img/qr-video.png" alt=""><div class="t"><b>2-minute film</b>flexipath.vercel.app/video</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Bottom row ─────────────────────────────────────────── -->
+<div class="abs bottom">
+  <div class="fut">
+    <div class="kicker or">Future improvements &amp; real-life plan</div>
+    <ul style="margin-top:5mm">
+      <li><b>Real radios.</b> Port the engine to a Linux companion computer with Wi-Fi, 5G and satellite modems, and measure real handovers with our probe script. Today every number is simulated.</li>
+      <li><b>Fairer comparison.</b> Give the reactive baseline the same 60 ms outage detection as FlexiPath (our lead in lost packets then falls from about 35 % to about 20 %) and add signal-threshold triggers such as 3GPP measurement events.</li>
+      <li><b>Better prediction.</b> Replace the linear trend with a model trained on flight logs, and let a fleet share its coverage maps so every flight learns from the last.</li>
+      <li><b>Closer radio model.</b> Air-to-ground propagation, antenna tilt and altitude effects, shared capacity between traffic classes, and real LEO constellation timing.</li>
+      <li><b>Security and standards.</b> Encrypt the anchor tunnel and align it with 3GPP ATSSS and MPTCP so it can run beside existing stacks.</li>
+      <li><b>Real-life plan.</b> A 3–6 month pilot with one drone operator, then industrial sites and emergency response, where a silent control link is not an option.</li>
+    </ul>
+  </div>
+  <div class="sys">
+    <div class="kicker">System design · one engine, several radios, continuous sessions</div>
+    <div class="flow">
+      <div class="bx"><div class="h">Applications</div>C2 control link (critical)<br>push-to-talk voice (real-time)<br>camera &amp; survey uploads (bulk)</div>
+      <div class="ar">▶</div>
+      <div class="bx eng"><div class="h">FlexiPath engine</div>link monitor &amp; predictor · path scorer · traffic manager (replicate, pace, reorder) · radio power manager · coverage map</div>
+      <div class="ar">▶</div>
+      <div class="bx"><div class="h">Radios</div>wired dock · Wi-Fi 6 · 5G SA · LEO satellite</div>
+      <div class="ar">▶</div>
+      <div class="bx relay"><div class="h">Anchor relay</div>one fixed address; the tunnel rebinds across radios</div>
+      <div class="ar">▶</div>
+      <div class="bx gs"><div class="h">Ground station</div>never sees a change</div>
+    </div>
+    <div class="foot">Designed to sit under any command-and-control application <span>· every decision is logged with its reason</span></div>
+  </div>
+</div>
+
+<!-- ── Footer ─────────────────────────────────────────────── -->
+<div class="footer">
+  <div><b>Simulation prototype.</b> Every number on this poster is a simulated measurement or a model parameter; we claim no live-network measurements. Baselines are modelled on RFC 8684 (MPTCP), 3GPP TS 23.501 (ATSSS) and 3GPP TS 38.323 (PDCP duplication); the hover budgets follow 3GPP TS 22.125.</div>
+  <div><b>AI-use declaration (ATP 2026 FAQ 09):</b> Anthropic Claude assisted with the code, documentation, deck, video and this poster; the video narration is an AI voice. The concept, the design choices and the review of results are the team's own.</div>
+  <div class="r"><b>Team FlexiPath (Tarot Club) · Al Ain University</b><br>flexipath.vercel.app · Stand 27 · ATP 2026 EDGE track</div>
+</div>
+
+<div class="corner" style="left:18mm;top:113mm;border-right:0;border-bottom:0"></div>
+<div class="corner" style="right:18mm;top:113mm;border-left:0;border-bottom:0"></div>
+</div></body></html>
