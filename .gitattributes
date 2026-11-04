@@ -2,3 +2,5 @@
 *.glb binary
 *.png binary
 *.jpg binary
+# Archived benchmark CSVs are compared byte for byte (CRLF, RFC 4180): keep them exactly as written
+results/published/**/*.csv -text
