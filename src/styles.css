@@ -1796,6 +1796,13 @@ body {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+/* Projector heights (1366×768, 1280×720; D-03): the twin gives up height so the open step timeline or the charts
+   row fit on the screen without scrolling (the shell still scrolls below this). */
+@media (min-width: 1280px) and (max-height: 900px) {
+  .fp-shell .fp-main {
+    min-height: 340px;
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *,
