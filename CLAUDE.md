@@ -66,7 +66,7 @@ the tests and the benchmark:
 
 In the browser, URL parameters on `simulator.html` give reproducible states (`index.html` forwards any link that carries
 one of them to the simulator): `?scenario=A&seed=2026&speed=90&mode=advanced&focus=legacy
-&camera=overview&intro=0&paused=1` (`paused` only applies with `intro=0`); `demo=1` starts the guided demo, `kiosk=1`
+&camera=overview&intro=0&paused=1` (`paused` only applies with `intro=0`); `demo=1` starts the guided demo, `demo=3min` the timed tour (`GuidedDemo.quick`: `QUICK_DWELL_MS` per card, no panel walks, no scenario card, no replay), `kiosk=1`
 (unattended screen: engine runs behind the intro, `startKiosk()` starts the demo after 8 s, `GuidedDemo.kiosk` steps paused
 cards on after 9 s and replays from the end card; the first key / click / wheel turns it off),
 `models=procedural` forces the primitive models and `look=twin` starts in the neon look. `window.flexipath` exposes `{ engine, dashboard, sceneManager,

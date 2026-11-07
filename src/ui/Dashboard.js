@@ -921,7 +921,8 @@ export class Dashboard {
   }
 
   /** The guided demo (GuidedDemo.js): the full mission, paused at each real decision until the visitor continues. */
-  startDemo() {
+  startDemo({ quick = false } = {}) {
+    this.demo.quick = quick;
     this.demo.start();
   }
 
