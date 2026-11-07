@@ -911,8 +911,11 @@ Stack: Vite 8 · Three.js r186 · Chart.js 4 · Tailwind CSS 4 · Lucide.
   the same PHY curves as the link model, without fading.
 - **Head-of-line**: critical and real-time flows are packet-level; bulk TCP is an analytical per-tick model (loss
   repair by fast retransmit or RTO), not a packet-level TCP implementation.
-- **Tunnel**: the relay is assumed close to the drone's networks (no extra relay latency); addresses are illustrative
+- **Tunnel**: "authenticated" is an assumption. The model has no cryptography, key exchange or replay protection;
+  a real build would use an existing tunnel such as WireGuard or QUIC. The relay is assumed close to the drone's networks (no extra relay latency); addresses are illustrative
   (`198.51.100.0/24` is RFC 5737 documentation space, `100.64.0.0/10` is RFC 6598 CGNAT space).
+- **The LEO link is always available** in the model (a satellite is always in view; only its SNR and RTT vary). Real
+  terminals have obstruction, satellite handovers and 15 s reconfigurations, so the LEO fallback is the best case.
 - **Drone altitude**: the drones fly a low-altitude corridor above the route, and the radio model is the ground-level
   model evaluated on the corridor centre-line; altitude effects (cell antennas tilted down, line-of-sight interference
   from many cells, air-to-ground fading) are not modelled. The altitude shown in the 3D twin is visual only.
