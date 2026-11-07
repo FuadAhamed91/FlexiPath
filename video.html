@@ -9,12 +9,6 @@
     <title>FlexiPath · The two-minute video</title>
     <meta name="description" content="A two-minute video of the FlexiPath prototype: a drone keeps its command link while it flies between Wi-Fi, 5G and LEO satellite." />
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&family=Orbitron:wght@700;800&display=swap"
-      rel="stylesheet"
-    />
     <link rel="stylesheet" href="/src/landing/landing.css" />
     <script type="module" src="/src/landing/video.js"></script>
   </head>
@@ -66,6 +60,35 @@
         };
         v.addEventListener('error', show, true);
         v.querySelector('source').addEventListener('error', show);
+      })();
+    </script>
+    <script>
+      // D-02: a page opened by double-click (file://) cannot load its module scripts and stylesheet, so it stays
+      // blank. This classic inline script still runs there: it tells the visitor to serve the folder over HTTP.
+      (function () {
+        if (location.protocol !== 'file:') return;
+        function show() {
+          var splash = document.getElementById('boot-splash');
+          if (splash) splash.style.display = 'none';
+          var box = document.createElement('div');
+          box.id = 'file-protocol-notice';
+          box.setAttribute('role', 'alert');
+          box.style.cssText = 'position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:24px;background:#0b1220;color:#e2e8f0;font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif';
+          box.innerHTML =
+            '<div style="max-width:640px">' +
+            '<div style="font-weight:800;letter-spacing:.12em;color:#22d3ee;margin-bottom:8px">FLEXIPATH</div>' +
+            '<h1 style="font-size:24px;margin:0 0 12px;color:#fff">Open this page through a local web server</h1>' +
+            '<p style="margin:0 0 12px">The browser opened this file directly (file://). In this mode it blocks the module scripts and the stylesheet, so the simulator can not start.</p>' +
+            '<p style="margin:0 0 8px">In a terminal, in the folder that holds this file, run:</p>' +
+            '<pre style="margin:0 0 8px;padding:10px 12px;background:#1e293b;border-radius:6px;color:#a5f3fc;white-space:pre-wrap">sh serve.sh</pre>' +
+            '<p style="margin:0 0 8px">or</p>' +
+            '<pre style="margin:0 0 12px;padding:10px 12px;background:#1e293b;border-radius:6px;color:#a5f3fc;white-space:pre-wrap">python3 -m http.server 8000</pre>' +
+            '<p style="margin:0">Then open <b>http://localhost:8000/</b> (guided demo: <b>http://localhost:8000/simulator.html?demo=1</b>). From the project folder, <b>npm run serve</b> builds and serves the site. README.txt has the details.</p>' +
+            '</div>';
+          document.body.appendChild(box);
+        }
+        if (document.body) show();
+        else document.addEventListener('DOMContentLoaded', show);
       })();
     </script>
   </body>

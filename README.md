@@ -32,17 +32,21 @@ this; scenario H tests what an out-of-date map costs.
 
 **Existing mechanisms.** FlexiPath is also compared with two existing seamless-connectivity designs:
 
-- **Reactive multipath**: MPTCP with a backup subflow (RFC 8684), or 3GPP ATSSS active-standby.
+- **Reactive multipath**: MPTCP with a backup subflow (RFC 8684), or 3GPP ATSSS active-standby. It runs twice: with
+  its own 250 ms detection of a lost link, and with FlexiPath's 60 ms, so that no result rests on the detection
+  constant alone.
 - **Always duplicate**: the MPTCP redundant scheduler, or 3GPP PDCP duplication.
 
-Both are modelled as baselines and run on the same seeds as FlexiPath and Legacy. The analysis of the references is in
+They are modelled as baselines and run on the same seeds as FlexiPath and Legacy. The analysis of the references is in
 [docs/existing-mechanisms.md](docs/existing-mechanisms.md), and the evidence-based guidelines in
 [docs/qos-qoe-guidelines.md](docs/qos-qoe-guidelines.md).
 
 **How the claims are tested.** Besides the baselines, every benchmark flies three **ablations** (FlexiPath with trend
 prediction, the duplication burst or the coverage map switched off), reports **prediction precision and recall**, and
-can be re-run once on a **held-out block of seeds** never used while building or tuning FlexiPath. The negative results
-are reported too: in this model the 400 ms burst adds no measurable reliability, and a stale map costs throughput.
+is re-run on a **held-out block of seeds** never used while building or tuning FlexiPath; the headline comes from that
+block, with confidence intervals that resample whole seeds. The negative results are reported too: in this model the
+400 ms burst adds no measurable reliability, FlexiPath gives up 15–28 % throughput in the shadow scenarios G and H,
+and a stale map costs throughput.
 
 ---
 
@@ -89,132 +93,201 @@ existing-mechanisms comparison on the same runs.
 ## Measured results (simulation)
 
 `npm run benchmark` runs scenarios A–H, 5 seeds × 4 speeds (30/60/90/120 km/h): 20 paired runs per scenario. In each run
-FlexiPath and Legacy fly together on the same seed, route, RF field and fault timing, and by default the two
+FlexiPath and Legacy fly together on the same seed, route, RF field and fault timing, and by default the three
 existing-mechanism baselines and the three FlexiPath ablations fly alongside them. Values are means over the 20 pairs.
 The baselines have their own random streams and the ablations replay FlexiPath's, so the FlexiPath and Legacy values
-below are identical with or without them (`--baselines none --ablations none`); A–F are unchanged from the release
-before G and H were added.
+below are identical with or without them (`--baselines none --ablations none`).
 
-**Continuity**
+**Archived data.** The raw CSVs behind every table in this section are committed in
+[`results/published/`](results/published/MANIFEST.md): ten runs, each on the development and the held-out seeds: the
+default (speed-consistent) hover rule, the 300 ms and the 1 s rule at every speed, the 260 ms modem wake and the 60 ms
+reactive RTO. The data was produced at commit `ec5378940279eb494a9e7be1aacd020de39cf276`;
+[MANIFEST.md](results/published/MANIFEST.md) gives the date, the exact commands, the seed blocks and SHA-256 sums. To
+check a number, check out that commit (or any later one that does not change `src/simulation`) and run the same
+command: the runs are deterministic, so the CSVs are byte-identical (`npm run test:full` does this for you). When the
+model changes, re-run the commands in the manifest into `results/published/`, put the new commit hash here and in the
+manifest, and update the tables.
+
+**Hover rule.** A drone hovers (fail-safe) when its C2 link is silent too long. The benchmark uses a speed-consistent
+rule, after 3GPP TS 22.125: **300 ms at ≤ 60 km/h** (stick steering, which the standard specifies up to 60 km/h) and
+**1 s above 60 km/h** (waypoint flight). The pure 300 ms rule at every speed is kept as a sensitivity run
+(`--failsafe-ms 300`), see [The hover rule](#the-hover-rule-piloted-vs-waypoint-flight).
+
+**Seeds.** The headline and the four-stack comparison use the **held-out seed block** (`--seed-block test`: seeds
+`900001 + 7919·i`, never used while FlexiPath was built or tuned). The detail tables (continuity, Phase 2, reliability
+per watt, ablation, prediction) use the **development block** (`1000 + 7919·i`, the default), on which FlexiPath was
+tuned; [Held-out seeds](#held-out-seeds) compares the two blocks.
+
+**Confidence intervals.** The four speeds of one seed share its RF field and faults, so the seed is the unit of
+independence: 5 seeds per block, not 20 independent runs. The 95 % intervals in brackets come from a bootstrap that
+resamples whole seeds (seed-clustered); the benchmark writes them to every CSV next to the Student-t interval over runs
+(`± …`).
+
+### Headline (held-out seeds)
+
+Pooled over scenarios A–D, G and H (120 paired runs: 5 held-out seeds × 4 speeds × 6 scenarios; E repeats A's C2
+numbers and F has no C2), the benchmark's `_headline.csv`:
+
+| FlexiPath against | Critical C2 loss, FlexiPath / baseline | Fewer critical packets lost | Critical delivery | Radio power | Mean throughput | Runs FlexiPath better / worse |
+| --- | --- | --- | --- | --- | --- | --- |
+| Reactive multipath (250 ms detection) | 1.49 % / 2.40 % | **38 %** [33, 42] | +0.91 pp [+0.77, +1.06] | +0.12 W [+0.11, +0.13] | −5.2 Mbit/s [−5.7, −4.9] | 117 / 3 |
+| Reactive multipath, **60 ms detection** (as FlexiPath) | 1.49 % / 2.12 % | **30 %** [25, 35] | +0.63 pp [+0.51, +0.78] | +0.12 W [+0.11, +0.13] | −5.4 Mbit/s [−5.8, −5.0] | 114 / 5 |
+| Always duplicate | 1.49 % / 0.60 % | −149 % (loses 2.5× more) | −0.89 pp [−0.98, −0.82] | −1.74 W [−1.76, −1.72] | −5.3 Mbit/s [−5.9, −4.9] | 7 / 112 |
+
+**In words:** on held-out seeds, FlexiPath loses 38 % fewer critical C2 packets than reactive multipath, and 30 % fewer
+when the reactive baseline detects a lost link as fast as FlexiPath (60 ms), for about 0.12 W more radio power. It
+pays for it with throughput in the shadow scenarios (15–28 % less than reactive multipath in G and H, below). These
+numbers assume a spare modem that **wakes in 100 ms** (a fast-resume state). With the measured **260 ms** LTE wake the
+reductions grow to 42 % and 36 %, but FlexiPath then hovers on half of the flights in D and H
+([Sensitivity](#sensitivity-a-slower-modem-wake)).
+
+On the development seeds the same pooled figures are 37.3 % [33.5, 40.0] against reactive multipath and 29.1 %
+[24.9, 32.1] against the 60 ms variant (118 / 2 and 111 / 8 runs).
+
+**Continuity** (development seeds)
 
 | Scenario | Simulated interruption (s) LG / FP | Critical packets delivered (%) LG / FP | Voice MOS LG / FP | FP replication overhead: protected / all bytes | Action vs. path failure (s) LG / FP |
 | --- | --- | --- | --- | --- | --- |
-| A · Wi-Fi → 5G | 3.80 / 0.00 | 84.9 / 99.0 | 3.71 / 4.30 | 1.11 % / 0.005 % | +1.43 / −3.38 |
-| B · Wi-Fi → 5G → LEO | 7.52 / 0.00 | 84.1 / 98.6 | 3.66 / 4.25 | 1.24 % / 0.007 % | +1.92 / −3.78 |
-| C · 5G degradation → LEO | 3.73 / 0.00 | 82.8 / 98.2 | 3.59 / 4.22 | 1.36 % / 0.009 % | +2.27 / −4.60 |
-| D · Multiple degradation | 16.37 / 0.16 | 77.3 / 98.2 | 3.38 / 4.19 | 0.90 % / 0.006 % | +1.00 / −1.25 |
-| E · Critical traffic only | 3.80 / 0.00 | 84.9 / 99.0 | 3.71 / 4.30 | 1.11 % / 1.11 % | +1.43 / −3.38 |
+| A · Wi-Fi → 5G | 3.80 / 0.00 | 83.8 / 99.0 | 3.67 / 4.30 | 1.20 % / 0.005 % | +1.43 / −3.38 |
+| B · Wi-Fi → 5G → LEO | 7.37 / 0.00 | 83.5 / 98.6 | 3.66 / 4.25 | 1.33 % / 0.007 % | +1.94 / −3.78 |
+| C · 5G degradation → LEO | 3.63 / 0.00 | 82.4 / 98.3 | 3.60 / 4.22 | 1.46 % / 0.010 % | +2.27 / −4.60 |
+| D · Multiple degradation | 16.77 / 0.16 | 74.8 / 98.2 | 3.28 / 4.20 | 0.95 % / 0.006 % | +0.99 / −1.25 |
+| E · Critical traffic only | 3.80 / 0.00 | 83.8 / 99.0 | 3.67 / 4.30 | 1.20 % / 1.197 % | +1.43 / −3.38 |
 | F · Bulk traffic only | 3.80 / 0.00 | — (no packet flows) | — (no voice) | 0 % / 0 % | +1.43 / −3.38 |
-| G · Radio shadow on the route | 7.88 / 0.00 | 79.5 / 98.6 | 3.47 / 4.25 | 1.84 % / 0.010 % | +0.41 / −3.15 |
-| H · Coverage map out of date | 8.26 / 0.10 | 77.8 / 98.2 | 3.40 / 4.18 | 2.62 % / 0.016 % | +0.58 / −3.47 |
+| G · Radio shadow on the route | 6.93 / 0.00 | 79.3 / 98.5 | 3.46 / 4.24 | 2.22 % / 0.012 % | +0.29 / −3.15 |
+| H · Coverage map out of date | 7.88 / 0.10 | 76.4 / 98.1 | 3.34 / 4.17 | 3.00 % / 0.019 % | +0.64 / −3.47 |
 
-**Battery · ordering · session (Phase 2)**
+**Battery · ordering · session (Phase 2)** (development seeds)
 
 | Scenario | Mean radio power (W) LG / FP | Radio energy per journey (J) LG / FP | FP burst time (s) | Late duplicates discarded (FP) | Bulk HoL mean (ms) LG / FP | Bulk HoL peak (ms) LG / FP | TCP timeout stalls LG / FP | Client IP changes seen remotely LG / FP |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| A | 1.216 / 1.315 | 42.8 / 39.0 | 0.40 | 43 | 7.6 / 1.2 | 390 / 102 | 15.0 / 0.5 | 1.00 / 0 |
-| B | 1.216 / 1.315 | 88.1 / 81.7 | 0.84 | 102 | 7.8 / 2.5 | 411 / 133 | 27.4 / 0.6 | 1.95 / 0 |
-| C | 1.217 / 1.316 | 43.4 / 40.8 | 0.40 | 54 | 8.3 / 3.1 | 394 / 65 | 12.3 / 0.0 | 0.95 / 0 |
-| D | 1.221 / 1.254 | 113.6 / 90.7 | 1.00 | 111 | 6.4 / 3.9 | 421 / 257 | 25.8 / 2.2 | 5.20 / 0 |
-| E | 1.216 / 1.315 | 42.8 / 39.0 | 0.40 | 43 | — (no bulk) | — | — | 1.00 / 0 |
-| F | 1.221 / 1.315 | 36.3 / 39.0 | 0.40 | 0 | 9.1 / 1.1 | 390 / 102 | 15.0 / 0.5 | 1.00 / 0 |
-| G | 1.218 / 1.346 | 54.7 / 43.7 | 0.80 | 97 | 4.4 / 2.5 | 267 / 93 | 9.3 / 0.2 | 2.60 / 0 |
-| H | 1.220 / 1.388 | 54.6 / 44.8 | 1.18 | 133 | 6.2 / 3.4 | 390 / 197 | 12.3 / 0.7 | 2.70 / 0 |
+| A | 1.218 / 1.315 | 41.4 / 38.9 | 0.40 | 42 | 8.0 / 1.2 | 390 / 102 | 14.9 / 0.5 | 1.00 / 0 |
+| B | 1.217 / 1.315 | 85.4 / 81.7 | 0.84 | 102 | 8.0 / 2.4 | 420 / 133 | 27.4 / 0.6 | 1.75 / 0 |
+| C | 1.218 / 1.316 | 42.1 / 40.8 | 0.40 | 54 | 8.5 / 3.1 | 394 / 65 | 12.2 / 0.0 | 0.80 / 0 |
+| D | 1.224 / 1.254 | 109.2 / 90.7 | 1.00 | 111 | 6.9 / 3.9 | 447 / 257 | 25.4 / 2.2 | 5.15 / 0 |
+| E | 1.218 / 1.315 | 41.4 / 38.9 | 0.40 | 42 | — (no bulk) | — | — | 1.00 / 0 |
+| F | 1.221 / 1.315 | 36.2 / 38.9 | 0.40 | 0 | 9.1 / 1.1 | 390 / 102 | 14.9 / 0.5 | 1.00 / 0 |
+| G | 1.218 / 1.346 | 49.6 / 43.7 | 0.80 | 97 | 3.1 / 2.7 | 183 / 93 | 6.5 / 0.2 | 2.35 / 0 |
+| H | 1.220 / 1.388 | 51.2 / 44.8 | 1.18 | 133 | 6.6 / 3.7 | 390 / 197 | 12.2 / 0.7 | 2.60 / 0 |
 
 How to read it:
 
 - **Interruption** is the time every flow was cut off. Each legacy break lasts a model-defined time (3.8 s, see below),
   so this row measures how *often* each stack breaks the session. FlexiPath's 0.16 s in D is an abrupt cell outage that
-  no trend predicted: 60 ms detection + 100 ms to wake the sleeping fallback modem from DRX.
+  no trend predicted: 60 ms detection + 100 ms to wake the sleeping fallback modem from DRX. Both are model parameters;
+  the 60 ms is an assumed constant, not a simulated probe ([limitations](#modelling-notes-and-limitations)).
 - **Action vs. path failure** compares when each stack acted with the instant the path it was leaving actually failed
   (EWMA of the true loss > 15 % or link down). Negative = acted before the failure.
 - **Overhead** is replicated bytes / original bytes. Replication is confined to the ~400 ms handoff burst, so it costs
-  ≈ 1 % of protected-flow bytes (Phase 1 replicated for the whole risk window: 6–13 %). E (only protected traffic)
-  shows the cost side; F shows that bulk traffic is never duplicated. E matches A in every C2 and voice number: in
-  this model the uploads never take capacity from C2 or voice, so removing them changes only the bulk and all-traffic
-  figures.
+  1.0–1.5 % of protected-flow bytes in A–E and 2.2–3.0 % in G and H (Phase 1 replicated for the whole risk window:
+  6–13 %). E (only protected traffic) shows the cost side; F shows that bulk traffic is never duplicated. E matches A in
+  every C2 and voice number: in this model the uploads never take capacity from C2 or voice, so removing them changes
+  only the bulk and all-traffic figures.
 - **Radio power**: FlexiPath draws ≈ 8 % more radio power on average than the single-radio legacy stack (1.32 vs
   1.22 W in A–C) — the price of warm-probing the next modem (1.8 W) and of the 400 ms dual-radio burst (3.4 W). Keeping
   both radios on all the time would cost 3.4 W. **Radio energy per journey** is lower for FlexiPath in A–E only because
   the legacy drone stops and hovers (fail-safe) and arrives later; in F (no C2 telemetry, so no hover and identical
-  journey times) FlexiPath uses 7 % more energy (39.0 vs 36.3 J). Both are reported.
+  journey times) FlexiPath uses 7 % more energy (38.9 vs 36.2 J). Both are reported.
 - **Head-of-line**: the critical / real-time HoL stall is **0 ms in every run** — the receiver delivers the first copy
   of each sequence number and discards the late duplicate. Bulk HoL comes from the TCP model: a loss that fast
   retransmit cannot repair stalls the legacy stream for a retransmission timeout (200–500 ms); FlexiPath's bulk stays on
   a healthy path and is paced across the burst.
 - **IP changes**: remote services only ever see FlexiPath's anchor relay; the legacy stack's source address changes at
   every reattach, and each change resets its TCP sessions (4 sockets per break).
-- The CSV export adds per-metric standard deviations and the 95 % confidence interval of each paired difference.
+- The CSV export adds per-metric standard deviations, the Student-t 95 % interval of each paired difference and the
+  seed-clustered bootstrap interval.
 
 ### Comparison with existing mechanisms
 
-Same benchmark and runs. The analysis and the full tables, with 95 % confidence intervals, are in
-[docs/existing-mechanisms.md](docs/existing-mechanisms.md).
+Same benchmark, **held-out seeds** (`npm run benchmark -- --seed-block test`), speed-consistent hover rule. The
+analysis of the references is in [docs/existing-mechanisms.md](docs/existing-mechanisms.md); its tables predate the
+60 ms baseline and the speed-consistent rule (they use the development seeds and the 300 ms rule at every speed).
 
-Each cell reads **Legacy · Reactive multipath · Always duplicate · FlexiPath**:
-- **Reactive multipath**: MPTCP backup subflow / ATSSS active-standby.
+Each cell reads **Legacy · Reactive multipath · Reactive multipath, 60 ms detection · Always duplicate · FlexiPath**:
+- **Reactive multipath**: MPTCP backup subflow / ATSSS active-standby. It leaves a path after 15 % loss for one 250 ms
+  retransmission timeout, and notices a dropped link after the same 250 ms.
+- **Reactive multipath, 60 ms detection**: the same design, but it notices a dropped link after 60 ms, FlexiPath's
+  detection time. It replays the default baseline's random streams, so the difference between the two comes only
+  from the detection time.
 - **Always duplicate**: redundant scheduler / PDCP duplication.
 
-| Scenario | Flights that kept C2 (%) | Interruption (s) | Critical delivered (%) | Voice MOS | Duplicate bytes, protected flows (%) | Mean radio power (W) |
-| --- | --- | --- | --- | --- | --- | --- |
-| A · Wi-Fi → 5G | 0 · 100 · 100 · 100 | 3.80 · 0.00 · 0.00 · 0.00 | 84.9 · 98.3 · 100.0 · 99.0 | 3.71 · 4.23 · 4.38 · 4.30 | 0 · 0 · 99.7 · 1.1 | 1.22 · 1.20 · 3.39 · 1.31 |
-| B · Wi-Fi → 5G → LEO | 0 · 100 · 100 · 100 | 7.52 · 0.00 · 0.00 · 0.00 | 84.1 · 97.8 · 99.5 · 98.6 | 3.66 · 4.16 · 4.33 · 4.25 | 0 · 0 · 73.4 · 1.2 | 1.22 · 1.20 · 3.13 · 1.31 |
-| C · 5G degradation → LEO | 0 · 100 · 100 · 100 | 3.73 · 0.00 · 0.00 · 0.00 | 82.8 · 97.5 · 99.3 · 98.2 | 3.59 · 4.12 · 4.30 · 4.22 | 0 · 0 · 64.5 · 1.4 | 1.22 · 1.20 · 2.85 · 1.32 |
-| D · Multiple degradation | 0 · 0 · 100 · 100 | 16.37 · 0.68 · 0.00 · 0.16 | 77.3 · 97.0 · 99.0 · 98.2 | 3.38 · 4.10 · 4.27 · 4.19 | 0 · 0 · 49.0 · 0.9 | 1.22 · 1.20 · 2.65 · 1.25 |
-| E · Critical traffic only | 0 · 100 · 100 · 100 | 3.80 · 0.00 · 0.00 · 0.00 | 84.9 · 98.3 · 100.0 · 99.0 | 3.71 · 4.23 · 4.38 · 4.30 | 0 · 0 · 99.7 · 1.1 | 1.22 · 1.20 · 3.39 · 1.31 |
-| F · Bulk traffic only | — (no C2) | 3.80 · 0.00 · 0.00 · 0.00 | — | — | 0 · 0 · 0 · 0 | 1.22 · 1.20 · 1.20 · 1.31 |
-| G · Radio shadow on the route | 0 · 0 · 40 · 100 | 7.88 · 0.39 · 0.21 · 0.00 | 79.5 · 97.8 · 99.2 · 98.6 | 3.47 · 4.18 · 4.31 · 4.25 | 0 · 0 · 93.6 · 1.8 | 1.22 · 1.21 · 3.20 · 1.35 |
-| H · Coverage map out of date | 0 · 0 · 100 · 100 | 8.26 · 0.35 · 0.00 · 0.10 | 77.8 · 97.5 · 99.8 · 98.2 | 3.40 · 4.14 · 4.37 · 4.18 | 0 · 0 · 93.7 · 2.6 | 1.22 · 1.21 · 3.21 · 1.39 |
+| Scenario | Flights that kept C2 (%) | Longest gap (s) | Critical delivered (%) | Voice MOS |
+| --- | --- | --- | --- | --- |
+| A · Wi-Fi → 5G | 0 · 100 · 100 · 100 · 100 | 3.80 · 0.00 · 0.00 · 0.00 · 0.00 | 83.7 · 98.2 · 98.2 · 100.0 · 99.1 | 3.67 · 4.22 · 4.22 · 4.38 · 4.29 |
+| B · Wi-Fi → 5G → LEO | 0 · 100 · 100 · 100 · 100 | 3.80 · 0.00 · 0.00 · 0.00 · 0.00 | 83.3 · 97.8 · 97.8 · 99.4 · 98.6 | 3.65 · 4.17 · 4.17 · 4.33 · 4.24 |
+| C · 5G degradation → LEO | 0 · 100 · 100 · 100 · 100 | 3.77 · 0.00 · 0.00 · 0.00 · 0.00 | 82.3 · 97.7 · 97.7 · 99.3 · 98.4 | 3.60 · 4.15 · 4.15 · 4.31 · 4.23 |
+| D · Multiple degradation | 0 · 50 · 95 · 100 · 100 | 3.80 · 0.35 · 0.16 · 0.00 · 0.16 | 74.7 · 97.0 · 97.5 · 99.0 · 98.2 | 3.28 · 4.09 · 4.13 · 4.27 · 4.19 |
+| E · Critical traffic only | 0 · 100 · 100 · 100 · 100 | 3.80 · 0.00 · 0.00 · 0.00 · 0.00 | 83.7 · 98.2 · 98.2 · 100.0 · 99.1 | 3.67 · 4.22 · 4.22 · 4.38 · 4.29 |
+| F · Bulk traffic only | — (no C2) | 3.80 · 0.00 · 0.00 · 0.00 · 0.00 | — | — |
+| G · Radio shadow on the route | 0 · 50 · 95 · 80 · 100 | 3.80 · 0.35 · 0.16 · 0.24 · 0.00 | 78.7 · 97.6 · 98.1 · 99.0 · 98.6 | 3.44 · 4.17 · 4.20 · 4.29 · 4.23 |
+| H · Coverage map out of date | 0 · 50 · 100 · 100 · 100 | 3.80 · 0.35 · 0.16 · 0.00 · 0.10 | 76.7 · 97.2 · 97.8 · 99.8 · 98.2 | 3.36 · 4.13 · 4.16 · 4.36 · 4.15 |
 
-"Kept C2" counts the flights in which the C2 link was never silent long enough (> 300 ms, the piloted-flight rule) to
-force the fail-safe hover. [The hover rule](#the-hover-rule-piloted-vs-waypoint-flight) below adds the waypoint-flight
-rule (1 s), derived from the 1 s latency that 3GPP TS 22.125 gives for steer-to-waypoint C2. The 300 ms
-piloted-flight rule is our own conservative choice; TS 22.125 defines no hover or lost-link timeout.
+| Scenario | Mean throughput (Mbit/s) | Mean radio power (W) | Radio energy per journey (J) | Duplicate bytes, protected flows (%) |
+| --- | --- | --- | --- | --- |
+| A · Wi-Fi → 5G | 77.8 · 90.1 · 90.1 · 90.3 · 93.2 | 1.22 · 1.20 · 1.20 · 3.39 · 1.32 | 41.4 · 35.9 · 35.9 · 101.3 · 39.0 | 0 · 0 · 0 · 99.6 · 1.2 |
+| B · Wi-Fi → 5G → LEO | 64.4 · 69.6 · 69.6 · 69.8 · 70.7 | 1.22 · 1.20 · 1.20 · 3.11 · 1.30 | 85.8 · 75.4 · 75.4 · 194.8 · 81.1 | 0 · 0 · 0 · 75.8 · 1.3 |
+| C · 5G degradation → LEO | 50.6 · 56.0 · 56.0 · 56.0 · 55.9 | 1.22 · 1.20 · 1.20 · 2.83 · 1.30 | 42.4 · 37.7 · 37.7 · 88.1 · 40.4 | 0 · 0 · 0 · 65.8 · 1.4 |
+| D · Multiple degradation | 52.5 · 58.0 · 58.3 · 58.1 · 59.1 | 1.22 · 1.20 · 1.20 · 2.64 · 1.27 | 109.3 · 86.2 · 86.1 · 197.1 · 91.5 | 0 · 0 · 0 · 51.4 · 1.0 |
+| E · Critical traffic only | 0.3 · 0.4 · 0.4 · 0.4 · 0.4 | 1.22 · 1.20 · 1.20 · 3.39 · 1.32 | 41.4 · 35.9 · 35.9 · 101.3 · 39.0 | 0 · 0 · 0 · 99.6 · 1.2 |
+| F · Bulk traffic only | 77.0 · 91.5 · 91.5 · 91.5 · 95.2 | 1.22 · 1.20 · 1.20 · 1.20 · 1.32 | 36.2 · 35.9 · 35.9 · 35.9 · 39.0 | 0 · 0 · 0 · 0 · 0 |
+| G · Radio shadow on the route | 68.8 · 82.6 · 82.9 · 82.5 · **70.3** | 1.22 · 1.21 · 1.21 · 3.20 · 1.34 | 50.1 · 39.7 · 39.7 · 105.6 · 43.6 | 0 · 0 · 0 · 92.8 · 2.2 |
+| H · Coverage map out of date | 68.1 · 86.3 · 86.5 · 86.3 · **62.0** | 1.22 · 1.21 · 1.21 · 3.20 · 1.38 | 50.4 · 39.7 · 39.7 · 105.7 · 44.8 | 0 · 0 · 0 · 92.8 · 3.1 |
+
+"Kept C2" counts the flights in which the C2 link was never silent long enough to force the fail-safe hover under the
+speed-consistent rule (300 ms at ≤ 60 km/h, 1 s above; [The hover rule](#the-hover-rule-piloted-vs-waypoint-flight)).
+The 300 ms piloted-flight threshold is our own conservative choice; TS 22.125 defines no hover or lost-link timeout.
 
 - **Anchoring removes the interruption.** Every anchored stack removes the legacy interruption, all TCP resets and all
   remote-visible IP changes in the predictable handovers.
-- **Prediction adds the remaining reliability** (the ablation below isolates it). Against reactive multipath, FlexiPath:
-  - loses 25–40 % fewer critical packets (+0.6 to +1.2 pp delivery; 95 % CIs exclude zero);
-  - raises MOS by 0.07–0.10;
-  - halves the unpredictable outage's gap in D (0.16 vs 0.35 s, inside the 300 ms fail-safe budget);
-  - acts 1.3–4.6 s before the failure instead of 0.3–0.5 s after.
-
-  The cost is about 0.1 W (≈ 9 %) more radio power.
-- **Permanent duplication is the most reliable but the most expensive.** It delivers 99–100 % of critical packets, but
-  draws 2.65–3.39 W (2.1–2.6× FlexiPath) and duplicates 49–100 % of protected bytes, against FlexiPath's ~1 %.
-- **A shared dead zone defeats the existing designs (G).** Wi-Fi and 5G die at the same place. Under the piloted rule,
-  reactive multipath (a 0.35 s gap) hovers on all 20 flights, and always duplicate, whose two copies die together, on
-  12 of 20. FlexiPath,
-  warned by the coverage map, is on the satellite before the shadow: 0 s gap, C2 kept on all 20 flights. The cost is
-  7.5 Mbps less mean throughput than flying without the map, from the extra time on the satellite.
-- **An out-of-date map costs, and does not help (H).** FlexiPath moves needlessly at the remembered canyon (21.8 Mbps
+- **Prediction adds reliability, but less than the detection constant suggests.** In A–C no path drops abruptly, so
+  both reactive baselines behave the same; there FlexiPath delivers +0.63 to +0.84 pp more critical packets (CIs
+  exclude zero) and acts 3.3–3.9 s before the failure. In D, G and H part of the lead came from the faster detection:
+  against the 60 ms variant FlexiPath's lead falls from +1.22 to +0.69 pp (D), +1.01 to +0.50 pp (G) and +0.97 to
+  +0.35 pp (H). All three still exclude zero on the held-out seeds. The cost is about 0.12 W (≈ 9 %) more radio power
+  and 3–6 J (6–13 %) more radio energy per journey than reactive multipath.
+- **Kept C2 with and without equal detection.** With its 250 ms detection, reactive multipath (a 0.35 s gap) hovers on
+  the 10 flights at ≤ 60 km/h in D, G and H, and FlexiPath on none. With 60 ms detection the gap is 0.16 s, the same
+  as FlexiPath's in D, and reactive multipath keeps C2 on 19 of 20 flights in D and G and on 20 of 20 in H. So the
+  "kept C2" difference in D and H comes from the detection constant, not from the FlexiPath design. Only G (the
+  mapped shadow, 0 s gap) and one flight in D remain.
+- **FlexiPath trades throughput for C2 continuity in G and H.** It moves to the slower satellite before the shadow
+  (G) or at the remembered canyon (H). Mean throughput: 70.3 vs 82.6 Mbit/s for reactive multipath in G (−15 %), and
+  62.0 vs 86.3 Mbit/s in H (−28 %), where it is also below the legacy stack's 68.1 Mbit/s. In A–D it is 0.3 % lower to
+  3.5 % higher than reactive multipath.
+- **Permanent duplication is the most reliable but the most expensive.** It delivers 99.0–100 % of critical packets, but
+  draws 2.64–3.39 W (2.1–2.6× FlexiPath) and duplicates 51–100 % of protected bytes, against FlexiPath's 1–3 %.
+- **A shared dead zone defeats the existing designs (G).** Wi-Fi and 5G die at the same place. Reactive multipath
+  hovers on 10 of 20 flights (19 of 20 kept with 60 ms detection), and always duplicate, whose two copies die together,
+  on 4 of 20. FlexiPath, warned by the coverage map, is on the satellite before the shadow: 0 s gap, C2 kept on all 20
+  flights. No baseline receives a map, so G shows the value of route foresight, not a like-for-like contest.
+- **An out-of-date map costs, and does not help (H).** FlexiPath moves needlessly at the remembered canyon (25.5 Mbit/s
   less mean throughput than without the map) and meets the new, unmapped shadow with an ordinary failover (0.10 s). It
   still keeps C2, as fast failover does without any map.
 
 ![Reliability vs radio power: critical packets delivered against mean radio power for always duplicate, FlexiPath and reactive multipath in scenarios A–D, G and H](public/landing/tradeoff.svg)
 
-FlexiPath sits between the two existing designs. It delivers 0.6–1.2 points more critical packets than reactive
-multipath for 0.05–0.18 W more, and 0.6–1.6 points fewer than always duplicate for 2.1–2.6× less power. The chart is drawn
-from the benchmark's `_mechanisms.csv` by `node scripts/tradeoff-chart.js`. E is left out (its C2 numbers equal A's)
-and so is F (no C2 traffic).
+On the development seeds FlexiPath sits between the two existing designs. It delivers 0.70–1.31 points more critical
+packets than reactive multipath for 0.05–0.18 W more, and 0.44–1.72 points fewer than always duplicate for
+2.1–2.6× less power. The chart is drawn from the default benchmark's `_mechanisms.csv` (development seeds) by
+`node scripts/tradeoff-chart.js`; it shows the 250 ms reactive baseline. E is left out (its C2 numbers equal A's) and
+so is F (no C2 traffic).
 
-**Reliability per extra watt.** Divide what a stack gains in critical delivery by the radio power it adds over its
-neighbour on the power axis. These are paired means; the benchmark writes them to `_efficiency.csv`.
+**Reliability per extra watt** (development seeds). Divide what a stack gains in critical delivery by the radio power
+it adds over its neighbour on the power axis. These are paired means; the benchmark writes them to `_efficiency.csv`.
 
-| Scenario | FlexiPath over reactive multipath | Always duplicate over FlexiPath |
-| --- | --- | --- |
-| A | +0.64 pp for +0.11 W = **5.7 pp/W** | +1.00 pp for +2.08 W = **0.5 pp/W** |
-| B | +0.79 pp for +0.11 W = **7.1 pp/W** | +0.83 pp for +1.81 W = **0.5 pp/W** |
-| C | +0.70 pp for +0.11 W = **6.2 pp/W** | +1.03 pp for +1.54 W = **0.7 pp/W** |
-| D | +1.22 pp for +0.05 W = **24.5 pp/W** | +0.77 pp for +1.39 W = **0.6 pp/W** |
-| G | +0.87 pp for +0.14 W = **6.2 pp/W** | +0.55 pp for +1.86 W = **0.3 pp/W** |
-| H | +0.73 pp for +0.18 W = **4.0 pp/W** | +1.62 pp for +1.82 W = **0.9 pp/W** |
+| Scenario | FlexiPath over reactive multipath | FlexiPath over reactive multipath, 60 ms detection | Always duplicate over FlexiPath |
+| --- | --- | --- | --- |
+| A | +0.70 pp for +0.11 W = **6.3 pp/W** | +0.70 pp for +0.11 W = **6.3 pp/W** | +1.00 pp for +2.08 W = **0.5 pp/W** |
+| B | +0.85 pp for +0.11 W = **7.6 pp/W** | +0.85 pp for +0.11 W = **7.6 pp/W** | +0.89 pp for +1.81 W = **0.5 pp/W** |
+| C | +0.77 pp for +0.11 W = **6.7 pp/W** | +0.77 pp for +0.11 W = **6.7 pp/W** | +1.07 pp for +1.54 W = **0.7 pp/W** |
+| D | +1.31 pp for +0.05 W = **26.3 pp/W** | +0.79 pp for +0.05 W = **15.8 pp/W** | +0.81 pp for +1.39 W = **0.6 pp/W** |
+| G | +1.00 pp for +0.14 W = **7.1 pp/W** | +0.40 pp for +0.14 W = **2.8 pp/W** | +0.44 pp for +1.86 W = **0.2 pp/W** |
+| H | +0.85 pp for +0.18 W = **4.7 pp/W** | +0.29 pp for +0.18 W = **1.6 pp/W** | +1.72 pp for +1.82 W = **0.9 pp/W** |
 
-Spent the FlexiPath way, an extra watt buys 4–7 points of critical delivery. In D it buys 24.5, because there FlexiPath
-draws only 0.05 ± 0.02 W more than reactive multipath. Spent on permanent duplication, the same watt buys 0.3–0.9
-points. That makes FlexiPath's watts 4.5 to 21 times more productive (44 times in D). A ratio is only as certain as its
-two differences; their 95 % confidence intervals are in
-[docs/existing-mechanisms.md](docs/existing-mechanisms.md).
+Spent the FlexiPath way, an extra watt buys 4.7–7.6 points of critical delivery over the 250 ms baseline (26.3 in D,
+because there FlexiPath draws only 0.05 W more), and 1.6–7.6 points over the 60 ms baseline (15.8 in D). Spent on
+permanent duplication, the same watt buys 0.2–0.9 points. A ratio is only as certain as its two differences; their
+intervals are in the `_mechanisms.csv`.
 
 ### The hover rule: piloted vs waypoint flight
 
@@ -223,64 +296,75 @@ for command and control of UAV operation") sets the requirement per control mode
 
 | Control mode (3GPP TS 22.125) | C2 message interval | End-to-end latency | Max ground speed | Hover rule used here |
 | --- | --- | --- | --- | --- |
-| Direct stick steering (piloted, with video) | 40 ms | 40 ms | 60 km/h | 300 ms (default): about 7 missed commands, so more lenient than the standard |
-| Steer to waypoints | ≥ 1 s | 1 s | 300 km/h | 1 s (`npm run benchmark -- --failsafe-ms 1000`) |
+| Direct stick steering (piloted, with video) | 40 ms | 40 ms | 60 km/h | 300 ms at ≤ 60 km/h (default): about 7 missed commands, so more lenient than the standard |
+| Steer to waypoints | ≥ 1 s | 1 s | 300 km/h | 1 s above 60 km/h (default); at every speed with `--failsafe-ms 1000` |
 
-Flights that kept C2 (%), **Legacy · Reactive multipath · Always duplicate · FlexiPath**, on the same seeds. The 90
-and 120 km/h runs are above the stick-steering speed limit, so they belong under the waypoint rule.
+The default rule is speed-consistent: the 90 and 120 km/h runs are above the stick-steering speed limit, so they use
+the waypoint rule. `--failsafe-ms 300` applies the piloted rule at every speed (a sensitivity run, stricter than the
+standard's scope), and `--failsafe-ms 1000` the waypoint rule at every speed.
 
-| Scenario | Piloted rule (300 ms) | Waypoint rule (1 s) |
-| --- | --- | --- |
-| A, B, C, E | 0 · 100 · 100 · 100 | 0 · 100 · 100 · 100 |
-| D · Multiple degradation | 0 · 0 · 100 · 100 | 0 · 100 · 100 · 100 |
-| G · Radio shadow on the route | 0 · 0 · 40 · 100 | 0 · 100 · 100 · 100 |
-| H · Coverage map out of date | 0 · 0 · 100 · 100 | 0 · 100 · 100 · 100 |
+Flights that kept C2 (%), **Legacy · Reactive multipath · Reactive multipath 60 ms · Always duplicate · FlexiPath**,
+held-out seeds (development seeds in brackets where they differ):
 
-- **Piloted flight:** FlexiPath is the only stack that keeps C2 on every flight of every scenario (with a modem kept in
-  a fast-resume state; with a 260 ms wake it hovers in D and most of H, see [Sensitivity](#sensitivity-a-slower-modem-wake)). Reactive multipath's
-  0.35 s gap (a 250 ms retransmission timeout plus a 100 ms modem wake) makes it hover in D, G and H.
-- **Waypoint flight:** every multipath stack keeps C2 everywhere; only the legacy stack's 3.6–3.8 s breaks force a
-  hover. FlexiPath's advantage is then the rest of the comparison: the shortest gaps of the low-power stacks (0–0.16 s
-  against reactive multipath's 0.35 s in D, G and H), more critical packets delivered than reactive multipath, and
-  2.1–2.6× less power than always duplicate.
-- **The standard is stricter than both rules.** Its 40 ms stick-steering budget would also catch FlexiPath's 0.16 s gap
-  in the abrupt outages of D and H. Only always duplicate rides through an unpredictable outage without a gap, at
+| Scenario | Speed-consistent rule (default) | 300 ms at every speed (sensitivity) | 1 s at every speed |
+| --- | --- | --- | --- |
+| A, B, C, E | 0 · 100 · 100 · 100 · 100 | 0 · 100 · 100 · 100 · 100 | 0 · 100 · 100 · 100 · 100 |
+| D · Multiple degradation | 0 · 50 · 95 · 100 · 100 | 0 · 0 · 95 (90) · 100 · 100 | 0 · 100 · 100 · 100 · 100 |
+| G · Radio shadow on the route | 0 · 50 · 95 · 80 (90) · 100 | 0 · 0 · 95 · 30 (40) · 100 | 0 · 100 · 100 · 100 · 100 |
+| H · Coverage map out of date | 0 · 50 · 100 · 100 · 100 | 0 · 0 · 100 · 100 · 100 | 0 · 100 · 100 · 100 · 100 |
+
+- **Speed-consistent rule:** FlexiPath keeps C2 on every flight of every scenario — **with a spare modem that wakes in
+  100 ms**; with the measured 260 ms wake it hovers on half of the flights in D and H ([Sensitivity](#sensitivity-a-slower-modem-wake)).
+  Reactive multipath's 0.35 s gap (a 250 ms detection plus a 100 ms modem wake) makes it hover on the 10 flights at
+  ≤ 60 km/h in D, G and H. With 60 ms detection it keeps C2 on 19–20 of 20 flights there. Always duplicate hovers on 4
+  of 20 flights in G (2 of 20 on the development seeds).
+- **300 ms at every speed:** the earlier headline rule. Reactive multipath then hovers on every flight of D, G and H,
+  and always duplicate on 14 of 20 in G (12 of 20 on the development seeds). The 60 ms variant still keeps C2 on 19–20
+  of 20 (18 of 20 in D on the development seeds). This row overstates the baselines' losses, because 90 and 120 km/h
+  are outside the stick-steering scope.
+- **1 s at every speed:** every multipath stack keeps C2 everywhere; only the legacy stack's 3.6–3.8 s breaks force a
+  hover.
+- **The standard is stricter than all three rules.** Its 40 ms stick-steering budget would also catch FlexiPath's 0.16 s
+  gap in the abrupt outages of D and H. Only always duplicate rides through an unpredictable outage without a gap, at
   2.1–2.6× the power. The standard also asks for 99.9 % C2 reliability within the latency; in this model, which never
   retransmits a lost C2 datagram, only always duplicate comes close (99.0–100 %).
-- Under the waypoint rule the multipath stacks' delivery and voice numbers move by at most 0.3 points and their power
-  by at most 0.01 W: a run ends when the last drone arrives, and the legacy drone now hovers for shorter stretches.
+- The hover rule changes the multipath stacks' delivery and power only a little: on the development seeds, pooled over
+  A–D, G and H, FlexiPath's critical-loss reduction against reactive multipath is 37 % under the speed-consistent rule
+  and 35 % under the 300 ms rule at every speed (30 % and 28 % against the 60 ms variant on the held-out seeds).
 
 ### Ablation: what each part contributes
 
-The same runs fly FlexiPath three more times with one part switched off. The ablations replay FlexiPath's own random
-streams (common random numbers), so the radio conditions are identical and any difference comes from the part that was
-switched off. Each cell is the change in critical packets lost per flight when the part is off (mean ± 95 % CI over the
-20 pairs; + = worse without it).
+Development seeds. The same runs fly FlexiPath three more times with one part switched off. The ablations replay
+FlexiPath's own random streams (common random numbers), so the radio conditions are identical and any difference
+comes from the part that was switched off. Each cell is the change in critical packets lost per flight when the part
+is off (mean over the 20 pairs, seed-clustered 95 % CI in brackets; + = worse without it).
 
 | Scenario | No trend prediction | No 400 ms burst | No coverage map |
 | --- | --- | --- | --- |
-| A · Wi-Fi → 5G | +10.2 ± 4.6 | −2.3 ± 2.0 | identical (nothing on the map) |
-| B · Wi-Fi → 5G → LEO | +30.1 ± 8.5 | −1.6 ± 3.1 | identical |
-| C · 5G → LEO | +16.9 ± 6.5 | +0.5 ± 1.5 | identical |
-| D · Multiple faults | +19.9 ± 14.3 | 0.0 ± 5.8 | identical |
-| E · Critical only | +10.2 ± 4.6 | −2.3 ± 2.0 | identical |
-| G · Radio shadow | 0.0 ± 0.3 | +0.4 ± 3.2 | +14.9 ± 4.5, and a 0.20 s gap; 1 flight hovers |
-| H · Stale map | +2.6 ± 4.2 | +3.1 ± 3.9 | −15.8 ± 6.8 (the stale map hurts) |
+| A · Wi-Fi → 5G | +9.6 [+6.9, +13.3] | −2.8 [−5.4, −0.3] | identical (nothing on the map) |
+| B · Wi-Fi → 5G → LEO | +30.1 [+22.7, +36.4] | −1.6 [−2.4, −0.7] | identical |
+| C · 5G → LEO | +16.9 [+11.8, +22.1] | +0.5 [−0.4, +1.4] | identical |
+| D · Multiple faults | +19.1 [+11.8, +26.6] | −0.7 [−7.7, +6.0] | identical |
+| E · Critical only | +9.6 [+6.9, +13.3] | −2.8 [−5.4, −0.3] | identical |
+| G · Radio shadow | −0.1 [−0.1, 0.0] | −0.1 [−1.6, +1.4] | +14.2 [+12.2, +16.9], and a 0.20 s gap; 1 flight hovers |
+| H · Stale map | +2.6 [0.0, +6.2] | +3.2 [−0.9, +6.3] | −15.5 [−20.6, −10.2] (the stale map hurts) |
 
 - **Trend prediction does the work in A–E.** Without it FlexiPath reacts to measured trouble only: it acts on 13–40 %
-  of the failures before they happen instead of 62–100 %, loses 0.16–0.46 pp more critical packets and 0.01–0.05 MOS,
+  of the failures before they happen instead of 62–100 %, loses 0.15–0.48 pp more critical packets and 0.02–0.05 MOS,
   and draws slightly *more* power (+0.004 to +0.040 W), because it reacts later and less cleanly.
-- **The coverage map does the work in G** (0.20 s → 0 s gap, 15 fewer critical packets lost, +0.05 MOS) at 7.5 Mbps of
-  throughput, and costs 21.8 Mbps for nothing when it is out of date (H).
-- **The 400 ms burst adds no measurable reliability in this model** (within ±0.1 pp in A–E) and costs 0.02–0.04 W. The
-  model has no switch-over transient on the new path (route convergence, NAT binding, a congestion window restarting),
-  which is what the burst insures against; it is kept as cheap insurance, and the claim is made no stronger than that.
+- **The coverage map does the work in G** (0.20 s → 0 s gap, 14 fewer critical packets lost, +0.07 MOS) at 9.0 Mbit/s
+  of throughput, and costs 24.5 Mbit/s for nothing when it is out of date (H).
+- **The 400 ms burst adds no measurable reliability in this model** (critical delivery within ±0.11 pp in A–E) and costs
+  0.02–0.04 W. In A, B and E its point estimate is slightly harmful (1.6–2.8 more packets lost with it). The model has
+  no switch-over transient on the new path (route convergence, NAT binding, a congestion window restarting), which is
+  what the burst insures against; it is kept as insurance for a transient the model does not include, and the claim is
+  made no stronger than that.
 
 ### Prediction quality
 
-Pooled over all 20 runs of a scenario. **Recall** = path failures FlexiPath acted on before they happened / all path
-failures (abrupt ones included). **Precision** = early moves that a real failure of the path followed (within 12 s) /
-all early moves. **Lead** = mean time from the action to the failure.
+Development seeds, pooled over all 20 runs of a scenario. **Recall** = path failures FlexiPath acted on before they
+happened / all path failures (abrupt ones included). **Precision** = early moves that a real failure of the path
+followed (within 12 s) / all early moves. **Lead** = mean time from the action to the failure.
 
 | Scenario | Recall | Recall without trend | Recall without map | Precision | Lead |
 | --- | --- | --- | --- | --- | --- |
@@ -298,34 +382,39 @@ the 35 predictable failures. In H the stale map's needless move lowers precision
 
 ### Held-out seeds
 
-Every number above uses the development seeds (`1000 + 7919·i`), the block FlexiPath was built and tuned on. The whole
-benchmark was re-run once on a held-out block (`npm run benchmark -- --seed-block test`: seeds `900001 + 7919·i`, never
-used before). The conclusions hold:
+The headline and the four-stack comparison above use the held-out block (`npm run benchmark -- --seed-block test`:
+seeds `900001 + 7919·i`, never used while building or tuning FlexiPath). The detail tables use the development block
+(`1000 + 7919·i`). The conclusions are the same on both. Paired differences in critical delivery (pp), with the
+seed-clustered 95 % CI:
 
-| Scenario | FlexiPath − reactive multipath, critical delivery (pp) · dev → test | FlexiPath − always duplicate (pp) · dev → test | Flights FlexiPath kept C2 · dev → test |
-| --- | --- | --- | --- |
-| A | +0.64 ± 0.17 → +0.76 ± 0.23 | −1.00 ± 0.09 → −0.90 ± 0.09 | 100 % → 100 % |
-| B | +0.79 ± 0.18 → +0.75 ± 0.16 | −0.83 ± 0.13 → −0.75 ± 0.06 | 100 % → 100 % |
-| C | +0.70 ± 0.21 → +0.58 ± 0.20 | −1.03 ± 0.13 → −0.81 ± 0.16 | 100 % → 100 % |
-| D | +1.22 ± 0.15 → +1.09 ± 0.12 | −0.77 ± 0.10 → −0.75 ± 0.07 | 100 % → 100 % |
-| G | +0.87 ± 0.15 → +0.84 ± 0.18 | −0.55 ± 0.22 → −0.47 ± 0.23 | 100 % → 100 % |
-| H | +0.73 ± 0.23 → +0.76 ± 0.24 | −1.62 ± 0.20 → −1.57 ± 0.14 | 100 % → 100 % |
+| Scenario | FlexiPath − reactive multipath · dev → test | FlexiPath − reactive multipath 60 ms · dev → test | FlexiPath − always duplicate · dev → test | Flights FlexiPath kept C2 · dev → test |
+| --- | --- | --- | --- | --- |
+| A | +0.70 [0.58, 0.85] → +0.84 [0.58, 1.16] | same as reactive multipath | −1.00 [−1.14, −0.86] → −0.88 [−1.01, −0.78] | 100 % → 100 % |
+| B | +0.85 [0.69, 1.01] → +0.79 [0.63, 0.95] | same | −0.89 [−1.04, −0.70] → −0.79 [−0.85, −0.73] | 100 % → 100 % |
+| C | +0.77 [0.59, 0.94] → +0.63 [0.39, 0.85] | same | −1.07 [−1.15, −1.01] → −0.90 [−1.16, −0.64] | 100 % → 100 % |
+| D | +1.31 [1.20, 1.42] → +1.22 [1.15, 1.32] | +0.79 [0.72, 0.89] → +0.69 [0.60, 0.78] | −0.81 [−0.94, −0.68] → −0.80 [−0.83, −0.76] | 100 % → 100 % |
+| G | +1.00 [0.80, 1.15] → +1.01 [0.79, 1.27] | +0.40 [0.20, 0.55] → +0.50 [0.33, 0.70] | −0.44 [−0.66, −0.26] → −0.32 [−0.51, −0.11] | 100 % → 100 % |
+| H | +0.85 [0.67, 1.00] → +0.97 [0.72, 1.23] | +0.29 [0.11, 0.41] → +0.35 [0.10, 0.60] | −1.72 [−2.01, −1.48] → −1.65 [−1.76, −1.56] | 100 % → 100 % |
 
-The ablation and prediction results also carry over (trend prediction: +11 to +25 lost packets per flight when off in
-A–E; map: 0.18 s gap when off in G; recall and precision within a few points).
+In A–C no path drops abruptly, so the two reactive baselines are identical there. The ablation and prediction
+results also carry over (trend prediction: +11 to +25 lost packets per flight when off in A–E; map: 0.18 s gap and 16
+more lost packets when off in G; recall 100 % in A–C, 64 % in D, 47 % in H; precision 100 % in D, 75 % in H). Five
+seeds per block is a small number of independent units; the seed-clustered intervals are wide for that reason, and
+more seeds per block would narrow them.
 
 ### Checked against published measurements
 
 The challenge welcomes real-world measurements but does not require them. Instead of one laptop test, the model's key
 parameters are compared here with published measurements, Linux defaults and 3GPP requirements. The last column says
-which way the model leans. Where it leans towards the multipath stacks, the benchmark was re-run with the measured value
-(next section).
+which way the model leans. Where it leans towards one stack, the benchmark was re-run with the other value (next
+sections).
 
 | What | In the model | Published real-world value | Source | Which way the model leans |
 | --- | --- | --- | --- | --- |
 | Wi-Fi loss detection (legacy) | 1.0 s | Linux declares a beacon loss after 7 missed beacons (≈ 0.72 s at the usual 102.4 ms interval), then waits 500 ms per probe of the access point before it disconnects | [Linux mac80211][linux-mlme] | Shorter than Linux: generous to the legacy stack |
 | Wi-Fi scan + re-association | 0.8 s (scan and attach to the fallback network) | 399.8 ms on average for one card, access point to access point, link layer only; scanning is over 90 % of it | [Mishra et al., 2003][mishra] | Same order; the measured figure leaves out DHCP and the IP layer |
 | TCP retransmission timeout (how reactive multipath notices loss) | 250 ms | Linux minimum 200 ms; RFC 6298 recommends at least 1 s | [Linux `tcp.h`][linux-tcp], [RFC 6298][rfc6298] | Between the two |
+| Abrupt link loss detection (FlexiPath) | 60 ms, an assumed constant ("3 missed probes"); the simulation has no 20 ms probe, its tick and heartbeat are 100 ms | — | — | Towards FlexiPath against the 250 ms baseline: hence the 60 ms reactive baseline above, and `--rto-ms 60` below |
 | Cell-to-cell handover | Not modelled | 76 ms (LTE), 110 ms (5G standalone), 167 ms (5G non-standalone) on average, on US commercial networks; data stops for 59 % of a non-standalone handover | [Hassan et al., SIGCOMM 2022][hassan] | Real flights add ≈ 0.1 s handovers for every stack. FlexiPath's 0.16 s abrupt-outage gap is the size of one such handover |
 | Waking a sleeping modem | 100 ms | 260 ms for an LTE phone leaving RRC_IDLE (2012); 3GPP's 5G target from a battery-saving state is 10 ms | [Huang et al., MobiSys 2012][huang], [3GPP TR 38.913 §7.4][tr38913] | Optimistic for an idle LTE modem: re-run with 260 ms below |
 | Modem sleep cycle | 1.28 s | 1.28 s (LTE RRC_IDLE DRX cycle) | [Huang et al., 2012][huang] | Matches |
@@ -333,32 +422,45 @@ which way the model leans. Where it leans towards the multipath stacks, the benc
 | LEO round trip | 65 ms base | Starlink median ≈ 40–50 ms (M-Lab speed tests); ≈ 40 ms from the dish to Starlink's point of presence (RIPE Atlas) | [Mohan et al., WWW 2024][mohan] | Slower than Starlink: conservative for any stack on the satellite |
 | LEO path stability | Steady | Network-wide reconfiguration every 15 s, with brief sub-second disruptions | [Mohan et al., 2024][mohan] | Not modelled: real time on the satellite is bumpier |
 | LEO terminal power | The same three tiers as the other modems | Starlink Mini: 20–40 W on average, 15 W idle | [Starlink Help Centre][starlink-mini] | Not modelled: time on (or warm on) the satellite costs far more power in reality |
-| C2 timing | Hover after 300 ms (piloted) or 1 s (waypoints) | 40 ms per command (stick steering, ≤ 60 km/h); 1 s (waypoints, ≤ 300 km/h) | [3GPP TS 22.125 §7.2][ts22125] | See [The hover rule](#the-hover-rule-piloted-vs-waypoint-flight) |
+| C2 timing | Hover after 300 ms at ≤ 60 km/h (piloted), 1 s above (waypoints) | 40 ms per command (stick steering, ≤ 60 km/h); 1 s (waypoints, ≤ 300 km/h) | [3GPP TS 22.125 §7.2][ts22125] | See [The hover rule](#the-hover-rule-piloted-vs-waypoint-flight) |
 
 ### Sensitivity: a slower modem wake
 
-`npm run benchmark -- --wake-ms 260` re-runs the benchmark with the measured LTE wake for every multipath stack (260 ms
-instead of 100 ms). The legacy stack has no sleeping spare, so its numbers do not change.
+`npm run benchmark -- --seed-block test --wake-ms 260` re-runs the benchmark with the measured LTE wake for every
+multipath stack (260 ms instead of 100 ms). The legacy stack has no sleeping spare, so its numbers do not change.
+Held-out seeds, speed-consistent hover rule:
 
-| Scenario | Kept C2, piloted rule: 100 → 260 ms wake (LG · MP · RD · FP, %) | Longest gap, FlexiPath / reactive multipath (s) | FlexiPath − reactive multipath, critical delivery (pp, 95 % CI) |
-| --- | --- | --- | --- |
-| A | unchanged: 0 · 100 · 100 · 100 | 0 / 0 → 0 / 0 | +0.64 ± 0.17 → +0.91 ± 0.27 |
-| B | unchanged: 0 · 100 · 100 · 100 | 0 / 0 → 0 / 0 | +0.79 ± 0.18 → +1.08 ± 0.24 |
-| C | unchanged: 0 · 100 · 100 · 100 | 0 / 0 → 0 / 0 | +0.70 ± 0.21 → +0.97 ± 0.27 |
-| D | 0 · 0 · 100 · 100 → 0 · 0 · 100 · 0 | 0.16 / 0.35 → 0.32 / 0.51 | +1.22 ± 0.15 → +1.47 ± 0.16 |
-| G | unchanged: 0 · 0 · 40 · 100 | 0 / 0.35 → 0 / 0.51 | +0.87 ± 0.15 → +1.33 ± 0.18 |
-| H | 0 · 0 · 100 · 100 → 0 · 0 · 100 · 20 | 0.10 / 0.35 → 0.26 / 0.51 | +0.73 ± 0.23 → +1.00 ± 0.37 |
+| Scenario | Kept C2: 100 → 260 ms wake (LG · MP · MP 60 ms · RD · FP, %) | Longest gap, FP / MP / MP 60 ms (s): 100 → 260 ms | FlexiPath − reactive multipath, critical delivery (pp): 100 → 260 ms | FlexiPath − reactive multipath 60 ms (pp): 100 → 260 ms |
+| --- | --- | --- | --- | --- |
+| A | unchanged: 0 · 100 · 100 · 100 · 100 | 0 / 0 / 0 → 0 / 0 / 0 | +0.84 → +1.11 | same as MP |
+| B | unchanged: 0 · 100 · 100 · 100 · 100 | 0 / 0 / 0 → 0 / 0 / 0 | +0.79 → +1.03 | same as MP |
+| C | unchanged: 0 · 100 · 100 · 100 · 100 | 0 / 0 / 0 → 0 / 0 / 0 | +0.63 → +0.85 | same as MP |
+| D | 0 · 50 · 95 · 100 · 100 → 0 · 50 · 50 · 100 · **50** | 0.16 / 0.35 / 0.16 → 0.32 / 0.51 / 0.32 | +1.22 → +1.52 | +0.69 → +0.95 |
+| G | 0 · 50 · 95 · 80 · 100 → 0 · 50 · 50 · 75 · 100 | 0 / 0.35 / 0.16 → 0 / 0.51 / 0.32 | +1.01 → +1.50 | +0.50 → +0.92 |
+| H | 0 · 50 · 100 · 100 · 100 → 0 · 50 · 50 · 100 · **50** | 0.10 / 0.35 / 0.16 → 0.27 / 0.51 / 0.32 | +0.97 → +1.08 | +0.35 → +0.48 |
 
 - **Predicted failures do not pay the wake.** In A–C and G FlexiPath wakes the next modem seconds before it needs it,
-  so nothing changes for it. Reactive multipath pays the full wake on every move: its gaps grow to 0.51 s, and
-  FlexiPath's delivery lead grows by a third to a half.
-- **Unpredicted failures do.** D's cell outage and H's unmapped shadow cost FlexiPath detection plus the wake, 0.26–0.32
-  s. Under the piloted rule it then hovers on all 20 flights of D and 16 of 20 in H; only always duplicate, which never
-  waits for a modem, keeps C2 there. Under the waypoint rule (1 s) every multipath stack still keeps C2 in every
-  scenario (`--wake-ms 260 --failsafe-ms 1000`).
+  so nothing changes for it. The reactive baselines pay the full wake on every move: their gaps grow by 0.16 s, and
+  FlexiPath's delivery lead grows. Pooled over A–D, G and H, FlexiPath then loses 42 % [38, 46] fewer critical packets
+  than reactive multipath and 35.5 % [30.5, 40.2] fewer than the 60 ms variant.
+- **Unpredicted failures do.** D's cell outage and H's unmapped shadow cost FlexiPath detection plus the wake, 0.27–0.32
+  s. Under the speed-consistent rule it then hovers on the 10 flights at ≤ 60 km/h in D and H; only always duplicate,
+  which never waits for a modem, keeps C2 there. With the 300 ms rule at every speed it hovers on all 20 flights of D
+  and 17 of 20 in H (16 of 20 on the development seeds). Under the 1 s rule every multipath stack still keeps C2 in
+  every scenario.
 - **What it means for a design:** a drone flown by stick needs its spare modem in a state that resumes well inside the
   budget (5G RRC_INACTIVE or connected-mode DRX), or permanent duplication of its C2. The model's 100 ms assumes the
   former. This is guideline 6 in [docs/qos-qoe-guidelines.md](docs/qos-qoe-guidelines.md).
+
+### Sensitivity: reactive multipath with a 60 ms timeout
+
+The 60 ms reactive baseline above shortens only its link-down detection; it still needs 15 % loss for one 250 ms RTO
+before it leaves a degrading path. `npm run benchmark -- --rto-ms 60` shortens the RTO itself to 60 ms, so both
+triggers are as fast as FlexiPath's abrupt-loss detection (the always-duplicate baseline uses the same timer, so it
+changes too). Pooled over A–D, G and H, FlexiPath then loses 23.0 % [17.0, 28.6] fewer critical packets than reactive
+multipath on the held-out seeds (21.5 % [16.8, 24.9] on the development seeds). Reactive multipath then keeps C2 on 20 of 20
+flights in D and H and 19 of 20 in G, and in H FlexiPath's delivery lead (+0.19 pp [−0.02, +0.37]) is no longer
+significant.
 
 [linux-mlme]: https://github.com/torvalds/linux/blob/master/net/mac80211/mlme.c
 [linux-tcp]: https://github.com/torvalds/linux/blob/master/include/net/tcp.h
@@ -461,8 +563,9 @@ A single-path, break-before-make reference stack (not a model of any named OS): 
 | **Simulated interruption** | **3.8 s** | **2.0 s** |
 
 A preferred interface coming back (e.g. Wi-Fi after a fade) triggers a voluntary switch-back with a 1.8 s interruption.
-With the default fail-safe policy, a drone whose C2 telemetry is silent for > 300 ms stops and hovers in place
-(simulated lost-link policy, the piloted-flight rule; `--failsafe-ms 1000` gives the waypoint rule, see
+With the default fail-safe policy, a drone whose C2 telemetry is silent for > 300 ms (at ≤ 60 km/h, the piloted-flight
+rule) or > 1 s (above 60 km/h, the waypoint rule) stops and hovers in place (simulated lost-link policy; `--failsafe-ms`
+applies one threshold at every speed, see
 [The hover rule](#the-hover-rule-piloted-vs-waypoint-flight)). The legacy stack uses one radio at a time (the others idle in DRX, the scan / attach
 phase counts as a second awake radio), binds its sockets to its physical address and runs single-path TCP.
 
@@ -547,22 +650,30 @@ npm run dev          # landing page http://localhost:5173 · simulator http://lo
 | --- | --- |
 | `npm run dev` | Vite dev server with the full HUD |
 | `npm run build` / `npm run preview` | Production bundle in `dist/` (open it through a web server, see below) |
-| `npm run benchmark` | Paired experiments → `results/benchmark_*.json`, per-run `.csv`, `_comparison.csv`, `_mechanisms.csv`, `_efficiency.csv` (critical delivery per extra watt), `_ablations.csv` and `_prediction.csv` (`--quick`, `--seeds 10`, `--speeds 60`, `--scenarios A,D`, `--no-failsafe`, `--baselines mptcp,redundant` or `none`, `--ablations fpNoPred,fpNoBurst,fpNoMap` or `none`, `--seed-block dev` or `test`, `--failsafe-ms 1000` for the waypoint-flight hover rule) |
+| `npm run serve` | Build, then serve `dist/` on http://localhost:4173/ and open the browser |
+| `npm run benchmark` | Paired experiments → `results/benchmark_*.json`, per-run `.csv`, `_comparison.csv`, `_mechanisms.csv`, `_efficiency.csv` (critical delivery per extra watt), `_ablations.csv` and `_prediction.csv` (`--quick`, `--seeds 10`, `--speeds 60`, `--scenarios A,D`, `--no-failsafe`, `--baselines mptcp,mptcpFast,redundant` or `none`, `--ablations fpNoPred,fpNoBurst,fpNoMap` or `none`, `--seed-block dev` or `test`, `--failsafe-ms 300` / `1000` for one hover rule at every speed instead of the speed-consistent default, `--wake-ms 260`, `--rto-ms 60`); `_headline.csv` pools A–D, G, H with seed-clustered CIs |
+| `npm test` | Tests of the simulation core (Vitest, about 5 s): determinism per seed, A–H run to completion, controller invariants, and a quick benchmark checked against the README's four-stack table within stated tolerances |
+| `npm run test:full` | `npm test` plus the ten full benchmarks archived in `results/published/`, which must reproduce its CSVs byte for byte (about 2 min) |
 | `node scripts/tradeoff-chart.js <_mechanisms.csv>` | Redraw `public/landing/tradeoff.svg` (reliability vs radio power) from a default benchmark |
 | `node scripts/handover-probe.js` | Measure one real network change on your own laptop ([Real-world check](#real-world-check-one-network-change-on-your-own-laptop)) |
 | `npm run models` | Regenerate the six GLB assets with headless Blender (`blender` on `PATH`) |
 
 **Open the built files through a local web server, not by double-click.** A browser opened on `dist/index.html` as a
-`file://` page blocks the module scripts and the stylesheet, so the page stays blank. Serve `dist/` instead:
+`file://` page blocks the module scripts and the stylesheet, so the page can not start (it shows a "serve over HTTP"
+message instead). Serve `dist/` instead:
 
 ```bash
+npm run serve                                     # build, then http://localhost:4173/ (opens the browser)
+sh dist/serve.sh                                  # one-line launcher shipped in dist/ (Python 3): http://localhost:8000/
 npm run preview                                   # http://localhost:4173/
 python3 -m http.server 8000 --directory dist      # http://localhost:8000/
 ```
 
+On Windows, double-click `dist\serve.cmd`. `dist/README.txt` repeats these steps for a copy of `dist/` on its own.
+
 Simulator URL parameters (on `simulator.html`; a link to the site root that carries any of them is forwarded to the
 simulator): `?scenario=A&seed=2026&speed=90&mode=advanced&focus=legacy&camera=overview&paused=1`, `intro=0` skips
-the intro screen, `demo=1` starts the guided demo, `models=procedural` forces the built-in primitive models, `look=twin` starts in the neon digital-twin look.
+the intro screen, `demo=1` starts the guided demo, `demo=3min` starts the timed 3-minute tour (12 cards of 6.5 s each, no panel walk-throughs, ends on the result card; about 170 s with the 92 s flight; → / Enter skips a card), `kiosk=1` is for an unattended screen (the mission flies behind the intro, the guided demo starts after 8 s and its cards step on by themselves; the first key press or click hands control to the visitor), `models=procedural` forces the built-in primitive models, `look=twin` starts in the neon digital-twin look.
 
 Keys: `Space` pause · `M` mission / advanced · `D` guided demo (`→` next, `←` back) · `X` experiments · `I` why FlexiPath? · `F` Wi-Fi fade ·
 `G` 5G outage · `R` reset · `1`/`2` focus · `C` camera · `V` ghost drone · `T` theatre · `L` real / twin look · `E` export JSON.
@@ -760,22 +871,21 @@ Stack: Vite 8 · Three.js r186 · Chart.js 4 · Tailwind CSS 4 · Lucide.
 - **Traffic classes do not share capacity**: each flow sees its link's loss and delay on its own, so the uploads never
   slow C2 or voice (which is why E matches A). On a real uplink, bulk traffic queues in front of C2 unless it is
   prioritised.
-- **The hover rule** is a model parameter: 300 ms by default (piloted flight), 1 s with `--failsafe-ms 1000` (waypoint
-  flight). Which stacks keep C2 depends on it ([The hover rule](#the-hover-rule-piloted-vs-waypoint-flight)).
+- **The hover rule** is a model parameter: by default 300 ms at ≤ 60 km/h (piloted flight) and 1 s above (waypoint
+  flight); `--failsafe-ms 300` or `1000` applies one threshold at every speed. Which stacks keep C2 depends on it
+  ([The hover rule](#the-hover-rule-piloted-vs-waypoint-flight)).
 - **Modem wake** is 100 ms, which assumes a spare modem kept in a fast-resume state; an idle LTE modem measured 260 ms.
   `--wake-ms 260` shows the effect ([Sensitivity](#sensitivity-a-slower-modem-wake)).
 - **Abrupt-loss detection is an assumed constant, not a simulated probe.** FlexiPath detects a sudden link loss after
-  60 ms; the reactive multipath baseline detects it after 250 ms (its retransmission timeout). Both react to the same
-  link-down flag in the same tick. With equal detection (60 ms for both), reactive multipath keeps C2 in D and H (19/20
-  in G), and FlexiPath's critical-loss advantage falls from about 35 % to about 20 % (A–D, G, H; dev and held-out
-  seeds), and to about 3 % in H. Part of the headline therefore reflects the detection assumption; the rest comes from
-  the warm path and the 0 ms gap on predicted moves.
-- **The 300 ms hover rule is applied at all speeds.** 3GPP TS 22.125 scopes stick steering to ≤ 60 km/h. Under a
-  speed-consistent rule (300 ms at ≤ 60 km/h, 1 s above) always duplicate keeps C2 on 18 of 20 flights in G, and
-  reactive multipath on 10 of 20 in D, G and H.
-- **FlexiPath trades throughput for C2 continuity in G and H.** Against reactive multipath it delivers 71.9 vs
-  82.4 Mbit/s in G and 64.5 vs 85.3 Mbit/s in H, where it is also below the legacy stack's 66.7 Mbit/s, because the
-  satellite path it moves to is slower. The mechanisms table does not report throughput.
+  60 ms; the default reactive multipath baseline detects it after 250 ms (its retransmission timeout). Both react to
+  the same link-down flag in the same tick. The benchmark therefore also flies reactive multipath with 60 ms
+  detection: it keeps C2 on 19–20 of 20 flights in D, G and H, and FlexiPath's pooled critical-loss reduction falls
+  from 38 % to 30 % (held-out seeds). With a 60 ms RTO for both of the baseline's triggers (`--rto-ms 60`) it falls to
+  23 %, and in H the lead is no longer significant. Part of the result therefore reflects the detection assumption;
+  the rest comes from acting before predicted failures with a warm path (0 s gap on predicted moves).
+- **FlexiPath trades throughput for C2 continuity in G and H.** Against reactive multipath it delivers 70.3 vs
+  82.6 Mbit/s in G and 62.0 vs 86.3 Mbit/s in H (held-out seeds), where it is also below the legacy stack's 68.1 Mbit/s,
+  because the satellite path it moves to is slower.
 - **The reactive baseline is loss-triggered** (it leaves a path after 15 % loss for 250 ms). Real stacks also use
   signal thresholds (3GPP measurement events, ATSSS, 802.11k/v/r). A threshold-triggered variant with no prediction
   matches FlexiPath in A and H in a 3-seed check; it is future work, and we do not claim that prediction alone gives
@@ -801,8 +911,11 @@ Stack: Vite 8 · Three.js r186 · Chart.js 4 · Tailwind CSS 4 · Lucide.
   the same PHY curves as the link model, without fading.
 - **Head-of-line**: critical and real-time flows are packet-level; bulk TCP is an analytical per-tick model (loss
   repair by fast retransmit or RTO), not a packet-level TCP implementation.
-- **Tunnel**: the relay is assumed close to the drone's networks (no extra relay latency); addresses are illustrative
+- **Tunnel**: "authenticated" is an assumption. The model has no cryptography, key exchange or replay protection;
+  a real build would use an existing tunnel such as WireGuard or QUIC. The relay is assumed close to the drone's networks (no extra relay latency); addresses are illustrative
   (`198.51.100.0/24` is RFC 5737 documentation space, `100.64.0.0/10` is RFC 6598 CGNAT space).
+- **The LEO link is always available** in the model (a satellite is always in view; only its SNR and RTT vary). Real
+  terminals have obstruction, satellite handovers and 15 s reconfigurations, so the LEO fallback is the best case.
 - **Drone altitude**: the drones fly a low-altitude corridor above the route, and the radio model is the ground-level
   model evaluated on the corridor centre-line; altitude effects (cell antennas tilted down, line-of-sight interference
   from many cells, air-to-ground fading) are not modelled. The altitude shown in the 3D twin is visual only.

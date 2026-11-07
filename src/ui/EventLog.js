@@ -25,7 +25,7 @@ export class EventLog {
       <div class="flex items-center justify-between gap-2 px-3 pt-3 pb-2">
         <h2 class="hud-title">Event Log</h2>
         <div class="seg p-[2px]!" role="group" aria-label="Filter events">
-          ${FILTERS.map(([v, l]) => `<button type="button" class="h-[20px]! px-2! text-[9.5px]!" data-filter="${v}" aria-pressed="${v === 'all'}">${l}</button>`).join('')}
+          ${FILTERS.map(([v, l]) => `<button type="button" class="h-[24px]! px-2! text-[9.5px]!" data-filter="${v}" aria-pressed="${v === 'all'}">${l}</button>`).join('')}
         </div>
       </div>
       <div class="hud-scroll min-h-0 flex-1 overflow-y-auto pb-2" data-ref="list" role="log" aria-live="off"></div>`;

@@ -258,6 +258,32 @@ export class SceneManager {
     this.scene.fog.density = this.fogDensity * Math.min(1, Math.max(0.3, 42 / dist));
     this.composer.render();
     this.labelRenderer.render(this.scene, this.camera);
+    this._declutterLabels();
+  }
+
+  /**
+   * D-09: the drone chips win. A node, pad or zone label that a drone chip overlaps fades out until they part.
+   * Checked about 8 times a second (it reads layout), on the CSS2D labels only; the 3D scene is untouched.
+   */
+  _declutterLabels() {
+    const now = performance.now();
+    if (now - (this._declutterAt ?? 0) < 120) return;
+    this._declutterAt = now;
+    const root = this.labelRenderer.domElement;
+    const chips = [];
+    for (const el of root.querySelectorAll('.veh-label')) {
+      if (el.style.display === 'none') continue;
+      const r = el.getBoundingClientRect();
+      if (r.width > 0) chips.push(r);
+    }
+    for (const el of root.querySelectorAll('.node-label, .zone-label')) {
+      let hit = false;
+      if (chips.length && el.style.display !== 'none') {
+        const r = el.getBoundingClientRect();
+        hit = chips.some((c) => r.left < c.right + 4 && r.right > c.left - 4 && r.top < c.bottom + 4 && r.bottom > c.top - 4);
+      }
+      if (el.classList.contains('is-occluded') !== hit) el.classList.toggle('is-occluded', hit);
+    }
   }
 
   dispose() {

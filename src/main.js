@@ -5,7 +5,9 @@
  * Three.js digital twin (60 fps, interpolated) and the HUD.
  *
  * URL parameters: ?scenario=mission|A…F&seed=2026&speed=60&mode=mission|advanced
- *                 &focus=flexipath|legacy&camera=chase|cinematic|overview&intro=0&paused=1&demo=1
+ *                 &focus=flexipath|legacy&camera=chase|cinematic|overview&intro=0&paused=1&demo=1|3min
+ *                 &kiosk=1 (unattended screen: the mission flies behind the intro, the guided demo starts after 8 s
+ *                 and steps on by itself until a visitor presses a key or clicks)
  */
 import * as THREE from 'three';
 import { SimulationEngine } from './simulation/SimulationEngine.js';
@@ -32,7 +34,9 @@ function readParams() {
     look: q.get('look') === 'twin' ? 'twin' : 'real',
     paused: q.get('paused') === '1',
     intro: q.get('intro') !== '0',
-    demo: q.get('demo') === '1',
+    demo: q.get('demo') === '1' || q.get('demo') === '3min',
+    demoQuick: q.get('demo') === '3min',
+    kiosk: q.get('kiosk') === '1',
   };
 }
 
@@ -176,7 +180,8 @@ async function boot() {
   requestAnimationFrame(frame);
 
   hideSplash();
-  if (params.demo) dashboard.startDemo();
+  if (params.demo) dashboard.startDemo({ quick: params.demoQuick });
+  else if (params.kiosk) dashboard.startKiosk();
   else if (params.intro) dashboard.showIntro();
   else dashboard.togglePause(params.paused);
 

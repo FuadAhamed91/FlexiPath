@@ -9,9 +9,10 @@ FlexiPath is a **simulation prototype** of a predictive, traffic-aware multipath
 prepare → replicate → switch → continue) and a **legacy break-before-make OS stack** as the baseline. The drones carry a
 C2 link (critical), push-to-talk voice (real-time) and camera / survey uploads (bulk) from their dock through Wi-Fi, 5G
 and LEO zones; the code still calls them vehicles (`agent.vehicle`, `VehicleManager`, `render.vehicles`). A Three.js digital
-twin and an explainable HUD render it live; a headless runner produces paired experiments, by default also against two
-baselines modelled on existing mechanisms (reactive multipath = MPTCP backup subflow / ATSSS active-standby; always
-duplicate = MPTCP redundant scheduler / PDCP duplication) and three FlexiPath ablations (no trend prediction, no
+twin and an explainable HUD render it live; a headless runner produces paired experiments, by default also against
+baselines modelled on existing mechanisms (reactive multipath = MPTCP backup subflow / ATSSS active-standby, flown twice:
+with its 250 ms detection and with FlexiPath's 60 ms (`mptcpFast`); always duplicate = MPTCP redundant scheduler / PDCP
+duplication) and three FlexiPath ablations (no trend prediction, no
 duplication burst, no coverage map). FlexiPath also reads a coverage map of the flight plan (dead zones from earlier
 survey flights); scenarios G and H put a radio shadow on the route. Plain ES modules, no framework, no TypeScript. `README.md`
 documents the model rules, parameters and published results; `docs/existing-mechanisms.md` and
@@ -23,27 +24,41 @@ documents the model rules, parameters and published results; `docs/existing-mech
 npm run dev          # Vite dev server: landing page http://localhost:5173, simulator /simulator.html
 npm run build        # production bundle → dist/ (base './', sourcemaps on)
 npm run preview      # serve dist/ on :4173
-npm run benchmark    # headless paired experiments in Node → results/benchmark_<stamp>.{json,csv} + _comparison / _mechanisms / _efficiency / _ablations / _prediction CSVs
+npm run benchmark    # headless paired experiments in Node → results/benchmark_<stamp>.{json,csv} + _comparison / _mechanisms / _efficiency / _headline / _ablations / _prediction CSVs
+npm test             # Vitest: simulation-core tests (~6 s)
+npm run test:full    # + the ten full benchmarks vs results/published/ CSVs, byte for byte (about 2 min)
 npm run models       # regenerate public/models/*.glb (needs `blender` on PATH)
 ```
 
-There is no test suite, linter or type checker. Verify changes with `npm run build` and the benchmark:
+`npm test` (Vitest, `tests/`, about 6 s) covers the simulation core: determinism, A–H completion, controller
+invariants (FlexiPath never sends on a down link, legacy breaks of fixed length, flown with the speed-consistent hover
+rule) and a quick benchmark (3 held-out seeds × 60 + 90 km/h, all five engines) checked against the README's
+five-stack held-out tables within stated tolerances. `npm run test:full` also re-runs the ten full benchmarks archived
+in `results/published/` (`PUBLISHED_RUNS` in `tests/regression.test.js`) and compares them byte for byte. To
+re-publish, run the ten commands listed in `results/published/MANIFEST.md` into their folders. CI
+(`.github/workflows/ci.yml`) runs build + both. There is no linter or type checker. Verify changes with `npm run build`,
+the tests and the benchmark:
 
 - Narrow runs: `npm run benchmark -- --quick` (3 seeds, 60 km/h), or e.g. `-- --seeds 1 --speeds 60 --scenarios A,D`;
-  also `--no-failsafe`, `--out <dir>`, `--baselines mptcp,redundant` (default) or `none`, `--ablations
+  also `--no-failsafe`, `--out <dir>`, `--baselines mptcp,mptcpFast,redundant` (default) or `none`, `--ablations
   fpNoPred,fpNoBurst,fpNoMap` (default) or `none`, and `--seed-block dev` (default: `1000 + 7919·i`, the block FlexiPath
-  was tuned on) or `test` (held out: `900001 + 7919·i`), and `--failsafe-ms 1000` (the hover rule, default 300 ms =
-  piloted flight; 1000 = waypoint flight, 3GPP TS 22.125) and `--wake-ms 260` (sensitivity: every multipath stack's
-  modem wake, default 100 ms; it overrides `POWER_PARAMS` / `MULTIPATH_PARAMS` before the runs). Non-default runs get
-  `_failsafe<ms>ms` / `_wake<ms>ms` file names. The default is scenarios A–H × 5 seeds × 30/60/90/120 km/h = 160
-  paired runs.
+  was tuned on) or `test` (held out: `900001 + 7919·i`; the README headline and four-stack tables use it). The hover
+  rule is speed-consistent by default (`failSafeForSpeed` in `ExperimentRunner`: 300 ms at ≤ 60 km/h = piloted flight,
+  1 s above = waypoint flight, 3GPP TS 22.125); `--failsafe-ms 300` / `1000` applies one threshold at every speed.
+  `--wake-ms 260` (sensitivity: every multipath stack's modem wake, default 100 ms) and `--rto-ms 60` (sensitivity:
+  reactive multipath's RTO, default 250 ms) override `POWER_PARAMS` / `MULTIPATH_PARAMS` before the runs. Non-default
+  runs get `_failsafe<ms>ms` / `_wake<ms>ms` / `_rto<ms>ms` file names. The default is scenarios A–H × 5 seeds ×
+  30/60/90/120 km/h = 160 paired runs. Every paired difference carries a Student-t CI over runs and a seed-clustered
+  bootstrap CI (`seedCI`, resamples whole seeds; deterministic); `_headline.csv` pools A–D, G, H.
 - Runs are deterministic per seed. For a change that must not alter behaviour, benchmark into two `--out` dirs (before
   and after) and compare: both CSVs must be byte-identical; the JSON differs only in `meta` (timestamps, wall time).
   The baselines and ablations never change FlexiPath / Legacy values: a `--baselines none --ablations none` run
   reproduces the FP/LG-only CSVs exactly, and the `fp_` / `lg_` columns of a full run match them. When you add a
   metric, append it to `SUMMARY_METRICS` so earlier CSV columns keep their order, and compare old vs new by column name.
-- The README's "Measured results" tables come from the default `npm run benchmark`; when model behaviour changes,
-  re-run it and update them, the hover-rule table (re-run with `--failsafe-ms 1000`) and the trade-off chart:
+- The README's "Measured results" tables come from `npm run benchmark` (detail tables, development seeds) and
+  `npm run benchmark -- --seed-block test` (headline and four-stack tables); when model behaviour changes, re-run them
+  and update the tables, `results/published/` and its `MANIFEST.md` (commit hash, date, checksums; the README's
+  "Archived data" paragraph names the commit too), the hover-rule table (re-run with `--failsafe-ms 300` and `1000`) and the trade-off chart:
   `node scripts/tradeoff-chart.js results/benchmark_mechanisms_<stamp>.csv` redraws `public/landing/tradeoff.svg`
   (README and landing page).
 - `node scripts/handover-probe.js` measures one real network change on the laptop it runs on (README "Real-world
@@ -51,7 +66,9 @@ There is no test suite, linter or type checker. Verify changes with `npm run bui
 
 In the browser, URL parameters on `simulator.html` give reproducible states (`index.html` forwards any link that carries
 one of them to the simulator): `?scenario=A&seed=2026&speed=90&mode=advanced&focus=legacy
-&camera=overview&intro=0&paused=1` (`paused` only applies with `intro=0`); `demo=1` starts the guided demo,
+&camera=overview&intro=0&paused=1` (`paused` only applies with `intro=0`); `demo=1` starts the guided demo, `demo=3min` the timed tour (`GuidedDemo.quick`: `QUICK_DWELL_MS` per card, no panel walks, no scenario card, no replay), `kiosk=1`
+(unattended screen: engine runs behind the intro, `startKiosk()` starts the demo after 8 s, `GuidedDemo.kiosk` steps paused
+cards on after 9 s and replays from the end card; the first key / click / wheel turns it off),
 `models=procedural` forces the primitive models and `look=twin` starts in the neon look. `window.flexipath` exposes `{ engine, dashboard, sceneManager,
 vehicles, nodes, beams, particles }` in the console.
 
@@ -65,7 +82,7 @@ vehicles, nodes, beams, particles }` in the console.
 - `SimulationEngine` is the hub. `advance(realDt)` accumulates wall time × `simRate` and runs whole fixed ticks
   (`DT = 0.1 s`, at most 40 per call), returning an interpolation `alpha`; `getRenderState()` interpolates vehicle arc
   length and satellites between `prevSnapshot` and `snapshot` for rendering.
-- Agents: `flexipath` and `legacy` always; `config.agents` may add `mptcp` / `redundant` (`BASELINE_ENGINES`) and
+- Agents: `flexipath` and `legacy` always; `config.agents` may add `mptcp` / `mptcpFast` / `redundant` (`BASELINE_ENGINES`) and
   `fpNoPred` / `fpNoBurst` / `fpNoMap` (`ABLATION_ENGINES`: a `FlexiPathController` with `ENGINES[id].params`), which
   the benchmark CLI does by default (the in-app Experiments panel runs the baselines only). The live twin and HUD use
   only the first two; `_capture`, `getSummary` and the exports cover every agent present, and `getRenderState` iterates
@@ -110,7 +127,8 @@ vehicles, nodes, beams, particles }` in the console.
 - `decision.replicate` must be an explicit per-class map: `TrafficManager` mirrors every packet flow when it is
   undefined.
 - `MultipathController.js`: `ReactiveMultipathController` (anchored session, standby radio in DRX, moves after loss >
-  15 % for one 250 ms RTO or a drop, + 100 ms wake) and `RedundantMultipathController` (critical + real-time on two
+  15 % for one 250 ms RTO or a drop noticed after `downDetectS ?? rtoS`, + 100 ms wake; `ENGINES.mptcpFast` sets
+  `downDetectS` to FlexiPath's 60 ms and replays `agent:mptcp`'s random streams via `rngOf`) and `RedundantMultipathController` (critical + real-time on two
   joinable paths, radio state `DUAL` = tier 2; with no protected classes it delegates to a reactive instance). Both
   share the legacy priority and join thresholds (`MULTIPATH_PARAMS`) and use `MultipathTrace`; they emit `HOT_SWAP` /
   `FAILOVER` (with `upgrade` on switch-backs), never `TCP_RST`.
@@ -195,7 +213,7 @@ vehicles, nodes, beams, particles }` in the console.
 - The guided demo (`GuidedDemo.js`, `D`, `?demo=1`) flies the full `mission` scenario (seed 2026, 60 km/h: three
   handovers, dock → Wi-Fi → 5G → LEO) and owns the tour layer (`refs.tour`: a fixed card over the lower part of the
   twin and a ring around the panel a card talks about). It is never scripted: one orientation card on the dock, then
-  engine events pause the simulation (`_moment`) and **nothing resumes by itself**. Each moment names the panels it
+  engine events pause the simulation (`_moment`) and **nothing resumes by itself** (except in kiosk mode, until the visitor touches anything). Each moment names the panels it
   changed (`panels`, keys of `_panelCards`: the Mission panels, the Advanced tabs, the charts); a panel is explained
   once in the demo (`shownPanels`) unless a stop marks it `'name!'` because its numbers are the point. Next steps
   through them one card each, beside the ringed panel with a pointer (`_layout`: left of a right-hand panel, above a

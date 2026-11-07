@@ -55,7 +55,7 @@ export function comparisonTable(table) {
     ${notes.length ? `<p class="mt-2 font-mono text-[10px] leading-relaxed text-slate-500">${esc(notes.join(' '))}</p>` : ''}`;
 }
 
-const MECHANISM_ROWS = ['c2KeptPct', 'interruptionS', 'longestInterruptionS', 'criticalDeliveryPct', 'meanMos', 'replicationOverheadPct', 'meanPowerW', 'energyJ', 'tcpResets', 'remoteIpChanges', 'actionVsFailureS'];
+const MECHANISM_ROWS = ['c2KeptPct', 'interruptionS', 'longestInterruptionS', 'criticalDeliveryPct', 'meanMos', 'replicationOverheadPct', 'meanPowerW', 'energyJ', 'meanThroughputMbps', 'tcpResets', 'remoteIpChanges', 'actionVsFailureS'];
 
 /** Legacy | existing multipath mechanisms | FlexiPath, means over the same paired runs. */
 export function mechanismsTable(table, baselines) {
@@ -87,6 +87,7 @@ function mechanismsNote() {
     <p class="mt-2 text-[11px] leading-relaxed text-slate-600">
       ${tag('param')} Baselines modelled on existing mechanisms, with the legacy stack's path preference and thresholds and detection in their favour:
       reactive multipath moves traffic once the active path has lost &gt; ${(q.failLoss * 100).toFixed(0)} % for one ${Math.round(q.rtoS * 1000)} ms retransmission timeout (or dropped), after a ${Math.round(q.wakeLatencyS * 1000)} ms standby-radio wake;
+      the "60 ms detection" variant notices a dropped link as fast as FlexiPath (${FLEXIPATH_PARAMS.failoverDetectMs} ms), so an unpredicted outage costs both the same gap;
       always-duplicate sends every critical and real-time packet on two paths with both radios transmitting. Sessions stay anchored for both (no socket resets). See docs/existing-mechanisms.md.
     </p>`;
 }
@@ -97,7 +98,7 @@ function provenance(meta) {
     <div class="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-[11px] leading-relaxed text-slate-600">
       <div class="mb-1.5 flex flex-wrap items-center gap-1.5">${tag('measured')}<span class="font-semibold text-slate-700">Measured simulation results, not real-world measurements.</span></div>
       Each trial runs FlexiPath and Legacy together on the same seed, route, RF field and fault timing, so every row compares matched pairs.
-      Seeds: ${esc(meta.seeds.join(', '))} · speed ${esc(meta.speeds.join(', '))} km/h · fail-safe hover ${meta.failSafe ? 'on' : 'off'}.
+      Seeds: ${esc(meta.seeds.join(', '))} · speed ${esc(meta.speeds.join(', '))} km/h · fail-safe hover ${meta.failSafe ? (meta.failSafeRule === 'speed' ? 'on (C2 silent > 300 ms at ≤ 60 km/h, > 1 s above: 3GPP TS 22.125 speed limit for stick steering)' : `on (C2 silent > ${Math.round((meta.failSafeS ?? 0.3) * 1000)} ms)`) : 'off'}.
       <div class="mt-1.5 flex flex-wrap items-center gap-1.5">${tag('param')}<span>Values that come straight from the model:</span></div>
       legacy break-before-make recovery ${LEGACY_WIRELESS_STALL_S.toFixed(1)} s (detect 1.0 + attach 0.8 + DHCP 0.5 + TCP/TLS 1.5) · FlexiPath failover detection ${p.failoverDetectMs} ms · switch at ${(p.switchLoss * 100).toFixed(0)} % loss · protection trigger TTF &lt; ${p.ttfTriggerS} s.
       The interruption rows therefore reflect how <i>often</i> each stack breaks the session, with each break lasting a model-defined time.

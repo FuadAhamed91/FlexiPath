@@ -6,7 +6,7 @@
       // Links made for the simulator before it moved (?scenario=…, ?demo=1, …) still open it directly.
       (function () {
         var q = new URLSearchParams(location.search);
-        var keys = ['scenario', 'seed', 'speed', 'mode', 'focus', 'camera', 'intro', 'paused', 'demo', 'models', 'look'];
+        var keys = ['scenario', 'seed', 'speed', 'mode', 'focus', 'camera', 'intro', 'paused', 'demo', 'kiosk', 'models', 'look'];
         if (keys.some(function (k) { return q.has(k); })) location.replace('simulator.html' + location.search + location.hash);
       })();
     </script>
@@ -20,12 +20,6 @@
       content="FlexiPath keeps a drone's command-and-control link alive between Wi-Fi, 5G and LEO satellite: it predicts the failing path, prepares the next one and protects critical traffic through the handover. A simulation prototype for the ATRC EDGE Challenge."
     />
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&family=Orbitron:wght@700;800&display=swap"
-      rel="stylesheet"
-    />
     <link rel="stylesheet" href="/src/landing/landing.css" />
     <script type="module" src="/src/landing/landing.js"></script>
   </head>
@@ -123,17 +117,17 @@
             <div class="lp-card lp-stat lp-reveal p-5">
               <div class="v">0.00 s</div>
               <p class="mt-3 text-[14.5px] leading-snug text-slate-700">simulated interruption in every predictable handover</p>
-              <p class="mt-2 font-mono text-[12px] text-legacy">Legacy OS: 3.7–16.4 s</p>
+              <p class="mt-2 font-mono text-[12px] text-legacy">Legacy OS: 3.6–16.8 s</p>
             </div>
             <div class="lp-card lp-stat lp-reveal p-5">
               <div class="v">98–99 %</div>
               <p class="mt-3 text-[14.5px] leading-snug text-slate-700">of critical C2 packets delivered</p>
-              <p class="mt-2 font-mono text-[12px] text-legacy">Legacy OS: 77–85 %</p>
+              <p class="mt-2 font-mono text-[12px] text-legacy">Legacy OS: 75–84 %</p>
             </div>
             <div class="lp-card lp-stat lp-reveal p-5">
               <div class="v">≈ 1 %</div>
               <p class="mt-3 text-[14.5px] leading-snug text-slate-700">extra bytes to protect the critical traffic</p>
-              <p class="mt-2 font-mono text-[12px] text-slate-500">Always-duplicate: 49–100 %</p>
+              <p class="mt-2 font-mono text-[12px] text-slate-500">Always-duplicate: 52–100 %</p>
             </div>
             <div class="lp-card lp-stat lp-reveal p-5">
               <div class="v">1.3–4.6 s</div>
@@ -149,7 +143,7 @@
         <div class="lp-wrap grid gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-16">
           <div class="lp-reveal">
             <p class="lp-kicker">The problem</p>
-            <h2 class="lp-h2">A standard OS stack changes networks only after it loses one.</h2>
+            <h2 class="lp-h2">A standard OS stack usually changes networks only after it loses one.</h2>
             <p class="lp-lead">
               A drone crossing a city, a 5G corridor and a rural zone changes networks several times per flight. A standard
               operating system stays on the current link until it is gone, then detects the loss, scans for another
@@ -157,7 +151,7 @@
             </p>
             <p class="lp-lead">
               For a drone, that silence on the C2 link is not an inconvenience. A drone that loses its C2 link falls
-              back to a fail-safe: here, telemetry silent for more than 300 ms makes it stop and hover until the link
+              back to a fail-safe: here, telemetry silent for more than 300 ms (1 s above 60 km/h) makes it stop and hover until the link
               returns, and the mission waits.
             </p>
           </div>
@@ -363,15 +357,16 @@
                   <span class="lp-tag lp-tag-measured mt-4">MEASURED · SIM</span>
                 </div>
                 <div class="rounded-xl border border-slate-200 bg-[#f6f8fb] p-4">
-                  <p class="font-mono text-[11px] font-bold tracking-[0.12em] text-slate-500">SCENARIO G · WI-FI AND 5G BLOCKED TOGETHER · 20 FLIGHTS</p>
+                  <p class="font-mono text-[11px] font-bold tracking-[0.12em] text-slate-500">SCENARIO G · WI-FI AND 5G BLOCKED TOGETHER · 20 FLIGHTS · HELD-OUT SEEDS</p>
                   <dl class="mt-3 grid grid-cols-[minmax(0,1fr)_auto_auto] items-baseline gap-x-4 gap-y-2 text-[13.5px]">
                     <dt class="font-mono text-[11px] text-slate-500">STACK</dt><dd class="font-mono text-[11px] text-slate-500">KEPT C2</dd><dd class="font-mono text-[11px] text-slate-500">GAP</dd>
-                    <dt class="text-slate-600">Legacy OS</dt><dd class="font-mono text-legacy">0 / 20</dd><dd class="font-mono text-slate-700">7.9 s</dd>
-                    <dt class="text-slate-600">Reactive multipath</dt><dd class="font-mono text-slate-700">0 / 20</dd><dd class="font-mono text-slate-700">0.39 s</dd>
-                    <dt class="text-slate-600">Always duplicate</dt><dd class="font-mono text-slate-700">8 / 20</dd><dd class="font-mono text-slate-700">0.21 s</dd>
+                    <dt class="text-slate-600">Legacy OS</dt><dd class="font-mono text-legacy">0 / 20</dd><dd class="font-mono text-slate-700">7.1 s</dd>
+                    <dt class="text-slate-600">Reactive multipath</dt><dd class="font-mono text-slate-700">10 / 20</dd><dd class="font-mono text-slate-700">0.39 s</dd>
+                    <dt class="text-slate-600">Reactive, 60 ms detection</dt><dd class="font-mono text-slate-700">19 / 20</dd><dd class="font-mono text-slate-700">0.20 s</dd>
+                    <dt class="text-slate-600">Always duplicate</dt><dd class="font-mono text-slate-700">16 / 20</dd><dd class="font-mono text-slate-700">0.24 s</dd>
                     <dt class="font-semibold text-fp">FlexiPath</dt><dd class="font-mono font-semibold text-slate-900">20 / 20</dd><dd class="font-mono font-semibold text-slate-900">0 s</dd>
                   </dl>
-                  <p class="mt-3 text-[12px] leading-snug text-slate-500">Kept C2 = no fail-safe hover under the piloted-flight rule (C2 never silent for more than 300 ms); under the 1 s waypoint rule all three multipath stacks keep C2 and FlexiPath’s 0 s gap remains. The cost: 7.5 Mbps less mean throughput than flying without the map, from the extra time on the satellite.</p>
+                  <p class="mt-3 text-[12px] leading-snug text-slate-500">Kept C2 = no fail-safe hover (C2 never silent for more than 300 ms at ≤ 60 km/h, 1 s above). Gap = total interruption per flight. No baseline gets a map: G shows the value of route foresight. The cost: 70.3 vs 82.6 Mbit/s mean throughput against reactive multipath (−15 %), from the time on the slower satellite.</p>
                 </div>
               </div>
             </article>
@@ -449,24 +444,24 @@
               <tbody>
                 <tr>
                   <th scope="row">Interruption per journey</th>
-                  <td class="num">3.7–16.4 s</td>
+                  <td class="num">3.6–16.8 s</td>
                   <td class="num">0–0.7 s</td>
                   <td class="num">0 s</td>
                   <td class="num is-fp">0–0.16 s</td>
                 </tr>
                 <tr>
                   <th scope="row">Critical packets delivered</th>
-                  <td class="num">77–85 %</td>
-                  <td class="num">97.0–98.3 %</td>
+                  <td class="num">75–84 %</td>
+                  <td class="num">96.9–98.3 %</td>
                   <td class="num">99.0–100 %</td>
-                  <td class="num is-fp">98.2–99.0 %</td>
+                  <td class="num is-fp">98.1–99.0 %</td>
                 </tr>
                 <tr>
                   <th scope="row">Duplicate bytes on protected flows</th>
                   <td class="num">0 %</td>
                   <td class="num">0 %</td>
-                  <td class="num">49–100 %</td>
-                  <td class="num is-fp">0.9–1.4 % (A–D)</td>
+                  <td class="num">52–100 %</td>
+                  <td class="num is-fp">1.0–1.5 % (A–D)</td>
                 </tr>
                 <tr>
                   <th scope="row">Mean radio power</th>
@@ -474,6 +469,13 @@
                   <td class="num">1.20 W</td>
                   <td class="num">2.65–3.39 W</td>
                   <td class="num is-fp">1.25–1.32 W (A–D)</td>
+                </tr>
+                <tr>
+                  <th scope="row">Mean throughput, G · H (radio shadows)</th>
+                  <td class="num">68.9 · 67.3 Mbit/s</td>
+                  <td class="num">82.6 · 85.7 Mbit/s</td>
+                  <td class="num">82.2 · 86.2 Mbit/s</td>
+                  <td class="num is-fp">70.2 · 62.3 Mbit/s</td>
                 </tr>
                 <tr>
                   <th scope="row">Use it when…</th>
@@ -493,10 +495,10 @@
                 <span class="font-mono text-[11.5px] text-slate-500">75 → 100 %</span>
               </div>
               <dl class="mt-5 grid grid-cols-[96px_minmax(0,1fr)_100px] items-center gap-x-3 gap-y-3.5 text-[13px] sm:grid-cols-[150px_minmax(0,1fr)_92px]">
-                <dt class="text-slate-600">Legacy OS</dt><dd class="lp-range" style="--c: #e11d48"><span data-lo="77.3" data-hi="84.9"></span></dd><dd class="text-right font-mono whitespace-nowrap text-slate-700">77–85 %</dd>
-                <dt class="text-slate-600">Reactive multipath</dt><dd class="lp-range" style="--c: #94a3b8"><span data-lo="97.0" data-hi="98.3"></span></dd><dd class="text-right font-mono whitespace-nowrap text-slate-700">97.0–98.3 %</dd>
+                <dt class="text-slate-600">Legacy OS</dt><dd class="lp-range" style="--c: #e11d48"><span data-lo="74.8" data-hi="83.8"></span></dd><dd class="text-right font-mono whitespace-nowrap text-slate-700">75–84 %</dd>
+                <dt class="text-slate-600">Reactive multipath</dt><dd class="lp-range" style="--c: #94a3b8"><span data-lo="96.9" data-hi="98.3"></span></dd><dd class="text-right font-mono whitespace-nowrap text-slate-700">96.9–98.3 %</dd>
                 <dt class="text-slate-600">Always duplicate</dt><dd class="lp-range" style="--c: #64748b"><span data-lo="99.0" data-hi="100"></span></dd><dd class="text-right font-mono whitespace-nowrap text-slate-700">99.0–100 %</dd>
-                <dt class="font-semibold text-fp">FlexiPath</dt><dd class="lp-range" style="--c: #0891b2"><span data-lo="98.2" data-hi="99.0"></span></dd><dd class="text-right font-mono whitespace-nowrap font-semibold text-slate-900">98.2–99.0 %</dd>
+                <dt class="font-semibold text-fp">FlexiPath</dt><dd class="lp-range" style="--c: #0891b2"><span data-lo="98.1" data-hi="99.0"></span></dd><dd class="text-right font-mono whitespace-nowrap font-semibold text-slate-900">98.1–99.0 %</dd>
               </dl>
             </div>
             <div class="lp-card lp-reveal p-5 sm:p-6" data-range data-min="0" data-max="3.5" data-unit="W">
@@ -520,12 +522,13 @@
               height="470"
               loading="lazy"
               class="block h-auto w-full"
-              alt="Scatter chart of critical packets delivered against mean radio power in scenarios A–D, G and H. Always duplicate: 99.0–100 % at 2.65–3.39 W. FlexiPath: 98.2–99.0 % at 1.25–1.39 W. Reactive multipath: 97.0–98.3 % at 1.20–1.21 W. The legacy OS is below the chart at 77–85 %. A callout gives the critical delivery gained per extra watt: 4.0 to 24.5 points for FlexiPath over reactive multipath, 0.3 to 0.9 points for always duplicate over FlexiPath."
+              alt="Scatter chart of critical packets delivered against mean radio power in scenarios A–D, G and H. Always duplicate: 99.0–100 % at 2.65–3.39 W. FlexiPath: 98.1–99.0 % at 1.25–1.39 W. Reactive multipath: 96.9–98.3 % at 1.20–1.21 W. The legacy OS is below the chart at 75–84 %. A callout gives the critical delivery gained per extra watt: 4.7 to 26.3 points for FlexiPath over reactive multipath, 0.2 to 0.9 points for always duplicate over FlexiPath."
             />
             <figcaption class="px-2 pt-2 pb-1 text-[12.5px] leading-snug text-slate-500">
               Every scenario, every stack: FlexiPath delivers almost what permanent duplication does, at about the radio
-              power of reactive multipath. Each extra watt buys 4–7 points of critical delivery the FlexiPath way, and only
-              0.3–0.9 points spent on permanent duplication.
+              power of reactive multipath. Each extra watt buys 4.7–7.6 points of critical delivery the FlexiPath way (against
+              the 250 ms reactive baseline; 1.6–7.6 against the 60 ms one), and only 0.2–0.9 points spent on permanent
+              duplication. Development seeds.
             </figcaption>
           </figure>
 
@@ -533,28 +536,32 @@
             <div class="lp-reveal rounded-2xl border border-slate-200 bg-white p-6">
               <h3 class="text-[15px] font-bold text-slate-900">Against reactive multipath</h3>
               <p class="mt-2 text-[14.5px] leading-relaxed text-slate-600">
-                FlexiPath loses 25–40 % fewer critical packets, raises voice quality (MOS) by 0.07–0.10 and acts 1.3–4.6 s
-                before the failure instead of 0.3–0.5 s after, for about 0.1 W more radio power: 4–7 points of critical
-                delivery per extra watt (24.5 in scenario D).
+                On held-out seeds, pooled over A–D, G and H, FlexiPath loses 38 % fewer critical C2 packets than reactive
+                multipath (95 % CI 33–42 %, seeds resampled), and 30 % fewer (25–35 %) when reactive multipath detects a
+                lost link as fast as FlexiPath (60 ms), for about 0.12 W more radio power. It acts 1.2–3.9 s before the
+                failure. The price: 15–28 % less throughput in the radio-shadow scenarios G and H. All with a spare modem
+                that wakes in 100 ms.
               </p>
             </div>
             <div class="lp-reveal rounded-2xl border border-slate-200 bg-white p-6">
               <h3 class="text-[15px] font-bold text-slate-900">Against always duplicate</h3>
               <p class="mt-2 text-[14.5px] leading-relaxed text-slate-600">
                 Permanent duplication delivers the most critical packets, 99–100 %, but draws 2.1–2.6× FlexiPath’s radio
-                power and copies 49–100 % of protected bytes, against FlexiPath’s ≈ 1 %. Each extra watt it draws buys only
-                0.3–0.9 points of critical delivery. When Wi-Fi and 5G die together
-                (scenario G), its two copies die together too: it kept C2 on 8 of 20 flights, FlexiPath on 20 of 20 (piloted-flight
-                hover rule, below).
+                power and copies 52–100 % of protected bytes, against FlexiPath’s ≈ 1 %. Each extra watt it draws buys only
+                0.2–0.9 points of critical delivery. When Wi-Fi and 5G die together
+                (scenario G), its two copies die together too: it kept C2 on 16 of 20 flights, FlexiPath on 20 of 20 (held-out
+                seeds, speed-consistent hover rule, below).
               </p>
             </div>
             <div class="lp-reveal rounded-2xl border border-slate-200 bg-white p-6 md:col-span-2">
               <h3 class="text-[15px] font-bold text-slate-900">The hover rule decides who keeps C2</h3>
               <p class="mt-2 text-[14.5px] leading-relaxed text-slate-600">
-                A drone hovers when its C2 link stays silent too long. Our default, 300 ms, suits a piloted drone: 3GPP TS
-                22.125 expects a stick command every 40 ms. Under it, FlexiPath is the only stack that keeps C2 on every flight
-                of every scenario (with a modem kept in a fast-resume state; with a 260 ms wake it hovers in D and most of H). For waypoint flight the standard allows 1 s; then all three multipath stacks keep C2, and
-                FlexiPath’s edge is its shorter gaps, its delivery and its power.
+                A drone hovers when its C2 link stays silent too long. 3GPP TS 22.125 specifies stick steering up to
+                60 km/h, so our rule follows the speed: 300 ms at ≤ 60 km/h, 1 s (waypoint flight) above. Under it, with a
+                spare modem that wakes in 100 ms, FlexiPath keeps C2 on every flight of every scenario; with the measured
+                260 ms wake it hovers on half of the flights in D and H. Reactive multipath hovers on the 10 slow flights
+                of D, G and H, but with FlexiPath’s 60 ms detection it keeps C2 on 19–20 of 20 there: in D and H the
+                difference comes from the detection constant. With 1 s at every speed all multipath stacks keep C2.
               </p>
             </div>
           </div>
@@ -576,9 +583,10 @@
             <div class="lp-card lp-reveal p-5 sm:p-6">
               <h4 class="text-[15px] font-bold text-slate-900">Checked once on unseen seeds</h4>
               <p class="mt-2 text-[14px] leading-relaxed text-slate-600">
-                Every scenario was re-run on a held-out block of seeds never used while building or tuning FlexiPath. The
-                conclusions hold: 0.6–1.1 points more critical packets than reactive multipath (95 % intervals exclude
-                zero), and FlexiPath again kept C2 on every flight.
+                The headline comes from a held-out block of seeds never used while building or tuning FlexiPath, with
+                confidence intervals that resample whole seeds. Per scenario: 0.6–1.2 points more critical packets than
+                reactive multipath, 0.4–0.8 points more than its 60 ms variant (intervals exclude zero), and FlexiPath
+                again kept C2 on every flight.
               </p>
             </div>
             <div class="lp-card lp-reveal p-5 sm:p-6">
@@ -599,8 +607,8 @@
               The model’s numbers were compared with published measurements: Linux defaults, measured Wi-Fi, 4G and 5G
               handovers, an LTE modem’s wake-up time and power, and Starlink’s latency and power. One was optimistic: a
               sleeping LTE modem took 260 ms to wake, not 100 ms. Re-run with 260 ms, FlexiPath’s lead over reactive
-              multipath grows wherever it predicts the failure, but an outage nobody predicts then exceeds the 300 ms
-              piloted budget. Time on the satellite also costs more in reality than in the model: a Starlink Mini draws
+              multipath grows wherever it predicts the failure (42 % fewer critical packets lost), but an outage nobody
+              predicts then exceeds the 300 ms piloted budget: FlexiPath hovers on half of the flights in D and H. Time on the satellite also costs more in reality than in the model: a Starlink Mini draws
               20–40 W.
             </p>
           </div>
@@ -725,7 +733,7 @@
               <span class="pin" aria-hidden="true"></span>
               <span class="lp-status">Done</span>
               <h3 class="mt-3 text-[18px] font-bold text-slate-900">Simulation prototype</h3>
-              <p class="mt-2 text-[14.5px] leading-relaxed text-slate-600">Deterministic network simulation, 3D digital twin, comparison with two existing designs and three ablations over 160 paired runs, checked on held-out seeds, and QoS/QoE guidelines.</p>
+              <p class="mt-2 text-[14.5px] leading-relaxed text-slate-600">Deterministic network simulation, 3D digital twin, comparison with two existing designs (one of them also with FlexiPath’s detection time) and three ablations over 160 paired runs, checked on held-out seeds, and QoS/QoE guidelines.</p>
             </li>
             <li class="lp-phase lp-reveal" style="--c: #2563eb">
               <span class="pin" aria-hidden="true"></span>
@@ -813,5 +821,34 @@
         </nav>
       </div>
     </footer>
+    <script>
+      // D-02: a page opened by double-click (file://) cannot load its module scripts and stylesheet, so it stays
+      // blank. This classic inline script still runs there: it tells the visitor to serve the folder over HTTP.
+      (function () {
+        if (location.protocol !== 'file:') return;
+        function show() {
+          var splash = document.getElementById('boot-splash');
+          if (splash) splash.style.display = 'none';
+          var box = document.createElement('div');
+          box.id = 'file-protocol-notice';
+          box.setAttribute('role', 'alert');
+          box.style.cssText = 'position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:24px;background:#0b1220;color:#e2e8f0;font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif';
+          box.innerHTML =
+            '<div style="max-width:640px">' +
+            '<div style="font-weight:800;letter-spacing:.12em;color:#22d3ee;margin-bottom:8px">FLEXIPATH</div>' +
+            '<h1 style="font-size:24px;margin:0 0 12px;color:#fff">Open this page through a local web server</h1>' +
+            '<p style="margin:0 0 12px">The browser opened this file directly (file://). In this mode it blocks the module scripts and the stylesheet, so the simulator can not start.</p>' +
+            '<p style="margin:0 0 8px">In a terminal, in the folder that holds this file, run:</p>' +
+            '<pre style="margin:0 0 8px;padding:10px 12px;background:#1e293b;border-radius:6px;color:#a5f3fc;white-space:pre-wrap">sh serve.sh</pre>' +
+            '<p style="margin:0 0 8px">or</p>' +
+            '<pre style="margin:0 0 12px;padding:10px 12px;background:#1e293b;border-radius:6px;color:#a5f3fc;white-space:pre-wrap">python3 -m http.server 8000</pre>' +
+            '<p style="margin:0">Then open <b>http://localhost:8000/</b> (guided demo: <b>http://localhost:8000/simulator.html?demo=1</b>). From the project folder, <b>npm run serve</b> builds and serves the site. README.txt has the details.</p>' +
+            '</div>';
+          document.body.appendChild(box);
+        }
+        if (document.body) show();
+        else document.addEventListener('DOMContentLoaded', show);
+      })();
+    </script>
   </body>
 </html>

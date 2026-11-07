@@ -30,6 +30,9 @@ const sentence = (s) => {
   const cap = t.charAt(0).toUpperCase() + t.slice(1);
   return /[.!?]$/.test(cap) ? cap : `${cap}.`;
 };
+const KIOSK_DWELL_MS = 9000; // kiosk mode: how long a paused card stays before the demo goes on
+const KIOSK_END_MS = 20000; // kiosk mode: how long the end card stays before the demo replays
+const QUICK_DWELL_MS = 6500; // 3-minute tour (?demo=3min): how long each paused card stays before the flight goes on
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const nth = (n) => ['First', 'Second', 'Third', 'Fourth', 'Fifth'][n] ?? `${n + 1}th`;
 const secs = (v) => (v < 1 ? v.toFixed(2) : v.toFixed(1));
@@ -48,6 +51,9 @@ export class GuidedDemo {
     this.unsubs = [];
     this.raf = 0;
     this._last = {};
+    this.kiosk = false; // ?kiosk=1 (D-06): paused cards step on by themselves until a visitor touches anything
+    this.quick = false; // ?demo=3min: a timed tour, no panel walk-throughs, cards step on by themselves, no replay
+    this._shownAt = 0;
     this._frame = this._frame.bind(this);
     this._build();
   }
@@ -214,6 +220,7 @@ export class GuidedDemo {
   // ── Rendering ─────────────────────────────────────────────────────────
   _render(spec) {
     this.spec = spec;
+    this._shownAt = performance.now();
     const R = this.refs;
     R.step.textContent = spec.step ?? '';
     R.title.textContent = spec.title ?? '';
@@ -259,6 +266,21 @@ export class GuidedDemo {
     if (!this.active) return;
     this.raf = requestAnimationFrame(this._frame);
     this._layout();
+    if (this.kiosk || this.quick) this._kioskStep();
+  }
+
+  /**
+   * Kiosk mode only (?kiosk=1, an unattended Demo Day screen): a card that waits for the visitor goes on by itself
+   * after a dwell time, and the end card replays the demo. The first key press or click turns kiosk mode off
+   * (Dashboard), so a hands-on visitor gets the normal demo, where nothing resumes by itself.
+   */
+  _kioskStep() {
+    const e = this.engine;
+    if (!this.spec || !(e.paused || e.completed)) return;
+    const waited = performance.now() - this._shownAt;
+    if (e.completed && this.spec === this.endCard) {
+      if (waited > KIOSK_END_MS && !this.quick) this.start(); // the 3-minute tour ends on the result card
+    } else if (waited > (this.quick ? QUICK_DWELL_MS : KIOSK_DWELL_MS)) this.next();
   }
 
   _target(spec) {
@@ -359,7 +381,10 @@ export class GuidedDemo {
     } else {
       const v = this.dash.refs.viewport.getBoundingClientRect();
       x = clamp(v.left + v.width / 2 - w / 2, MARGIN, vw - w - MARGIN);
-      y = clamp(v.bottom - h - 64, MARGIN, vh - h - MARGIN);
+      // D-10: keep the card clear of the playback bar, whatever its height.
+      const bar = this.dash.refs.play.parentElement.getBoundingClientRect();
+      const above = bar.height > 0 ? Math.min(v.bottom - h - 64, bar.top - h - 10) : v.bottom - h - 64;
+      y = clamp(above, MARGIN, vh - h - MARGIN);
     }
     y = clamp(y, MARGIN, Math.max(MARGIN, vh - h - MARGIN));
     const key = `${x | 0},${y | 0},${place},${ax | 0},${ay | 0}`;
@@ -385,7 +410,7 @@ export class GuidedDemo {
       e.setPaused(true);
       this.dash._updatePlay();
     }
-    const panels = (spec.panels ?? []).filter((k) => k.endsWith('!') || !this.shownPanels.has(k)).map((k) => k.replace(/!$/, ''));
+    const panels = (this.quick ? [] : spec.panels ?? []).filter((k) => k.endsWith('!') || !this.shownPanels.has(k)).map((k) => k.replace(/!$/, ''));
     this.moment = { ...spec, panels, resumeLabel: spec.resumeLabel ?? 'Resume the flight' };
     this.walk = null;
     this._render(this.moment);
@@ -541,6 +566,7 @@ export class GuidedDemo {
     const d = this.dash;
     this.walk = null;
     this._missionView();
+    if (this.quick) return this._render(this.endCard); // the tour goes straight to the result
     const list = EXPERIMENT_SCENARIOS.map((id) => `<b>${id}</b> ${esc(SCENARIOS[id].label)}`).join(' · ');
     this._render({
       step: 'MISSION COMPLETE · MORE TO FLY',

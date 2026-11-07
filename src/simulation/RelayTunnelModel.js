@@ -4,7 +4,7 @@
  * FlexiPath carries every flow inside a userspace UDP tunnel to an anchor relay. The drone's
  * physical address changes with the network it uses (private Wi-Fi DHCP, carrier CGNAT, LEO CGNAT)
  * and carrier NATs rebind ports when a mapping idles out. The relay re-learns the outer address from
- * the authenticated tunnel packets themselves (no handshake), so remote services only ever see the
+ * the tunnel packets themselves (no handshake; authentication is assumed, not modelled), so remote services only ever see the
  * static relay address and no TCP socket is reset by a path change. UDP encapsulation also passes
  * carrier middleboxes that drop unknown transport protocols.
  *

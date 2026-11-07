@@ -139,9 +139,9 @@ const LOGO = `
 
 const chartCard = (key, title, unit) => `
   <article class="hud-panel chart-card flex min-h-[148px] flex-col px-3 pt-2 pb-1">
-    <header class="flex items-center justify-between gap-2">
-      <h3 class="hud-title truncate" title="${title} · ${unit}">${title} <span class="font-mono text-[9px] tracking-normal text-slate-400 normal-case">${unit}</span></h3>
-      <div class="num flex shrink-0 gap-2.5 text-[10.5px] font-semibold">
+    <header class="flex items-start justify-between gap-2">
+      <h3 class="hud-title flex min-w-0 flex-col gap-0.5 leading-tight tracking-[0.1em]" title="${title} · ${unit}"><span class="truncate">${title}</span><span class="truncate font-mono text-[9px] tracking-normal text-slate-500 normal-case">${unit}</span></h3>
+      <div class="num flex shrink-0 flex-col items-end text-[10.5px] leading-tight font-semibold">
         <span class="text-fp" data-chart-fp="${key}">—</span><span class="text-legacy" data-chart-lg="${key}">—</span>
       </div>
     </header>
@@ -262,7 +262,7 @@ export class Dashboard {
         <div class="flex min-w-0 flex-1 items-center justify-center gap-2 overflow-hidden max-xl:order-last max-xl:basis-full max-xl:justify-start">
           <div class="state-pill min-w-0" data-ref="pill" aria-live="polite">
             <span class="dot shrink-0"></span><span class="shrink-0" data-ref="pillText">INITIALISING</span>
-            <span class="truncate font-mono text-[10px] font-semibold tracking-[0.04em] opacity-75" data-ref="pillDetail"></span>
+            <span class="pill-detail truncate font-mono text-[10px] font-semibold tracking-[0.04em]" data-ref="pillDetail"></span>
           </div>
         </div>
         <div class="flex min-w-0 flex-wrap items-center gap-2">
@@ -868,6 +868,15 @@ export class Dashboard {
     const el = document.createElement('div');
     el.className = `toast ${kind === 'warn' ? 'warn' : ''}`;
     el.textContent = message;
+    // D-10: anchor the stack in the twin's lower-right corner, above its playback bar, so a toast never hides the
+    // Legacy-vs-FlexiPath strip, the charts or the playback controls.
+    const vp = this.refs.viewport.getBoundingClientRect();
+    if (vp.height > 0) {
+      const bar = this.refs.play.parentElement.getBoundingClientRect();
+      const floor = bar.height > 0 ? bar.top - 8 : vp.bottom - 12;
+      this.refs.toasts.style.bottom = `${Math.max(16, window.innerHeight - floor)}px`;
+      this.refs.toasts.style.right = `${Math.max(16, window.innerWidth - vp.right + 12)}px`;
+    }
     this.refs.toasts.append(el);
     setTimeout(() => el.remove(), 2800);
     while (this.refs.toasts.childElementCount > 4) this.refs.toasts.firstElementChild.remove();
@@ -912,8 +921,29 @@ export class Dashboard {
   }
 
   /** The guided demo (GuidedDemo.js): the full mission, paused at each real decision until the visitor continues. */
-  startDemo() {
+  startDemo({ quick = false } = {}) {
+    this.demo.quick = quick;
     this.demo.start();
+  }
+
+  /**
+   * Kiosk mode (?kiosk=1, D-06) for an unattended screen: the intro shows over a flying mission (the engine runs
+   * behind it), the guided demo starts by itself after `delayMs`, and its cards step on by themselves. The first
+   * key press, click or touch hands control to the visitor: the automatic start and the auto-advance stop.
+   */
+  startKiosk(delayMs = 8000) {
+    this.refs.intro.hidden = false;
+    this.togglePause(false);
+    this.demo.kiosk = true;
+    const timer = setTimeout(() => {
+      if (this.demo.kiosk && !this.demo.active) this.startDemo();
+    }, delayMs);
+    const handOver = () => {
+      clearTimeout(timer);
+      this.demo.kiosk = false;
+      for (const t of ['keydown', 'pointerdown', 'wheel']) window.removeEventListener(t, handOver, true);
+    };
+    for (const t of ['keydown', 'pointerdown', 'wheel']) window.addEventListener(t, handOver, true);
   }
 
   // ── Modals ──────────────────────────────────────────────────────────────
