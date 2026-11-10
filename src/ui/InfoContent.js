@@ -85,7 +85,7 @@ const WHY = [
 
 const KEYS = [
   ['Space', 'Pause / resume'],
-  ['← / →', 'Back / forward 5 s'],
+  ['← / →', 'Back / forward 5 s (on a guided-demo card: back / next)'],
   ['M', 'Mission ↔ Advanced view'],
   ['D', 'Start the guided demo'],
   ['X', 'Experiments (paired trials)'],

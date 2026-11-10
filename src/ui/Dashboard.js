@@ -469,7 +469,10 @@ export class Dashboard {
   _bindToolbar() {
     this.modeButtons = [...this.root.querySelectorAll('[data-mode]')].filter((b) => b.tagName === 'BUTTON');
     for (const b of this.modeButtons) b.addEventListener('click', () => this.setMode(b.dataset.mode));
-    this.refs.scenario.addEventListener('change', () => this.setScenario(this.refs.scenario.value));
+    this.refs.scenario.addEventListener('change', () => {
+      this.setScenario(this.refs.scenario.value);
+      this.refs.scenario.blur(); // the page gets the keys back (Space, ← / →, F, G…), not the dropdown
+    });
     for (const b of this.refs.toolbar.querySelectorAll('[data-fault]')) b.addEventListener('click', () => this.injectFault(b.dataset.fault));
     this.refs.resetBtn.addEventListener('click', () => this.restart());
     this.refs.demoBtn.addEventListener('click', () => this.startDemo());
@@ -479,7 +482,9 @@ export class Dashboard {
 
   _bindKeyboard() {
     window.addEventListener('keydown', (e) => {
-      if (e.target.closest?.('input, textarea, select')) return;
+      // Text entry (the seed field) keeps its keys. The scenario dropdown and the speed slider pass the shortcuts on,
+      // so ← / → still jump the flight after using them (↑ / ↓ still change them).
+      if (e.target.closest?.('textarea, input:not([type="range"])')) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const key = e.key.toLowerCase();
       if (key === 'escape') {
@@ -819,19 +824,29 @@ export class Dashboard {
 
   /**
    * ← / →: jump the flight `seconds` back or forward (SimulationEngine.seek replays the run exactly). The panels and
-   * charts refill from the replayed ticks and the pause state stays as it was. Off while the intro or the guided
-   * demo shows (the demo uses the arrows for its cards).
+   * charts refill from the replayed ticks and the pause state stays as it was. On the intro an arrow means "explore
+   * freely" first. In the guided demo the arrows come here while the drones fly or the visitor holds the flight (a
+   * card that waits keeps them, GuidedDemo.onKey): a jump forward stops at the demo's next stop, and a jump back
+   * replays the demo's count of what happened without stopping (GuidedDemo.beginReplay).
    */
   seekBy(seconds) {
     const e = this.engine;
-    if (!this.refs.intro.hidden || this.demo.active) return;
+    if (!this.refs.intro.hidden) {
+      this.hideIntro();
+      this.togglePause(false);
+    }
     if (seconds > 0 && e.completed) return this.toast('Run complete · ← goes back 5 s');
+    if (seconds < 0 && e.tick <= 1) return;
     this.hooks.onSeek?.();
+    const replay = seconds < 0 && this.demo.active;
+    if (replay) this.demo.beginReplay();
     this._seeking = true;
+    this._seekHalt = false;
     try {
-      e.seek(e.t + seconds);
+      e.seek(e.t + seconds, { halt: () => this._seekHalt });
     } finally {
       this._seeking = false;
+      if (replay) this.demo.endReplay();
     }
     // Replayed inputs (speed, fail-safe) change the engine, not the controls.
     this.controls.setSpeed(e.config.speedKmh);
@@ -839,7 +854,8 @@ export class Dashboard {
     this._updatePlay();
     this.dirty = true;
     this._chartDirty = true;
-    this.toast(`${seconds < 0 ? '⏪' : '⏩'} ${Math.abs(seconds)} s · t = ${e.t.toFixed(1)} s`);
+    const at = `t = ${e.t.toFixed(1)} s`;
+    this.toast(this._seekHalt ? `⏩ to the next decision · ${at}` : `${seconds < 0 ? '⏪' : '⏩'} ${Math.abs(seconds)} s · ${at}`);
   }
 
   /** The beam legend in the twin's corner (the list button in the playback bar). */

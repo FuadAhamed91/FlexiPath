@@ -194,7 +194,12 @@ vehicles, nodes, beams, particles }` in the console.
   ticks at once; backward resets to the start settings and replays the run up to the target with the visitor's
   recorded inputs (`engine.inputs`: speed, fail-safe and manual faults, by tick; a new input after a rewind drops the
   recorded future). The ticks run with their events, so panels and charts refill. Keep any new visitor input to the
-  engine journaled (`_journal`), or a rewind will lose it. Off while the intro or the guided demo shows.
+  engine journaled (`_journal`), or a rewind will lose it. On the intro an arrow first does what "Explore freely"
+  does. In the guided demo a card that waits keeps the arrows (`GuidedDemo.onKey`); while the drones fly or the
+  visitor holds the flight they jump: forward ends at the demo's next stop (`seek`'s `halt`, set in `_moment`), back
+  re-counts the demo's handovers from the replayed events without stopping (`beginReplay` / `endReplay`). The key
+  handler skips only text fields: the scenario dropdown (blurred after a change) and the speed slider pass the
+  shortcuts on.
 - Both views are deliberately compact:
   - The header, toolbar and decision loop are one line each.
   - The loop is a stepper where only the active stage shows its caption and time. Every stage keeps its caption as a
@@ -231,7 +236,7 @@ vehicles, nodes, beams, particles }` in the console.
   offers all of them (`ALL_PANELS`), 10 paired trials, a replay and `explore()` (leave the demo and restart the
   mission). Captions while the flight runs (`_caption`) never replace a paused card. `Dashboard.togglePause` reports
   the visitor's own pauses to `demo.onUserPause` (Hold flight, the play button and Space all pause the same way);
-  `→` / Enter next, `←` back; Exit resumes the flight. Keep the moment captions to two or three sentences, the
+  on a card that waits `→` / Enter next and `←` back (while the drones fly `←` / `→` jump 5 s); Exit resumes the flight. Keep the moment captions to two or three sentences, the
   pauses to the real moments, and a stop's panel list to the panels that moment actually changed.
 - Lucide: an `<i data-lucide="name">` renders only if the icon is imported and added to `ICONS` in `Dashboard.js`,
   and `renderIcons(subtree)` runs after the HTML is injected.

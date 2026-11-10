@@ -108,7 +108,7 @@ export class GuidedDemo {
       e.on('tick', (s) => this._onTick(s)),
       e.on('complete', () => this._onComplete()),
       e.on('reset', () => {
-        if (!this._resetting) this.stop();
+        if (!this._resetting && !this.replaying) this.stop();
       }),
     ];
     this._resetting = true;
@@ -155,12 +155,47 @@ export class GuidedDemo {
     this.dash.restart({ scenario: 'mission' });
   }
 
-  /** Keyboard, from the dashboard: → / Enter next, ← back. */
+  /**
+   * Keyboard, from the dashboard. A card that waits for the visitor (a stop, its panels, the end) takes → / Enter
+   * (next) and ← (back). While the drones fly, or while the visitor holds the flight, ← / → go back to the dashboard
+   * and jump the flight 5 s (Dashboard.seekBy); Enter still steps the card.
+   */
   onKey(key) {
     if (!this.active) return false;
-    if (key === 'arrowright' || key === 'enter') return this.next(), true;
-    if (key === 'arrowleft') return this.back(), true;
+    const e = this.engine;
+    const waits = !!this.walk || e.completed || (e.paused && !this.spec?.held);
+    if (key === 'enter' || (waits && key === 'arrowright')) return this.next(), true;
+    if (waits && key === 'arrowleft') return this.back(), true;
     return false;
+  }
+
+  /**
+   * A jump back (←) resets the engine and replays the flight up to the new time (SimulationEngine.seek). The demo
+   * stays on: it counts the handovers and interruptions again from the replayed events, without stopping or
+   * captioning, so the next stop is the next one after the new time. The panels already explained stay explained.
+   */
+  beginReplay() {
+    this.replaying = true;
+    this.seen = new Set();
+    this.switches = 0;
+    this.lgLost = 0;
+    this.lgBack = 0;
+    this.predictedFor = null;
+    this.lastSwitchT = undefined;
+    this.moment = null;
+    this.walk = null;
+  }
+
+  endReplay() {
+    this.replaying = false;
+    const last = this.moment?.title;
+    this.moment = {
+      step: 'GUIDED DEMO · BACK 5 s',
+      title: `Replaying from ${this.engine.t.toFixed(1)} s`,
+      body: `${last ? `Before this point: ${esc(last)}. ` : ''}The flight stops again at the next decision.`,
+      panels: [],
+    };
+    this._render({ ...this.moment, ...(this.engine.paused ? { held: true } : { running: true }) });
   }
 
   /** The visitor paused or resumed the simulation themselves (Hold flight, the play button or Space). */
@@ -406,6 +441,11 @@ export class GuidedDemo {
    */
   _moment(spec) {
     const e = this.engine;
+    if (this.replaying) {
+      this.moment = { ...spec, panels: [] }; // a stop already passed: count it, don't stop
+      return;
+    }
+    if (this.dash._seeking) this.dash._seekHalt = true; // a jump forward ends at this stop
     if (!e.completed) {
       e.setPaused(true);
       this.dash._updatePlay();
@@ -418,8 +458,9 @@ export class GuidedDemo {
 
   /** A caption while the flight runs; it never replaces a paused moment's card. */
   _caption(spec) {
-    if (this.engine.paused) return;
+    if (this.engine.paused && !this.replaying) return;
     this.moment = { ...spec, panels: [] };
+    if (this.replaying) return;
     this._render({ ...this.moment, running: true });
   }
 

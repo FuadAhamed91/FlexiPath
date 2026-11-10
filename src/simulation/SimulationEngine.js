@@ -335,9 +335,10 @@ export class SimulationEngine {
    * Jump to simulated time `t` (whole ticks; the ← / → keys). Forward runs the missing ticks at once. Backward
    * replays the run from the start with the same seed, start settings and recorded inputs; the engine is
    * deterministic, so it reaches exactly the state the run had at that time. Inputs recorded after the target play
-   * again when the clock passes them, as in a recording. The playback rate and the pause state are kept.
+   * again when the clock passes them, as in a recording. The playback rate and the pause state are kept. `halt`, if
+   * given, is checked after every tick and ends the run there (the guided demo stops a jump at its next stop).
    */
-  seek(t) {
+  seek(t, { halt = null } = {}) {
     const target = Math.max(1, Math.round(t / DT));
     if (target < this.tick) {
       const inputs = this.inputs;
@@ -348,7 +349,10 @@ export class SimulationEngine {
       this.inputs = inputs;
       this._inputAt = 0;
     }
-    while (this.tick < target && !this.completed) this.step();
+    while (this.tick < target && !this.completed) {
+      this.step();
+      if (halt?.()) break;
+    }
     this.accumulator = 0;
     this.prevSnapshot = this.snapshot;
     return this.snapshot;
