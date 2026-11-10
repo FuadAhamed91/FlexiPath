@@ -185,9 +185,16 @@ vehicles, nodes, beams, particles }` in the console.
   panels render, so each panel scopes its own lookups. Panels refresh at most every 90 ms when dirty; charts every
   180 ms and only while the Advanced view shows them. `makeSetter` (`format.js`) skips unchanged DOM writes; pass dynamic text
   through `esc()`.
-- Views: `data-mode="mission|advanced"` on `.fp-shell`, elements tagged `data-view`; theatre mode (`data-theatre`)
-  hides `.fp-deck`, `.fp-bottom` and `.fp-toolbar`. These rules sit at the end of `styles.css`, outside `@layer`,
-  with `!important`.
+- Views: `data-mode="mission|advanced"` on `.fp-shell`, elements tagged `data-view`. The full-screen twin (`T` or the
+  expand button, `setTheatre`, `data-theatre`) makes the viewport cover the screen and hides everything else, inside
+  the viewport too, except the canvas host, the vignette, the route strip (`data-ref="routeStrip"`) and the camera row
+  (`.fp-camctl`), whose expand button becomes the exit button. It also asks the browser for full screen, and leaving
+  that (Esc) leaves the twin view. These rules sit at the end of `styles.css`, outside `@layer`, with `!important`.
+- `←` / `→` (`Dashboard.seekBy`) jump the flight 5 s through `SimulationEngine.seek(t)`: forward runs the missing
+  ticks at once; backward resets to the start settings and replays the run up to the target with the visitor's
+  recorded inputs (`engine.inputs`: speed, fail-safe and manual faults, by tick; a new input after a rewind drops the
+  recorded future). The ticks run with their events, so panels and charts refill. Keep any new visitor input to the
+  engine journaled (`_journal`), or a rewind will lose it. Off while the intro or the guided demo shows.
 - Both views are deliberately compact:
   - The header, toolbar and decision loop are one line each.
   - The loop is a stepper where only the active stage shows its caption and time. Every stage keeps its caption as a

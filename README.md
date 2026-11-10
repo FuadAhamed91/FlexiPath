@@ -675,8 +675,8 @@ Simulator URL parameters (on `simulator.html`; a link to the site root that carr
 simulator): `?scenario=A&seed=2026&speed=90&mode=advanced&focus=legacy&camera=overview&paused=1`, `intro=0` skips
 the intro screen, `demo=1` starts the guided demo, `demo=3min` starts the timed 3-minute tour (12 cards of 6.5 s each, no panel walk-throughs, ends on the result card; about 170 s with the 92 s flight; → / Enter skips a card), `kiosk=1` is for an unattended screen (the mission flies behind the intro, the guided demo starts after 8 s and its cards step on by themselves; the first key press or click hands control to the visitor), `models=procedural` forces the built-in primitive models, `look=twin` starts in the neon digital-twin look.
 
-Keys: `Space` pause · `M` mission / advanced · `D` guided demo (`→` next, `←` back) · `X` experiments · `I` why FlexiPath? · `F` Wi-Fi fade ·
-`G` 5G outage · `R` reset · `1`/`2` focus · `C` camera · `V` ghost drone · `T` theatre · `L` real / twin look · `E` export JSON.
+Keys: `Space` pause · `←` / `→` back / forward 5 s · `M` mission / advanced · `D` guided demo (`→` next, `←` back) · `X` experiments · `I` why FlexiPath? · `F` Wi-Fi fade ·
+`G` 5G outage · `R` reset · `1`/`2` focus · `C` camera · `V` ghost drone · `T` full-screen twin (Esc leaves it) · `L` real / twin look · `E` export JSON.
 
 ### Exports
 

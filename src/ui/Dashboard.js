@@ -298,7 +298,7 @@ export class Dashboard {
           <div class="absolute inset-0 isolate" data-ref="canvasHost"></div>
           <div class="viewport-vignette"></div>
 
-          <div class="overlay-glass pointer-events-none absolute inset-x-3 top-3 px-3 pt-2 pb-2.5">
+          <div class="overlay-glass pointer-events-none absolute inset-x-3 top-3 px-3 pt-2 pb-2.5" data-ref="routeStrip">
             <div class="relative">
               <div class="flex">${zones}</div>
               <div class="absolute inset-x-0 bottom-0 h-[6px]" data-ref="shadowStrip"></div>
@@ -314,16 +314,8 @@ export class Dashboard {
               <button type="button" class="px-2.5" data-cam="overview" aria-pressed="false"><i data-lucide="map"></i>Overview</button>
             </div>
             <button type="button" class="btn overlay-glass h-[36px]!" data-ref="look" aria-label="Switch between the realistic and the neon digital-twin look (L)" title="Realistic night / neon digital twin (L)"></button>
-            <button type="button" class="btn overlay-glass h-[36px]!" data-ref="theatre" aria-label="Theatre mode (T)" title="Theatre mode (T)"><i data-lucide="maximize-2"></i></button>
+            <button type="button" class="btn overlay-glass h-[36px]!" data-ref="theatre" aria-label="Full screen (T)" title="Full screen (T)"><i data-lucide="maximize-2"></i></button>
             <button type="button" class="btn overlay-glass h-[36px]!" data-ref="help" aria-label="Why FlexiPath, help and shortcuts" title="Why FlexiPath? · shortcuts (I)"><i data-lucide="circle-help"></i></button>
-          </div>
-
-          <div class="overlay-glass pointer-events-none absolute top-[62px] left-3 px-3 py-2" data-ref="kpi" hidden>
-            <div class="hud-label">Simulated interruption (cumulative)</div>
-            <div class="num mt-1.5 flex items-baseline gap-5">
-              <span class="text-[10px] font-bold tracking-[0.16em] text-fp">FLEXIPATH <b class="text-[22px]" data-ref="kpiFp">0.00</b> s</span>
-              <span class="text-[10px] font-bold tracking-[0.16em] text-legacy">LEGACY OS <b class="text-[22px]" data-ref="kpiLg">0.00</b> s</span>
-            </div>
           </div>
 
           <div class="offscreen-chip" data-ref="offscreen" hidden aria-hidden="true"></div>
@@ -452,6 +444,10 @@ export class Dashboard {
     this.refs.play.addEventListener('click', () => this.togglePause());
     this.refs.help.addEventListener('click', () => this.openInfo());
     this.refs.theatre.addEventListener('click', () => this.setTheatre(!this.view.theatre));
+    // Leaving the browser's full screen (Esc, or its own button) also leaves the full-screen twin.
+    document.addEventListener('fullscreenchange', () => {
+      if (!document.fullscreenElement && this.view.theatre) this.setTheatre(false);
+    });
     this.refs.legendBtn.addEventListener('click', () => this.setLegend(this.refs.shell.dataset.legend !== '1'));
     this.refs.look.addEventListener('click', () => this.setLook(this.view.look === 'real' ? 'twin' : 'real'));
     this.refs.modal.addEventListener('click', (e) => {
@@ -488,6 +484,7 @@ export class Dashboard {
       const key = e.key.toLowerCase();
       if (key === 'escape') {
         if (!this.refs.modal.hidden) return this.closeModal();
+        if (this.view.theatre) return this.setTheatre(false);
         if (this.demo.active) return this.demo.stop();
         return;
       }
@@ -495,6 +492,8 @@ export class Dashboard {
       if (this.demo.active && this.demo.onKey(key)) return e.preventDefault();
       const actions = {
         ' ': () => this.togglePause(),
+        arrowleft: () => this.seekBy(-5),
+        arrowright: () => this.seekBy(5),
         r: () => this.restart(),
         1: () => this.setFocus('flexipath'),
         2: () => this.setFocus('legacy'),
@@ -527,7 +526,7 @@ export class Dashboard {
     e.on('tick', (snap) => this._onTick(snap));
     e.on('event', (ev) => {
       this.log.push(ev);
-      if (ev.code === 'FAULT') this.toast(ev.message.replace('FAULT INJECTED · ', '⚠ '), 'warn');
+      if (ev.code === 'FAULT' && !this._seeking) this.toast(ev.message.replace('FAULT INJECTED · ', '⚠ '), 'warn');
     });
     e.on('decision', (rec) => {
       this.decision.push(rec);
@@ -538,7 +537,8 @@ export class Dashboard {
       this.dirty = true;
       if (this.demo.active) return; // the guided demo shows its own experiment step
       setTimeout(() => {
-        if (this.refs.modal.hidden) this.openSummary(summary);
+        // Not if the visitor went back (←) or restarted in the meantime.
+        if (this.refs.modal.hidden && this.engine.completed) this.openSummary(summary);
       }, 900);
     });
   }
@@ -663,10 +663,6 @@ export class Dashboard {
       this.controls.update(snap);
       this._updateChartLegends(snap);
     }
-    if (this.view.theatre) {
-      this.refs.kpiFp.textContent = snap.agents.flexipath.stats.stallTime.toFixed(2);
-      this.refs.kpiLg.textContent = snap.agents.legacy.stats.stallTime.toFixed(2);
-    }
 
     const fpX = snap.agents.flexipath.vehicle.cx;
     const lgX = snap.agents.legacy.vehicle.cx;
@@ -768,13 +764,26 @@ export class Dashboard {
     this.dirty = true;
   }
 
-  /** Theatre mode: hide decks, toolbar and bottom row so the 3D twin fills the screen (demos / video capture). */
+  /**
+   * Full screen (T, the expand button): the 3D twin fills the screen with only the route strip and the camera row
+   * over it; every other HUD element is hidden. It also asks the browser for full screen where that is allowed (from
+   * a click or key press; iPhones have no page full screen, so the twin then fills the window). Esc, T or the same
+   * button leave it.
+   */
   setTheatre(on) {
     this.view.theatre = on;
     this.refs.shell.dataset.theatre = on ? '1' : '0';
-    this.refs.kpi.hidden = !on;
+    const label = on ? 'Exit full screen (T or Esc)' : 'Full screen (T)';
+    this.refs.theatre.title = label;
+    this.refs.theatre.setAttribute('aria-label', label);
     this.refs.theatre.innerHTML = `<i data-lucide="${on ? 'minimize-2' : 'maximize-2'}"></i>`;
     renderIcons(this.refs.theatre);
+    const page = document.documentElement;
+    if (on && !document.fullscreenElement && page.requestFullscreen) {
+      Promise.resolve(page.requestFullscreen({ navigationUI: 'hide' })).catch(() => {});
+    } else if (!on && document.fullscreenElement && document.exitFullscreen) {
+      Promise.resolve(document.exitFullscreen()).catch(() => {});
+    }
     this.dirty = true;
     if (!on) this._chartDirty = true;
   }
@@ -806,6 +815,31 @@ export class Dashboard {
     this.engine.setPaused(paused);
     this._updatePlay();
     this.demo.onUserPause(paused);
+  }
+
+  /**
+   * ← / →: jump the flight `seconds` back or forward (SimulationEngine.seek replays the run exactly). The panels and
+   * charts refill from the replayed ticks and the pause state stays as it was. Off while the intro or the guided
+   * demo shows (the demo uses the arrows for its cards).
+   */
+  seekBy(seconds) {
+    const e = this.engine;
+    if (!this.refs.intro.hidden || this.demo.active) return;
+    if (seconds > 0 && e.completed) return this.toast('Run complete · ← goes back 5 s');
+    this.hooks.onSeek?.();
+    this._seeking = true;
+    try {
+      e.seek(e.t + seconds);
+    } finally {
+      this._seeking = false;
+    }
+    // Replayed inputs (speed, fail-safe) change the engine, not the controls.
+    this.controls.setSpeed(e.config.speedKmh);
+    this.controls.setFailSafe(e.config.failSafe);
+    this._updatePlay();
+    this.dirty = true;
+    this._chartDirty = true;
+    this.toast(`${seconds < 0 ? '⏪' : '⏩'} ${Math.abs(seconds)} s · t = ${e.t.toFixed(1)} s`);
   }
 
   /** The beam legend in the twin's corner (the list button in the playback bar). */

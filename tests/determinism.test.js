@@ -20,6 +20,41 @@ describe('determinism', () => {
     expect(history()).toBe(history());
   });
 
+  it('seek() lands on the state of an uninterrupted run, replaying the visitor inputs', () => {
+    // Visitor inputs by tick, applied between ticks as the UI does.
+    const INPUTS = {
+      120: (e) => e.injectFault('wifi-fade'),
+      200: (e) => e.setSpeedKmh(90, { log: true }),
+      260: (e) => e.setFailSafe(false),
+    };
+    const fly = (e, until, inputs = INPUTS) => {
+      while (e.tick < until && !e.completed) {
+        inputs[e.tick]?.(e);
+        e.step();
+      }
+      return e;
+    };
+    const state = (e) => JSON.stringify([e.tick, e.snapshot, e.events, e.decisions, e.history, e.faultLog, e.config]);
+    const engine = () => new SimulationEngine({ seed: 2026, speedKmh: 60, scenario: 'mission' });
+    const at = (tick, inputs) => state(fly(engine(), tick, inputs));
+
+    const e = fly(engine(), 450);
+    e.seek(40); // back 5 s
+    expect(state(e)).toBe(at(400));
+    e.seek(15); // back past the speed and fail-safe inputs: they play again
+    expect(state(e)).toBe(at(150));
+    fly(e, 450, {});
+    expect(state(e)).toBe(at(450));
+    e.seek(50); // forward 5 s
+    expect(state(e)).toBe(at(500));
+
+    // A new input after a rewind replaces the recorded future.
+    e.seek(15);
+    e.injectFault('cell-outage');
+    fly(e, 300, {});
+    expect(state(e)).toBe(at(300, { 120: INPUTS[120], 150: (x) => x.injectFault('cell-outage') }));
+  });
+
   it("treats '2026' and 2026 as the same seed", () => {
     const a = runSingle({ seed: 2026, speedKmh: 60, scenario: 'A' });
     const b = runSingle({ seed: '2026', speedKmh: 60, scenario: 'A' });
