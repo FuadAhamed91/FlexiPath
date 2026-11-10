@@ -55,6 +55,14 @@ describe('determinism', () => {
     expect(state(e)).toBe(at(300, { 120: INPUTS[120], 150: (x) => x.injectFault('cell-outage') }));
   });
 
+  it('seek() ends a jump where halt() says so (a guided-demo stop)', () => {
+    const e = new SimulationEngine({ seed: 2026, speedKmh: 60, scenario: 'mission' });
+    while (e.tick < 100) e.step();
+    e.seek(20, { halt: () => e.tick >= 130 });
+    expect(e.tick).toBe(130);
+    expect(e.prevSnapshot).toBe(e.snapshot);
+  });
+
   it("treats '2026' and 2026 as the same seed", () => {
     const a = runSingle({ seed: 2026, speedKmh: 60, scenario: 'A' });
     const b = runSingle({ seed: '2026', speedKmh: 60, scenario: 'A' });
