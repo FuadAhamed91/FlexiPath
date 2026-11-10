@@ -92,7 +92,7 @@ const KEYS = [
   ['F / G', 'Inject Wi-Fi fade / 5G cell outage'],
   ['R', 'Reset scenario (same seed)'],
   ['1 / 2', 'Focus FlexiPath / Legacy'],
-  ['C · V · T', 'Camera · ghost drone · theatre'],
+  ['C · V · T', 'Camera · ghost drone · full-screen twin'],
   ['L', 'Realistic night ↔ neon digital twin'],
   ['E', 'Export run as JSON'],
 ];

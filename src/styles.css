@@ -1747,11 +1747,49 @@ body {
 
 /* View switching (unlayered on purpose: these structural rules must beat the layout utilities). */
 .fp-shell[data-mode='mission'] [data-view='advanced'],
-.fp-shell[data-mode='advanced'] [data-view='mission'],
+.fp-shell[data-mode='advanced'] [data-view='mission'] {
+  display: none !important;
+}
+/*
+ * Full-screen twin (Dashboard.setTheatre, T): the 3D view alone covers the screen. Everything else in the shell, and
+ * every overlay inside the viewport except the canvas host (the scene and its labels), the vignette and the exit
+ * button, is hidden. Modals (z-index 60) and toasts (70) still show above it.
+ */
+.fp-shell[data-theatre='1'] > header,
+.fp-shell[data-theatre='1'] .fp-toolbar,
+.fp-shell[data-theatre='1'] .fp-loop,
 .fp-shell[data-theatre='1'] .fp-deck,
 .fp-shell[data-theatre='1'] .fp-bottom,
-.fp-shell[data-theatre='1'] .fp-toolbar {
+.fp-shell[data-theatre='1'] .viewport > :not([data-ref='canvasHost'], .viewport-vignette, .theatre-exit) {
   display: none !important;
+}
+.fp-shell[data-theatre='1'] .viewport {
+  position: fixed !important;
+  inset: 0;
+  z-index: 50;
+  height: auto !important;
+  min-height: 0 !important;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+.theatre-exit {
+  display: none !important;
+}
+.fp-shell[data-theatre='1'] .theatre-exit {
+  display: inline-flex !important;
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 5;
+  transition: opacity 0.3s ease;
+}
+.fp-shell[data-theatre='1'][data-idle='1'] .theatre-exit {
+  opacity: 0;
+  pointer-events: none;
+}
+.fp-shell[data-theatre='1'][data-idle='1'] .viewport {
+  cursor: none;
 }
 /* Advanced view: the side column shows one tab's panels (Dashboard.setPanelTab); the charts open on demand. */
 .fp-shell[data-mode='advanced'] [data-tab-panel].is-tab-off,
@@ -1806,9 +1844,6 @@ body {
   }
   .fp-shell[data-mode='advanced'] .fp-main {
     grid-template-columns: minmax(0, 1fr) 372px;
-  }
-  .fp-shell[data-theatre='1'] .fp-main {
-    grid-template-columns: minmax(0, 1fr);
   }
 }
 /* Projector heights (1366×768, 1280×720; D-03): the twin gives up height so the open step timeline or the charts
