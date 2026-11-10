@@ -297,9 +297,8 @@ export class Dashboard {
         <main class="viewport hud-panel relative order-first h-[62vh] min-h-[380px] overflow-hidden xl:order-none xl:h-auto" data-ref="viewport">
           <div class="absolute inset-0 isolate" data-ref="canvasHost"></div>
           <div class="viewport-vignette"></div>
-          <button type="button" class="theatre-exit btn overlay-glass h-[36px]!" data-ref="theatreExit" aria-label="Exit full screen (Esc)" title="Exit full screen (Esc)"><i data-lucide="minimize-2"></i>Exit full screen</button>
 
-          <div class="overlay-glass pointer-events-none absolute inset-x-3 top-3 px-3 pt-2 pb-2.5">
+          <div class="overlay-glass pointer-events-none absolute inset-x-3 top-3 px-3 pt-2 pb-2.5" data-ref="routeStrip">
             <div class="relative">
               <div class="flex">${zones}</div>
               <div class="absolute inset-x-0 bottom-0 h-[6px]" data-ref="shadowStrip"></div>
@@ -315,7 +314,7 @@ export class Dashboard {
               <button type="button" class="px-2.5" data-cam="overview" aria-pressed="false"><i data-lucide="map"></i>Overview</button>
             </div>
             <button type="button" class="btn overlay-glass h-[36px]!" data-ref="look" aria-label="Switch between the realistic and the neon digital-twin look (L)" title="Realistic night / neon digital twin (L)"></button>
-            <button type="button" class="btn overlay-glass h-[36px]!" data-ref="theatre" aria-label="Full-screen twin (T)" title="Full-screen twin (T)"><i data-lucide="maximize-2"></i></button>
+            <button type="button" class="btn overlay-glass h-[36px]!" data-ref="theatre" aria-label="Full screen (T)" title="Full screen (T)"><i data-lucide="maximize-2"></i></button>
             <button type="button" class="btn overlay-glass h-[36px]!" data-ref="help" aria-label="Why FlexiPath, help and shortcuts" title="Why FlexiPath? · shortcuts (I)"><i data-lucide="circle-help"></i></button>
           </div>
 
@@ -445,14 +444,10 @@ export class Dashboard {
     this.refs.play.addEventListener('click', () => this.togglePause());
     this.refs.help.addEventListener('click', () => this.openInfo());
     this.refs.theatre.addEventListener('click', () => this.setTheatre(!this.view.theatre));
-    this.refs.theatreExit.addEventListener('click', () => this.setTheatre(false));
     // Leaving the browser's full screen (Esc, or its own button) also leaves the full-screen twin.
     document.addEventListener('fullscreenchange', () => {
       if (!document.fullscreenElement && this.view.theatre) this.setTheatre(false);
     });
-    for (const type of ['pointermove', 'pointerdown']) {
-      this.refs.viewport.addEventListener(type, () => this.view.theatre && this._wakeTheatreControls());
-    }
     this.refs.legendBtn.addEventListener('click', () => this.setLegend(this.refs.shell.dataset.legend !== '1'));
     this.refs.look.addEventListener('click', () => this.setLook(this.view.look === 'real' ? 'twin' : 'real'));
     this.refs.modal.addEventListener('click', (e) => {
@@ -497,6 +492,8 @@ export class Dashboard {
       if (this.demo.active && this.demo.onKey(key)) return e.preventDefault();
       const actions = {
         ' ': () => this.togglePause(),
+        arrowleft: () => this.seekBy(-5),
+        arrowright: () => this.seekBy(5),
         r: () => this.restart(),
         1: () => this.setFocus('flexipath'),
         2: () => this.setFocus('legacy'),
@@ -529,7 +526,7 @@ export class Dashboard {
     e.on('tick', (snap) => this._onTick(snap));
     e.on('event', (ev) => {
       this.log.push(ev);
-      if (ev.code === 'FAULT') this.toast(ev.message.replace('FAULT INJECTED · ', '⚠ '), 'warn');
+      if (ev.code === 'FAULT' && !this._seeking) this.toast(ev.message.replace('FAULT INJECTED · ', '⚠ '), 'warn');
     });
     e.on('decision', (rec) => {
       this.decision.push(rec);
@@ -540,7 +537,8 @@ export class Dashboard {
       this.dirty = true;
       if (this.demo.active) return; // the guided demo shows its own experiment step
       setTimeout(() => {
-        if (this.refs.modal.hidden) this.openSummary(summary);
+        // Not if the visitor went back (←) or restarted in the meantime.
+        if (this.refs.modal.hidden && this.engine.completed) this.openSummary(summary);
       }, 900);
     });
   }
@@ -767,29 +765,27 @@ export class Dashboard {
   }
 
   /**
-   * Full-screen twin (T, the expand button): the 3D view alone fills the screen and every HUD element is hidden.
-   * It also asks the browser for full screen where that is allowed (from a click or key press; iPhones have no page
-   * full screen, so the twin then fills the window). Esc, T or the corner button leave it.
+   * Full screen (T, the expand button): the 3D twin fills the screen with only the route strip and the camera row
+   * over it; every other HUD element is hidden. It also asks the browser for full screen where that is allowed (from
+   * a click or key press; iPhones have no page full screen, so the twin then fills the window). Esc, T or the same
+   * button leave it.
    */
   setTheatre(on) {
     this.view.theatre = on;
     this.refs.shell.dataset.theatre = on ? '1' : '0';
+    const label = on ? 'Exit full screen (T or Esc)' : 'Full screen (T)';
+    this.refs.theatre.title = label;
+    this.refs.theatre.setAttribute('aria-label', label);
+    this.refs.theatre.innerHTML = `<i data-lucide="${on ? 'minimize-2' : 'maximize-2'}"></i>`;
+    renderIcons(this.refs.theatre);
     const page = document.documentElement;
     if (on && !document.fullscreenElement && page.requestFullscreen) {
       Promise.resolve(page.requestFullscreen({ navigationUI: 'hide' })).catch(() => {});
     } else if (!on && document.fullscreenElement && document.exitFullscreen) {
       Promise.resolve(document.exitFullscreen()).catch(() => {});
     }
-    this._wakeTheatreControls();
     this.dirty = true;
     if (!on) this._chartDirty = true;
-  }
-
-  /** In the full-screen twin, the exit button and the pointer fade out after 2.5 s without movement. */
-  _wakeTheatreControls() {
-    clearTimeout(this._idleTimer);
-    delete this.refs.shell.dataset.idle;
-    if (this.view.theatre) this._idleTimer = setTimeout(() => (this.refs.shell.dataset.idle = '1'), 2500);
   }
 
   /** World look: 'real' (night city and desert) or 'twin' (the neon digital twin). The network layer is the same in both. */
@@ -819,6 +815,31 @@ export class Dashboard {
     this.engine.setPaused(paused);
     this._updatePlay();
     this.demo.onUserPause(paused);
+  }
+
+  /**
+   * ← / →: jump the flight `seconds` back or forward (SimulationEngine.seek replays the run exactly). The panels and
+   * charts refill from the replayed ticks and the pause state stays as it was. Off while the intro or the guided
+   * demo shows (the demo uses the arrows for its cards).
+   */
+  seekBy(seconds) {
+    const e = this.engine;
+    if (!this.refs.intro.hidden || this.demo.active) return;
+    if (seconds > 0 && e.completed) return this.toast('Run complete · ← goes back 5 s');
+    this.hooks.onSeek?.();
+    this._seeking = true;
+    try {
+      e.seek(e.t + seconds);
+    } finally {
+      this._seeking = false;
+    }
+    // Replayed inputs (speed, fail-safe) change the engine, not the controls.
+    this.controls.setSpeed(e.config.speedKmh);
+    this.controls.setFailSafe(e.config.failSafe);
+    this._updatePlay();
+    this.dirty = true;
+    this._chartDirty = true;
+    this.toast(`${seconds < 0 ? '⏪' : '⏩'} ${Math.abs(seconds)} s · t = ${e.t.toFixed(1)} s`);
   }
 
   /** The beam legend in the twin's corner (the list button in the playback bar). */

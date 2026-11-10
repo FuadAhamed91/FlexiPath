@@ -93,6 +93,11 @@ async function boot() {
     snapCamera = true;
     environment.setScenario(engine.scenario);
   });
+  // ← / → jump the flight 5 s: drop the packets in flight and put the camera on the drone at once.
+  dashboard.hooks.onSeek = () => {
+    particles.clear();
+    snapCamera = true;
+  };
 
   const focusPos = new THREE.Vector3();
   const otherPos = new THREE.Vector3();

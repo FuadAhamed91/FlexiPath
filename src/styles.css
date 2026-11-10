@@ -1751,16 +1751,16 @@ body {
   display: none !important;
 }
 /*
- * Full-screen twin (Dashboard.setTheatre, T): the 3D view alone covers the screen. Everything else in the shell, and
- * every overlay inside the viewport except the canvas host (the scene and its labels), the vignette and the exit
- * button, is hidden. Modals (z-index 60) and toasts (70) still show above it.
+ * Full screen (Dashboard.setTheatre, T): the 3D twin covers the screen with only the route strip and the camera row
+ * (whose expand button turns into the exit button) over it. Everything else in the shell and every other overlay in
+ * the viewport is hidden. Modals (z-index 60) and toasts (70) still show above it.
  */
 .fp-shell[data-theatre='1'] > header,
 .fp-shell[data-theatre='1'] .fp-toolbar,
 .fp-shell[data-theatre='1'] .fp-loop,
 .fp-shell[data-theatre='1'] .fp-deck,
 .fp-shell[data-theatre='1'] .fp-bottom,
-.fp-shell[data-theatre='1'] .viewport > :not([data-ref='canvasHost'], .viewport-vignette, .theatre-exit) {
+.fp-shell[data-theatre='1'] .viewport > :not([data-ref='canvasHost'], .viewport-vignette, [data-ref='routeStrip'], .fp-camctl) {
   display: none !important;
 }
 .fp-shell[data-theatre='1'] .viewport {
@@ -1772,24 +1772,6 @@ body {
   border: 0;
   border-radius: 0;
   box-shadow: none;
-}
-.theatre-exit {
-  display: none !important;
-}
-.fp-shell[data-theatre='1'] .theatre-exit {
-  display: inline-flex !important;
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  z-index: 5;
-  transition: opacity 0.3s ease;
-}
-.fp-shell[data-theatre='1'][data-idle='1'] .theatre-exit {
-  opacity: 0;
-  pointer-events: none;
-}
-.fp-shell[data-theatre='1'][data-idle='1'] .viewport {
-  cursor: none;
 }
 /* Advanced view: the side column shows one tab's panels (Dashboard.setPanelTab); the charts open on demand. */
 .fp-shell[data-mode='advanced'] [data-tab-panel].is-tab-off,

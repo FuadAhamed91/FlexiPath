@@ -154,6 +154,10 @@ export class SimulationEngine {
     this.config.seed = normalizeSeed(this.config.seed);
     this.scenario = resolveScenario(this.config.scenario);
     this.config.scenario = this.scenario.id;
+    this._startConfig = { ...this.config };
+    // The visitor's inputs (speed, fail-safe, injected faults) by tick, so seek() can replay the run exactly.
+    this.inputs = [];
+    this._inputAt = 0;
     const root = new Random(this.config.seed);
     this.env = new NetworkEnvironment({ rng: root.fork('environment'), shadows: this.scenario.shadows ?? [] });
     this.coverageMap = coverageMapFor(this.scenario);
@@ -275,12 +279,14 @@ export class SimulationEngine {
   }
 
   setSpeedKmh(kmh, { log = false } = {}) {
+    this._journal({ kind: 'speed', kmh, log });
     this.config.speedKmh = kmh;
     for (const a of Object.values(this.agents)) a.mobility.setTargetSpeedKmh(kmh);
     if (log) this._log({ engine: 'sys', level: 'info', code: 'SPEED', message: `Target speed set to ${Math.round(kmh)} km/h` });
   }
 
   setFailSafe(on) {
+    this._journal({ kind: 'failsafe', on: !!on });
     this.config.failSafe = !!on;
     this._log({
       engine: 'sys',
@@ -291,6 +297,7 @@ export class SimulationEngine {
   }
 
   injectFault(type, { scheduledAtX = null } = {}) {
+    if (scheduledAtX === null) this._journal({ kind: 'fault', type });
     const f = this.env.injectFault(type, this.t);
     const fp = this.agents.flexipath.mobility.state;
     this.faultLog.push({ t: round(this.t, 2), type, xFlexiPath: round(fp.cx, 2), scheduled: scheduledAtX !== null });
@@ -301,6 +308,50 @@ export class SimulationEngine {
     const when = scheduledAtX !== null ? ` · scenario schedule X = ${scheduledAtX}` : '';
     this._log({ engine: 'env', level: 'crit', code: 'FAULT', message: `FAULT INJECTED · ${FAULTS[type].label} · ${detail}${when}` });
     return f;
+  }
+
+  /** Records a visitor input at the current tick. A new input after a rewind replaces the recorded future. */
+  _journal(input) {
+    if (this._replaying || !this.inputs) return;
+    this.inputs.length = this._inputAt;
+    this.inputs.push({ tick: this.tick, ...input });
+    this._inputAt = this.inputs.length;
+  }
+
+  /** After a rewind, applies the recorded inputs due at this tick (live inputs were applied when they happened). */
+  _replayInputs() {
+    const inputs = this.inputs;
+    while (this._inputAt < inputs.length && inputs[this._inputAt].tick <= this.tick) {
+      const input = inputs[this._inputAt++];
+      this._replaying = true;
+      if (input.kind === 'speed') this.setSpeedKmh(input.kmh, { log: input.log });
+      else if (input.kind === 'failsafe') this.setFailSafe(input.on);
+      else if (input.kind === 'fault') this.injectFault(input.type);
+      this._replaying = false;
+    }
+  }
+
+  /**
+   * Jump to simulated time `t` (whole ticks; the ← / → keys). Forward runs the missing ticks at once. Backward
+   * replays the run from the start with the same seed, start settings and recorded inputs; the engine is
+   * deterministic, so it reaches exactly the state the run had at that time. Inputs recorded after the target play
+   * again when the clock passes them, as in a recording. The playback rate and the pause state are kept.
+   */
+  seek(t) {
+    const target = Math.max(1, Math.round(t / DT));
+    if (target < this.tick) {
+      const inputs = this.inputs;
+      const simRate = this.config.simRate;
+      Object.assign(this.config, this._startConfig);
+      this.config.simRate = simRate;
+      this.reset();
+      this.inputs = inputs;
+      this._inputAt = 0;
+    }
+    while (this.tick < target && !this.completed) this.step();
+    this.accumulator = 0;
+    this.prevSnapshot = this.snapshot;
+    return this.snapshot;
   }
 
   // ── Clock ───────────────────────────────────────────────────────────────
@@ -322,6 +373,7 @@ export class SimulationEngine {
 
   step() {
     if (this.completed) return this.snapshot;
+    this._replayInputs();
     const t = this.tick * DT;
 
     // Scenario-scheduled faults trigger on the FlexiPath drone's position (shared environment).
